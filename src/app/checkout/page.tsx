@@ -48,6 +48,7 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('vodafone_cash');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [senderPhone, setSenderPhone] = useState('');
   const [transactionRef, setTransactionRef] = useState('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string>('');
@@ -202,6 +203,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
+          senderPhone: senderPhone.trim() || customerPhone.trim(),
           transactionRef: transactionRef.trim(),
           paymentMethod,
           receiptUrl: receiptUrl || undefined,
@@ -489,8 +491,9 @@ export default function CheckoutPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-200 mb-1">
-                      رقم الموبايل (الذي قمت بالتحويل منه للتحقق الفوري) <span className="text-rose-500">*</span>
+                    <label className="block text-xs font-bold text-slate-200 mb-1 flex items-center justify-between">
+                      <span>رقم موبايل العميل (الخاص بالحساب واستلام الطلب) <span className="text-rose-500">*</span></span>
+                      <span className="text-[10px] text-amber-400 font-semibold">ويرتبط بحسابك لمتابعة الطلب 🎓</span>
                     </label>
                     <input
                       type="tel"
@@ -498,6 +501,20 @@ export default function CheckoutPage() {
                       placeholder="010XXXXXXXX"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-200 mb-1 flex flex-wrap items-center justify-between gap-1">
+                      <span>رقم المحفظة المحوّل منها <span className="text-slate-400 font-normal">(في حالة تم التحويل من رقم آخر/صديق/والدك)</span></span>
+                      <span className="text-[10px] text-indigo-300 font-mono">Sender Wallet Phone</span>
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="أدخل رقم المحفظة التي حولت منها (أو اتركه فارغاً إذا كان نفس رقمك)"
+                      value={senderPhone}
+                      onChange={(e) => setSenderPhone(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm font-mono"
                     />
                   </div>
