@@ -281,6 +281,11 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
 export async function saveOrderToSupabase(order: Order): Promise<boolean> {
   try {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(order.id);
+
+    // Embed receipt_url into notes as backup marker if column is missing in DB schema
+    const receiptMarker = order.receipt_url ? ` [RECEIPT_URL:${order.receipt_url}]` : '';
+    const orderNotes = (order.notes || '') + receiptMarker;
+
     const orderPayload: any = {
       order_code: order.order_code,
       customer_name: order.customer_name,
@@ -291,7 +296,7 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
       sender_phone: order.sender_phone || order.customer_phone,
       transaction_ref: order.transaction_ref || null,
       receipt_url: order.receipt_url || null,
-      notes: order.notes || null
+      notes: orderNotes
     };
 
     if (isUuid) {
@@ -347,14 +352,25 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
 
         item.order_id = order.id;
 
+        const customOptStr = item.customization_option || (item as any).customizationOption || '';
+        const customTextStr = item.custom_text || (item as any).customText || '';
+
+        let titleWithDetails = item.product_title || item.product?.title_ar || item.product?.title || 'منتج التخرج';
+        if (customOptStr && !titleWithDetails.includes('[الإضافات:')) {
+          titleWithDetails += ` [الإضافات: ${customOptStr}]`;
+        }
+        if (customTextStr && !titleWithDetails.includes('[التطريز:')) {
+          titleWithDetails += ` [التطريز: ${customTextStr}]`;
+        }
+
         return {
           id: itemId,
           order_id: order.id,
           product_id: pId,
-          product_title: item.product_title || item.product?.title_ar || item.product?.title || 'منتج التخرج',
+          product_title: titleWithDetails,
           selected_size: item.selected_size || (item as any).selectedSize || null,
-          custom_text: item.custom_text || (item as any).customText || null,
-          customization_option: item.customization_option || (item as any).customizationOption || null,
+          custom_text: customTextStr || null,
+          customization_option: customOptStr || null,
           quantity: item.quantity,
           unit_price: item.unit_price
         };
@@ -402,34 +418,70 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
       return getMemoryOrders();
     }
 
-    const fetchedOrders: Order[] = dbOrders.map((o: any) => ({
-      id: o.id,
-      order_code: o.order_code,
-      customer_name: o.customer_name,
-      customer_phone: o.customer_phone,
-      sender_phone: o.sender_phone || o.customer_phone,
-      payment_method: o.payment_method,
-      status: o.status,
-      total_amount: Number(o.total_amount || 0),
-      transaction_ref: o.transaction_ref || '',
-      receipt_url: o.receipt_url || undefined,
-      notes: o.notes || '',
-      matched_transaction_id: o.matched_transaction_id || undefined,
-      verified_at: o.verified_at || undefined,
-      created_at: o.created_at || new Date().toISOString(),
-      updated_at: o.updated_at || new Date().toISOString(),
-      items: (o.store_order_items || []).map((item: any) => ({
-        id: item.id,
-        order_id: item.order_id,
-        product_id: item.product_id,
-        product_title: item.product_title,
-        selected_size: item.selected_size,
-        custom_text: item.custom_text || undefined,
-        customization_option: item.customization_option || undefined,
-        quantity: Number(item.quantity || 1),
-        unit_price: Number(item.unit_price || 0)
-      }))
-    }));
+    const fetchedOrders: Order[] = dbOrders.map((o: any) => {
+      let rawNotes = o.notes || '';
+      let extractedReceiptUrl = o.receipt_url || undefined;
+
+      if (!extractedReceiptUrl && rawNotes.includes('[RECEIPT_URL:')) {
+        const match = rawNotes.match(/\[RECEIPT_URL:(.*?)\]/);
+        if (match && match[1]) {
+          extractedReceiptUrl = match[1];
+          rawNotes = rawNotes.replace(/\[RECEIPT_URL:.*?\]/, '').trim();
+        }
+      }
+
+      const items = (o.store_order_items || []).map((item: any) => {
+        let title = item.product_title || '';
+        let custOpt = item.customization_option || undefined;
+        let custText = item.custom_text || undefined;
+
+        if (!custOpt && title.includes('[الإضافات:')) {
+          const match = title.match(/\[الإضافات:\s*(.*?)\]/);
+          if (match && match[1]) {
+            custOpt = match[1];
+            title = title.replace(/\[الإضافات:.*?\]/, '').trim();
+          }
+        }
+        if (!custText && title.includes('[التطريز:')) {
+          const match = title.match(/\[التطريز:\s*(.*?)\]/);
+          if (match && match[1]) {
+            custText = match[1];
+            title = title.replace(/\[التطريز:.*?\]/, '').trim();
+          }
+        }
+
+        return {
+          id: item.id,
+          order_id: item.order_id,
+          product_id: item.product_id,
+          product_title: title,
+          selected_size: item.selected_size,
+          custom_text: custText,
+          customization_option: custOpt,
+          quantity: Number(item.quantity || 1),
+          unit_price: Number(item.unit_price || 0)
+        };
+      });
+
+      return {
+        id: o.id,
+        order_code: o.order_code,
+        customer_name: o.customer_name,
+        customer_phone: o.customer_phone,
+        sender_phone: o.sender_phone || o.customer_phone,
+        payment_method: o.payment_method,
+        status: o.status,
+        total_amount: Number(o.total_amount || 0),
+        transaction_ref: o.transaction_ref || '',
+        receipt_url: extractedReceiptUrl,
+        notes: rawNotes,
+        matched_transaction_id: o.matched_transaction_id || undefined,
+        verified_at: o.verified_at || undefined,
+        created_at: o.created_at || new Date().toISOString(),
+        updated_at: o.updated_at || new Date().toISOString(),
+        items
+      };
+    });
 
     // Merge DB orders with memory cache for complete dataset
     const memory = getMemoryOrders();
