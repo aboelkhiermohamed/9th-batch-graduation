@@ -1,0 +1,1965 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { 
+  ShieldCheck, 
+  Package, 
+  ShoppingBag, 
+  Settings, 
+  MessageSquare, 
+  Search, 
+  Plus, 
+  CheckCircle2, 
+  Clock, 
+  XCircle, 
+  Edit3, 
+  Trash2, 
+  Save, 
+  RefreshCw,
+  LogOut,
+  Smartphone,
+  Info,
+  Printer,
+  FileText,
+  Copy,
+  Check,
+  Eye,
+  Download,
+  Activity,
+  Battery,
+  Wifi,
+  ExternalLink,
+  Layers,
+  Sparkles,
+  Bot,
+  UserCheck,
+  Calendar,
+  Phone,
+  User,
+  CreditCard,
+  Hash,
+  MessageCircle,
+  FileCheck,
+  AlertCircle
+} from 'lucide-react';
+import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
+
+export default function AdminDashboardPage() {
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+
+  // Active Tab: 'orders' | 'products' | 'settings' | 'sms' | 'gateway'
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'settings' | 'sms' | 'gateway'>('orders');
+
+  // Data state
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [settings, setSettings] = useState<StoreSettings>({
+    id: 'default',
+    store_name: '9th batch graduation',
+    vodafone_cash_numbers: ['01015339426'],
+    instapay_ipa: '9thbatch@instapay',
+    pickup_note: 'تابع جروب التليجرام',
+    updated_at: new Date().toISOString()
+  });
+  const [transactions, setTransactions] = useState<IncomingTransaction[]>([]);
+  const [devices, setDevices] = useState<GatewayDevice[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // PDF Export Modal State
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+
+  // Receipt Image Preview Modal State
+  const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
+
+  // Full Order Details & SMS Modal State
+  const [selectedOrderModal, setSelectedOrderModal] = useState<Order | null>(null);
+
+  // New product form modal state
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [newProdTitleAr, setNewProdTitleAr] = useState('');
+  const [newProdPrice, setNewProdPrice] = useState('');
+  const [newProdCategory, setNewProdCategory] = useState('الملابس');
+  const [newProdStock, setNewProdStock] = useState('100');
+  const [newProdImage, setNewProdImage] = useState('');
+  const [newProdImagesText, setNewProdImagesText] = useState('');
+  const [newProdSizeChart, setNewProdSizeChart] = useState('');
+  const [newProdHasCustomization, setNewProdHasCustomization] = useState(true);
+  const [newProdCustomLabel, setNewProdCustomLabel] = useState('اسم الطالب أو الكلية للتطريز على القطعة');
+  const [newProdSizes, setNewProdSizes] = useState('S, M, L, XL, XXL');
+  const [newProdDescAr, setNewProdDescAr] = useState('');
+
+  // Settings form state
+  const [vodaInput, setVodaInput] = useState('');
+  const [instaInput, setInstaInput] = useState('');
+  const [pickupInput, setPickupInput] = useState('');
+
+  // Search & Filter & Dynamic Origin URL
+  const [orderSearch, setOrderSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedBaseUrl, setCopiedBaseUrl] = useState(false);
+  const [originUrl, setOriginUrl] = useState('https://graduation-store.com');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOriginUrl(window.location.origin);
+    }
+  }, []);
+
+  // Check login on load
+  useEffect(() => {
+    const savedAuth = sessionStorage.getItem('admin_authenticated');
+    if (savedAuth === 'true') {
+      setIsAuthenticated(true);
+      fetchAllData();
+    }
+  }, []);
+
+  // Periodic poll for devices when gateway tab is active (Fast 3s poll for real-time testing)
+  useEffect(() => {
+    let interval: any;
+    if (isAuthenticated && activeTab === 'gateway') {
+      fetchDevices();
+      interval = setInterval(() => {
+        fetchDevices();
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [isAuthenticated, activeTab]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === 'admin123' || password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('admin_authenticated', 'true');
+      setAuthError('');
+      fetchAllData();
+    } else {
+      setAuthError('كلمة المرور غير صحيحة');
+    }
+  };
+
+  const fetchDevices = async () => {
+    try {
+      const res = await fetch('/api/admin/devices');
+      if (res.ok) setDevices(await res.json());
+    } catch (err) {
+      console.warn('Failed to fetch devices', err);
+    }
+  };
+
+  const fetchAllData = async () => {
+    setIsLoading(true);
+    try {
+      const [ordRes, prodRes, setRes, smsRes, devRes] = await Promise.all([
+        fetch('/api/orders'),
+        fetch('/api/admin/products'),
+        fetch('/api/admin/settings'),
+        fetch('/api/sms'),
+        fetch('/api/admin/devices')
+      ]);
+
+      if (ordRes.ok) setOrders(await ordRes.json());
+      if (prodRes.ok) setProducts(await prodRes.json());
+      if (setRes.ok) {
+        const s = await setRes.json();
+        if (s) {
+          setSettings(s);
+          setVodaInput(s.vodafone_cash_numbers?.join(', ') || '01015339426');
+          setInstaInput(s.instapay_ipa || '');
+          setPickupInput(s.pickup_note || '');
+        }
+      }
+      if (smsRes.ok) setTransactions(await smsRes.json());
+      if (devRes.ok) setDevices(await devRes.json());
+    } catch (err) {
+      console.error('Failed to load admin data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper to match an order with its SMS incoming transaction
+  const findMatchedTransaction = (order: Order): IncomingTransaction | null => {
+    if (!order) return null;
+    if (order.matched_transaction_id) {
+      const found = transactions.find(t => t.id === order.matched_transaction_id);
+      if (found) return found;
+    }
+    // Match by matched_order_id on transaction
+    const byOrderId = transactions.find(t => t.matched_order_id === order.id);
+    if (byOrderId) return byOrderId;
+
+    // Match by transaction_ref
+    if (order.transaction_ref && order.transaction_ref.trim()) {
+      const cleanRef = order.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanRef.length >= 4) {
+        const byRef = transactions.find(t => {
+          if (!t.transaction_ref) return false;
+          const tRef = t.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          return tRef === cleanRef || (tRef.length >= 4 && (tRef.includes(cleanRef) || cleanRef.includes(tRef)));
+        });
+        if (byRef) return byRef;
+      }
+    }
+
+    // Match by customer phone number & amount
+    if (order.customer_phone) {
+      const cleanPhone = order.customer_phone.replace(/[^0-9]/g, '').slice(-7);
+      if (cleanPhone.length >= 7) {
+        const byPhone = transactions.find(t => {
+          const sPhone = (t.sender_phone || '').replace(/[^0-9]/g, '');
+          const amountMatch = Math.abs(Number(t.amount) - Number(order.total_amount)) < 0.01;
+          return (sPhone.endsWith(cleanPhone) || t.raw_sms.includes(cleanPhone)) && (amountMatch || t.amount === 0);
+        });
+        if (byPhone) return byPhone;
+      }
+    }
+
+    return null;
+  };
+
+  // Helper to infer or resolve effective order items using product catalog prices
+  const getOrderEffectiveItems = (order: Order | null) => {
+    if (!order) return [];
+    if (order.items && order.items.length > 0) {
+      return order.items;
+    }
+
+    const amount = Number(order.total_amount || 0);
+
+    // 1. Single direct product price match
+    const matchingProd = products.find(p => Math.abs(p.price - amount) < 0.01);
+    if (matchingProd) {
+      return [{
+        id: `inferred-${order.id}`,
+        order_id: order.id,
+        product_id: matchingProd.id,
+        product_title: matchingProd.title_ar || matchingProd.title,
+        quantity: 1,
+        unit_price: matchingProd.price
+      }];
+    }
+
+    // 2. Exact division quantity match
+    for (const p of products) {
+      if (p.price > 0 && amount % p.price === 0) {
+        const qty = Math.round(amount / p.price);
+        return [{
+          id: `inferred-${order.id}`,
+          order_id: order.id,
+          product_id: p.id,
+          product_title: p.title_ar || p.title,
+          quantity: qty,
+          unit_price: p.price
+        }];
+      }
+    }
+
+    // Fallback if price doesn't match catalog
+    return [{
+      id: `fallback-${order.id}`,
+      order_id: order.id,
+      product_id: 'unknown',
+      product_title: `طلب منتج تخرج بقيمة (${amount} ج.م)`,
+      quantity: 1,
+      unit_price: amount
+    }];
+  };
+
+  // Update order status
+  const handleUpdateOrderStatus = async (orderId: string, status: string, matchedTxId?: string) => {
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status, matchedTransactionId: matchedTxId })
+      });
+      if (res.ok) {
+        setOrders(prev => prev.map(o => o.id === orderId ? { 
+          ...o, 
+          status: status as any,
+          matched_transaction_id: matchedTxId || o.matched_transaction_id,
+          verified_at: (status === 'manual_verified' || status === 'auto_verified') ? (o.verified_at || new Date().toISOString()) : o.verified_at
+        } : o));
+        
+        if (selectedOrderModal && selectedOrderModal.id === orderId) {
+          setSelectedOrderModal(prev => prev ? {
+            ...prev,
+            status: status as any,
+            matched_transaction_id: matchedTxId || prev.matched_transaction_id,
+            verified_at: (status === 'manual_verified' || status === 'auto_verified') ? (prev.verified_at || new Date().toISOString()) : prev.verified_at
+          } : null);
+        }
+      }
+    } catch (err) {
+      alert('فشل تحديث الحالة');
+    }
+  };
+
+  // Add Product
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProdTitleAr || !newProdPrice || !newProdImage) {
+      alert('يرجى إكمال الحقول الأساسية للمنتج');
+      return;
+    }
+
+    try {
+      const sizesArray = newProdSizes
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      const extraImages = newProdImagesText
+        .split('\n')
+        .map(url => url.trim())
+        .filter(Boolean);
+
+      const imagesArray = extraImages.length > 0 ? [newProdImage, ...extraImages] : [newProdImage];
+
+      const res = await fetch('/api/admin/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title_ar: newProdTitleAr,
+          price: Number(newProdPrice),
+          category: newProdCategory,
+          stock: Number(newProdStock),
+          image_url: newProdImage,
+          images: imagesArray,
+          size_chart_url: newProdSizeChart.trim() || undefined,
+          has_customization: newProdHasCustomization,
+          customization_label: newProdCustomLabel.trim() || undefined,
+          sizes: sizesArray,
+          description_ar: newProdDescAr
+        })
+      });
+
+      if (res.ok) {
+        setIsAddProductOpen(false);
+        setNewProdTitleAr('');
+        setNewProdPrice('');
+        setNewProdImage('');
+        setNewProdImagesText('');
+        setNewProdSizeChart('');
+        fetchAllData();
+      }
+    } catch (err) {
+      alert('فشل إضافة المنتج');
+    }
+  };
+
+  // Save Settings
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const vodaArray = vodaInput
+        .split(',')
+        .map(n => n.trim())
+        .filter(Boolean);
+
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vodafone_cash_numbers: vodaArray.length > 0 ? vodaArray : ['01015339426'],
+          instapay_ipa: instaInput.trim(),
+          pickup_note: pickupInput.trim()
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(data.settings);
+        alert('تم حفظ الإعدادات بنجاح');
+      }
+    } catch (err) {
+      alert('فشل حفظ الإعدادات');
+    }
+  };
+
+  // Delete Product
+  const handleDeleteProduct = async (id: string) => {
+    if (!confirm('هل أنت تأكد من حذف هذا المنتج؟')) return;
+    try {
+      const res = await fetch(`/api/admin/products?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setProducts(prev => prev.filter(p => p.id !== id));
+      }
+    } catch (err) {
+      alert('فشل حذف المنتج');
+    }
+  };
+
+  // Test Ping Gateway Device Simulation
+  const [simDeviceName, setSimDeviceName] = useState('Xiaomi Redmi Note 13');
+  const [simPhone, setSimPhone] = useState('01015339426');
+  const [simBattery, setSimBattery] = useState(92);
+
+  const handleSendCustomPing = async (name?: string, phone?: string, battery?: number) => {
+    try {
+      const dName = name || simDeviceName || 'Android Gateway Phone';
+      const dPhone = phone || simPhone || '01015339426';
+      const dBattery = battery !== undefined ? battery : simBattery;
+      const devId = 'dev-' + dName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+      const res = await fetch('/api/admin/devices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'graduation-store-secure-gateway-token-2026'
+        },
+        body: JSON.stringify({
+          device_id: devId,
+          device_name: dName,
+          phone_number: dPhone,
+          battery_level: dBattery,
+          app_version: 'v2.5.0-android'
+        })
+      });
+      if (res.ok) {
+        fetchDevices();
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
+  const handleDeleteDevice = async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/devices?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setDevices(prev => prev.filter(d => d.id !== id));
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
+  const handleClearAllDevices = async () => {
+    if (!confirm('هل أنت تأكد من مسح جميع الأجهزة المسجلة؟')) return;
+    try {
+      const res = await fetch('/api/admin/devices', { method: 'DELETE' });
+      if (res.ok) {
+        setDevices([]);
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
+  // Filtered orders list
+  const filteredOrders = orders.filter(o => {
+    const matchSearch = 
+      o.order_code.toLowerCase().includes(orderSearch.toLowerCase()) ||
+      o.customer_name.includes(orderSearch) ||
+      o.customer_phone.includes(orderSearch);
+
+    const matchStatus = statusFilter === 'all' || o.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  // Calculate statistics for PDF export & breakdown
+  const calculateProductSizeStats = () => {
+    const stats: Record<string, { productTitle: string; sizeCounts: Record<string, number>; totalUnits: number; totalRevenue: number }> = {};
+
+    orders.forEach(order => {
+      if (order.status === 'cancelled') return;
+      const items = getOrderEffectiveItems(order);
+      items.forEach(item => {
+        const title = item.product_title || 'منتج غير معرف';
+        if (!stats[title]) {
+          stats[title] = {
+            productTitle: title,
+            sizeCounts: { S: 0, M: 0, L: 0, XL: 0, XXL: 0, 'بدون مقاس': 0 },
+            totalUnits: 0,
+            totalRevenue: 0
+          };
+        }
+        const sz = item.selected_size || 'بدون مقاس';
+        if (!stats[title].sizeCounts[sz]) {
+          stats[title].sizeCounts[sz] = 0;
+        }
+        stats[title].sizeCounts[sz] += item.quantity;
+        stats[title].totalUnits += item.quantity;
+        stats[title].totalRevenue += item.quantity * item.unit_price;
+      });
+    });
+
+    return Object.values(stats);
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
+        <div className="w-full max-w-md glass-modal rounded-3xl p-8 border border-slate-800 text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mx-auto">
+            <ShieldCheck className="w-8 h-8" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-white">لوحة تحكم المتجر</h2>
+            <p className="text-xs text-slate-400 mt-1">9th Batch Graduation Store Admin</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4 text-right">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                كلمة السر للوحة التحكم
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="أدخل كلمة المرور (الافتراضية: admin123)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            {authError && <p className="text-xs text-rose-400 font-semibold">{authError}</p>}
+
+            <button
+              type="submit"
+              className="w-full py-3.5 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm shadow-lg shadow-indigo-600/20"
+            >
+              تسجيل الدخول
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  const productSizeStats = calculateProductSizeStats();
+  const totalVerifiedOrders = orders.filter(o => o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered').length;
+  const totalGrossRevenue = orders.reduce((sum, o) => o.status !== 'cancelled' ? sum + Number(o.total_amount) : sum, 0);
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+      {/* Admin Header */}
+      <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <h1 className="text-base font-bold text-white">
+              لوحة الإدارة - <span className="gradient-gold-text">{settings.store_name}</span>
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchAllData}
+              className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"
+              title="تحديث البيانات"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
+
+            <a
+              href="/"
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300"
+            >
+              المتجر الرئيسي ↗
+            </a>
+
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('admin_authenticated');
+                setIsAuthenticated(false);
+              }}
+              className="p-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 text-xs transition"
+              title="خروج"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex border-t border-slate-800/60 overflow-x-auto">
+          {[
+            { id: 'orders', label: `إدارة الطلبات (${orders.length})`, icon: ShoppingBag },
+            { id: 'products', label: `المنتجات والمعرض (${products.length})`, icon: Package },
+            { id: 'gateway', label: `بوابة SMS والأجهزة المزامنة (${devices.filter(d => d.status === 'online').length} أونلاين)`, icon: Smartphone },
+            { id: 'settings', label: 'إعدادات الدفع والمحفظة', icon: Settings },
+            { id: 'sms', label: `سجل الـ SMS (${transactions.length})`, icon: MessageSquare }
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 px-5 py-3 font-bold text-xs sm:text-sm border-b-2 whitespace-nowrap transition-all ${
+                  isActive
+                    ? 'border-indigo-500 text-indigo-400 bg-slate-800/40'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        {/* --- ORDERS TAB --- */}
+        {activeTab === 'orders' && (
+          <div className="space-y-6">
+            
+            {/* Filters Bar & PDF Export Button */}
+            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border border-slate-800">
+              <div className="flex-1 min-w-[240px] flex items-center gap-2 bg-slate-950 px-3.5 py-2.5 rounded-xl border border-slate-800">
+                <Search className="w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="ابحث بكود الطلب أو اسم العميل أو الموبايل..."
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  className="bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none w-full"
+                />
+              </div>
+
+              {/* Status Filter Dropdown & Export PDF */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 font-semibold">حالة الطلب:</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="bg-slate-950 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-800 focus:outline-none"
+                  >
+                    <option value="all">كل الطلبات</option>
+                    <option value="pending">معلق (Pending)</option>
+                    <option value="auto_verified">مؤكد تلقائياً (Auto Verified)</option>
+                    <option value="manual_verified">مؤكد يدوي (Manual Verified)</option>
+                    <option value="ready_for_pickup">جاهز للاستلام بالمقر</option>
+                    <option value="delivered">تم التسليم</option>
+                    <option value="cancelled">ملغي</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={() => setIsPdfModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>تصدير تقرير PDF احترافي 🖨️</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Orders Table */}
+            <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-900">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-slate-950/80 text-slate-400 font-bold border-b border-slate-800">
+                  <tr>
+                    <th className="p-4">كود الطلب</th>
+                    <th className="p-4">اسم العميل ورقم الموبايل</th>
+                    <th className="p-4">الرقم المرجعي / الإيصال</th>
+                    <th className="p-4">المنتجات والمقاس والتطريز</th>
+                    <th className="p-4">إجمالي المبلغ</th>
+                    <th className="p-4">طريقة الدفع</th>
+                    <th className="p-4">الحالة والتأكيد</th>
+                    <th className="p-4 text-center">إجراءات الإدارة</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {filteredOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-slate-500">
+                        لا توجد طلبات مسجلة بهذه الشروط
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredOrders.map(order => (
+                      <tr key={order.id} className="hover:bg-slate-800/40 transition">
+                        <td className="p-4 font-mono font-extrabold text-amber-400">
+                          #{order.order_code}
+                        </td>
+                        <td className="p-4 space-y-0.5">
+                          <p className="font-bold text-white text-sm">{order.customer_name}</p>
+                          <p className="font-mono text-slate-400 text-xs">{order.customer_phone}</p>
+                        </td>
+                        <td className="p-4 space-y-1">
+                          <p className="font-mono font-bold text-emerald-400 text-xs">
+                            {order.transaction_ref ? `Ref# ${order.transaction_ref}` : '—'}
+                          </p>
+                          {order.receipt_url && (
+                            <button
+                              onClick={() => setViewingReceiptUrl(order.receipt_url!)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold text-[11px] border border-indigo-500/30 transition"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>صورة الإيصال 📸</span>
+                            </button>
+                          )}
+                        </td>
+                        <td className="p-4 space-y-1.5">
+                          {(!order.items || order.items.length === 0) ? (
+                            <div className="text-amber-300 bg-amber-500/10 p-2 rounded-xl border border-amber-500/20 text-xs font-bold space-y-1">
+                              <p className="flex items-center gap-1 text-white">
+                                <Package className="w-3.5 h-3.5 text-amber-400" />
+                                <span>طلب منتج تخرج ({order.total_amount} ج.م)</span>
+                              </p>
+                              {order.notes && (
+                                <p className="text-[10px] text-slate-400 font-normal">ملاحظة: {order.notes}</p>
+                              )}
+                            </div>
+                          ) : (
+                            order.items.map((item, i) => (
+                              <div key={i} className="text-slate-300 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+                                <div className="flex items-center justify-between font-bold text-xs text-white">
+                                  <span>{item.product_title} × {item.quantity}</span>
+                                  {item.selected_size && (
+                                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[11px]">
+                                      المقاس: {item.selected_size}
+                                    </span>
+                                  )}
+                                </div>
+                                {item.custom_text && (
+                                  <p className="text-[11px] text-amber-400 font-medium mt-1">
+                                    ✨ التطريز: &quot;{item.custom_text}&quot;
+                                  </p>
+                                )}
+                              </div>
+                            ))
+                          )}
+                          {order.items && order.items.length > 0 && order.notes && (
+                            <p className="text-[11px] text-slate-400 italic">ملاحظة: {order.notes}</p>
+                          )}
+                        </td>
+                        <td className="p-4 font-black text-sm text-white">
+                          {order.total_amount} ج.م
+                        </td>
+                        <td className="p-4 font-medium text-slate-300">
+                          {order.payment_method === 'vodafone_cash' ? '🔴 فودافون كاش' : '🟣 InstaPay'}
+                        </td>
+                        <td className="p-4">
+                          {order.status === 'auto_verified' && (
+                            <div className="space-y-1">
+                              <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] border border-emerald-500/30 flex items-center gap-1.5 w-fit">
+                                <Bot className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>🤖 مؤكد تلقائياً (SMS)</span>
+                              </span>
+                              <p className="text-[10px] text-slate-400 font-mono">عبر بوابة الموبايل</p>
+                            </div>
+                          )}
+                          {order.status === 'manual_verified' && (
+                            <div className="space-y-1">
+                              <span className="px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 font-bold text-[11px] border border-cyan-500/30 flex items-center gap-1.5 w-fit">
+                                <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
+                                <span>👤 مؤكد يدوي (الإدارة)</span>
+                              </span>
+                              <p className="text-[10px] text-slate-400 font-mono">بواسطة أدمن المتجر</p>
+                            </div>
+                          )}
+                          {order.status === 'pending' && (
+                            <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[11px] border border-amber-500/30 flex items-center gap-1.5 w-fit animate-pulse">
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>⏳ بانتظار الـ SMS</span>
+                            </span>
+                          )}
+                          {order.status === 'ready_for_pickup' && (
+                            <div className="space-y-1">
+                              <span className="px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-[11px] border border-indigo-500/30 flex items-center gap-1.5 w-fit">
+                                <Package className="w-3.5 h-3.5 text-indigo-400" />
+                                <span>📦 جاهز للاستلام</span>
+                              </span>
+                              {order.matched_transaction_id ? (
+                                <span className="text-[10px] text-emerald-400 font-mono block">🤖 (تأكيد تلقائي)</span>
+                              ) : (
+                                <span className="text-[10px] text-cyan-400 font-mono block">👤 (تأكيد يدوي)</span>
+                              )}
+                            </div>
+                          )}
+                          {order.status === 'delivered' && (
+                            <div className="space-y-1">
+                              <span className="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[11px] border border-blue-500/30 flex items-center gap-1.5 w-fit">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
+                                <span>🎉 تم التسليم</span>
+                              </span>
+                            </div>
+                          )}
+                          {order.status === 'cancelled' && (
+                            <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 font-bold text-[11px] border border-rose-500/30 flex items-center gap-1.5 w-fit">
+                              <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                              <span>❌ ملغي</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 text-center">
+                          <button
+                            onClick={() => setSelectedOrderModal(order)}
+                            className="px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600/30 to-purple-600/30 hover:from-indigo-600 hover:to-purple-600 text-white font-bold text-xs border border-indigo-500/40 shadow-md transition flex items-center gap-1.5 mx-auto"
+                            title="عرض تفاصيل الطلب والرسالة والتأكيد بالكامل"
+                          >
+                            <Eye className="w-4 h-4 text-amber-400" />
+                            <span>عرض تفاصيل الطلب 👁️</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* --- PRODUCTS TAB --- */}
+        {activeTab === 'products' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold text-white">قائمة كروت ومعرض المنتجات المتاحة</h3>
+              <button
+                onClick={() => setIsAddProductOpen(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-purple-btn text-white font-bold text-xs shadow-lg shadow-indigo-600/20"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إضافة منتج جديد مع صور متعددة</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {products.map(product => (
+                <div key={product.id} className="rounded-3xl glass-card p-5 border border-slate-800 flex flex-col justify-between space-y-4">
+                  <div className="space-y-3">
+                    {/* Main Image */}
+                    <div className="relative group">
+                      <img
+                        src={product.image_url}
+                        alt={product.title_ar}
+                        className="w-full h-44 rounded-2xl object-cover bg-slate-950"
+                      />
+                      {product.images && product.images.length > 1 && (
+                        <span className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-slate-950/80 backdrop-blur-sm text-white font-bold text-[10px] flex items-center gap-1 border border-slate-700">
+                          <Layers className="w-3 h-3 text-amber-400" />
+                          <span>{product.images.length} صور</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-base font-bold text-white">{product.title_ar || product.title}</h4>
+                      <span className="text-amber-400 font-extrabold text-sm">{product.price} ج.م</span>
+                    </div>
+                    <p className="text-xs text-slate-400">{product.description_ar}</p>
+                    
+                    {/* Customization label preview */}
+                    {product.has_customization && (
+                      <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-semibold">
+                        ✨ يدعم التخصيص/التطريز: {product.customization_label}
+                      </div>
+                    )}
+
+                    {product.sizes && product.sizes.length > 0 && (
+                      <div className="flex flex-wrap gap-1 text-xs">
+                        <span className="text-slate-400 font-semibold">المقاسات:</span>
+                        {product.sizes.map(s => (
+                          <span key={s} className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+                    <span className="text-xs text-slate-400">المخزون: <strong className="text-white">{product.stock} قطعة</strong></span>
+                    <button
+                      onClick={() => handleDeleteProduct(product.id)}
+                      className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs transition flex items-center gap-1"
+                      title="حذف المنتج"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>حذف</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* --- GATEWAY & DEVICES TAB --- */}
+        {activeTab === 'gateway' && (
+          <div className="space-y-6">
+            
+            {/* API Credentials Box */}
+            <div className="p-6 rounded-3xl glass-card border border-indigo-500/30 bg-slate-900/90 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center">
+                    <Smartphone className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">إعدادات توكن مزامنة الـ Android Gateway App</h3>
+                    <p className="text-xs text-slate-400">استخدم البيانات التالية في تطبيق الموبايل لتمرير رسائل الـ SMS تلقائياً وإخطار حالة الموبايل</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleSendCustomPing()}
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white font-bold text-xs transition border border-indigo-500/30"
+                >
+                  <Activity className="w-4 h-4" />
+                  <span>مزامنة تجريبية (Ping Test)</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 1. Base Server URL Box */}
+                <div className="bg-slate-950 p-4 rounded-2xl border border-amber-500/40 space-y-2 md:col-span-2 shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <span className="text-amber-400 font-bold flex items-center gap-1.5 text-xs sm:text-sm">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>رابط الـ IP المحلي المباشر لتطبيق الموبايل (Local Network IP):</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const portMatch = originUrl.match(/:(\d+)/);
+                        const currentPort = portMatch ? portMatch[1] : '3000';
+                        const lanUrl = `http://192.168.1.4:${currentPort}`;
+                        navigator.clipboard.writeText(lanUrl);
+                        setCopiedBaseUrl(true);
+                        setTimeout(() => setCopiedBaseUrl(false), 2000);
+                      }}
+                      className="flex items-center gap-1 text-xs text-amber-400 font-bold hover:underline"
+                    >
+                      {copiedBaseUrl ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedBaseUrl ? 'تم نسخ الـ IP بنجاح! ✓' : 'نسخ رابط الـ IP 📋'}</span>
+                    </button>
+                  </div>
+
+                  <div dir="ltr" className="bg-slate-900 p-3 rounded-xl border border-amber-500/30 font-mono text-amber-300 font-extrabold text-base text-left select-all flex items-center justify-between">
+                    <span>http://192.168.1.4:{originUrl.match(/:(\d+)/)?.[1] || '3000'}</span>
+                    <span className="text-xs text-slate-400 font-sans font-normal">(ضع هذا الرابط في تطبيق الأندرويد)</span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-300">
+                    💡 <strong>تنبيه هائم جداً لتطبيق الأندرويد:</strong> ضع هذا الرابط بالكامل <code className="text-amber-300 font-mono">http://192.168.1.4:{originUrl.match(/:(\d+)/)?.[1] || '3000'}</code> في خانة <strong>Base Server URL</strong> داخل التطبيق بدلاً من <code className="text-rose-400">localhost</code> لكي يستطيع هاتف الأندرويد الاتصال بالكمبيوتر عبر الشبكة المحلية (Wi-Fi).
+                  </p>
+                </div>
+
+                {/* 2. SMS Endpoint Box */}
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-300 font-bold text-xs">رابط رفع الـ SMS (Full Endpoint):</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const port = originUrl.match(/:(\d+)/)?.[1] || '3000';
+                        navigator.clipboard.writeText(`http://192.168.1.4:${port}/api/sms`);
+                        alert('تم نسخ رابط الـ SMS Endpoint المباشر بنجاح!');
+                      }}
+                      className="text-[11px] text-emerald-400 font-bold hover:underline flex items-center gap-1"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>نسخ الرابط</span>
+                    </button>
+                  </div>
+                  <div dir="ltr" className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 font-mono text-emerald-400 text-xs text-left truncate select-all">
+                    http://192.168.1.4:{originUrl.match(/:(\d+)/)?.[1] || '3000'}/api/sms
+                  </div>
+                </div>
+
+                {/* 3. Device Ping Endpoint Box */}
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-300 font-bold text-xs">رابط مزامنة الهاتف (Ping Endpoint):</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const port = originUrl.match(/:(\d+)/)?.[1] || '3000';
+                        navigator.clipboard.writeText(`http://192.168.1.4:${port}/api/admin/devices`);
+                        alert('تم نسخ رابط الـ Device Ping Endpoint المباشر بنجاح!');
+                      }}
+                      className="text-[11px] text-emerald-400 font-bold hover:underline flex items-center gap-1"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>نسخ الرابط</span>
+                    </button>
+                  </div>
+                  <div dir="ltr" className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 font-mono text-emerald-400 text-xs text-left truncate select-all">
+                    http://192.168.1.4:{originUrl.match(/:(\d+)/)?.[1] || '3000'}/api/admin/devices
+                  </div>
+                </div>
+
+                {/* 4. X-API-KEY Box */}
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2 md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-300 font-bold text-xs">مفتاح السر بالـ Header (X-API-KEY):</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText('graduation-store-secure-gateway-token-2026');
+                        setCopiedKey(true);
+                        setTimeout(() => setCopiedKey(false), 2000);
+                      }}
+                      className="flex items-center gap-1 text-xs text-amber-400 font-bold hover:underline"
+                    >
+                      {copiedKey ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey ? 'تم النسخ!' : 'نسخ المفتاح'}</span>
+                    </button>
+                  </div>
+                  <div dir="ltr" className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 font-mono text-amber-300 font-bold text-xs text-left truncate select-all">
+                    graduation-store-secure-gateway-token-2026
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Gateway Controls & Realtime Simulator */}
+            <div className="p-6 rounded-3xl glass-card border border-amber-500/30 bg-slate-900/90 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-amber-400 animate-pulse" />
+                  <div>
+                    <h3 className="text-base font-bold text-white">أداة محاكاة واختبار الأجهزة المباشرة (Realtime Testing Simulator)</h3>
+                    <p className="text-xs text-slate-400">استخدم هذه الأداة لاختبار وصول إشارات المزامنة الحية واستجابة النظام في الوقت الفعلي</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] border border-emerald-500/30 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span>مزامنة حية (كل 3 ثوانٍ) 🔄</span>
+                  </span>
+                  {devices.length > 0 && (
+                    <button
+                      onClick={handleClearAllDevices}
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold transition border border-rose-500/20"
+                    >
+                      مسح الأجهزة 🧹
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Preset Devices Quick Test Buttons */}
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-slate-300">اختبار سريع بضغطة واحدة (Quick Preset Pings):</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSendCustomPing('Xiaomi Redmi Note 13', '01015339426', 96)}
+                    className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-indigo-600/30 text-indigo-300 border border-slate-800 text-xs font-bold flex items-center gap-1.5 transition"
+                  >
+                    <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+                    <span>تجربة Xiaomi Redmi (96%) ⚡</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendCustomPing('Samsung Galaxy S24 Ultra', '01098765432', 88)}
+                    className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-indigo-600/30 text-indigo-300 border border-slate-800 text-xs font-bold flex items-center gap-1.5 transition"
+                  >
+                    <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>تجربة Samsung S24 (88%) ⚡</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendCustomPing('Google Pixel 8 Pro', '01122334455', 99)}
+                    className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-indigo-600/30 text-indigo-300 border border-slate-800 text-xs font-bold flex items-center gap-1.5 transition"
+                  >
+                    <Smartphone className="w-3.5 h-3.5 text-blue-400" />
+                    <span>تجربة Google Pixel (99%) ⚡</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Devices Grid */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Wifi className="w-5 h-5 text-emerald-400" />
+                  <span>حالة الموبايلات المتصلة المباشرة ({devices.length})</span>
+                </h3>
+                <span className="text-xs text-slate-400 font-mono">
+                  الأجهزة الأونلاين: {devices.filter(d => d.status === 'online').length} من {devices.length}
+                </span>
+              </div>
+
+              {devices.length === 0 ? (
+                <div className="p-8 rounded-3xl glass-card border border-slate-800 text-center space-y-3 text-slate-400">
+                  <Smartphone className="w-12 h-12 stroke-1 text-slate-600 mx-auto" />
+                  <p className="text-sm font-bold text-slate-300">لا يوجد أجهزة متصلة حالياً</p>
+                  <p className="text-xs max-w-md mx-auto">
+                    بامكانك ربط هاتف الأندرويد الحقيقي عبر الـ Token الموضح أعلاه، أو إرسال إشارة اختبار سريعة من الأزرار بالأعلى لتجربة المزامنة الحية.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {devices.map(dev => (
+                    <div key={dev.id} className="p-5 rounded-3xl glass-card border border-slate-800 flex items-center justify-between relative group">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold ${
+                          dev.status === 'online'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse'
+                            : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        }`}>
+                          <Smartphone className="w-6 h-6" />
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-white text-sm">{dev.device_name}</h4>
+                            <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                              dev.status === 'online' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                            }`}>
+                              {dev.status === 'online' ? '🟢 اونلاين Online' : '🔴 أوفلاين Offline'}
+                            </span>
+                          </div>
+                          <p className="text-xs font-mono text-slate-400">رقم SIM: {dev.phone_number || 'غير محدد'}</p>
+                          <p className="text-[11px] text-slate-400">آخر إشارة: {new Date(dev.last_ping).toLocaleTimeString('ar-EG')}</p>
+                        </div>
+                      </div>
+
+                      <div className="text-left space-y-2 font-mono flex flex-col items-end">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 text-emerald-400 text-xs font-bold">
+                            <Battery className="w-4 h-4 text-emerald-400" />
+                            <span>{dev.battery_level}%</span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteDevice(dev.id)}
+                            className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs transition opacity-0 group-hover:opacity-100"
+                            title="حذف الجهاز"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-sans">
+                          تمت معالجة <strong className="text-amber-400">{dev.total_sms_processed}</strong> رسالة SMS
+                        </p>
+                        <span className="inline-block px-2 py-0.5 rounded bg-slate-900 text-slate-400 text-[10px]">
+                          {dev.app_version || 'v2.5.0'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- SETTINGS TAB --- */}
+        {activeTab === 'settings' && (
+          <div className="max-w-2xl mx-auto glass-card rounded-3xl p-6 sm:p-8 border border-slate-800 space-y-6">
+            <div className="flex items-center gap-3 pb-4 border-b border-slate-800">
+              <Settings className="w-6 h-6 text-amber-400" />
+              <div>
+                <h3 className="text-lg font-bold text-white">إعدادات أرقام فودافون كاش و InstaPay</h3>
+                <p className="text-xs text-slate-400">تحديث أرقام التحويل والملاحظات المعروضة للعملاء</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveSettings} className="space-y-5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  رقم / أرقام فودافون كاش (مفصولة بفاصلة)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={vodaInput}
+                  onChange={(e) => setVodaInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  عنوان حساب InstaPay (IPA / Phone)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={instaInput}
+                  onChange={(e) => setInstaInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  ملاحظة مكان التسليم (المعروضة للعميل)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={pickupInput}
+                  onChange={(e) => setPickupInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 px-6 rounded-2xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                <span>حفظ التعديلات والإعدادات</span>
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* --- SMS AUDIT TAB --- */}
+        {activeTab === 'sms' && (
+          <div className="space-y-6">
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-indigo-400" />
+                <span className="text-sm font-bold text-white">سجل الرسائل النصية الواردة تلقائياً من الموبايل</span>
+              </div>
+              <span className="text-xs text-slate-400">إجمالي الرسائل: {transactions.length}</span>
+            </div>
+
+            <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-900">
+              <table className="w-full text-right text-xs">
+                <thead className="bg-slate-950/80 text-slate-400 font-bold border-b border-slate-800">
+                  <tr>
+                    <th className="p-4">وقت الوصول</th>
+                    <th className="p-4">طريقة الدفع</th>
+                    <th className="p-4">المبلغ المستخرج</th>
+                    <th className="p-4">رقم الراسل</th>
+                    <th className="p-4">نص الرسالة الخام (Raw SMS)</th>
+                    <th className="p-4">نتيجة المطابقة</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {transactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-slate-500">
+                        لم يتم استقبال أي رسائل SMS حتى الآن من الموبايل
+                      </td>
+                    </tr>
+                  ) : (
+                    transactions.map(tx => (
+                      <tr key={tx.id} className="hover:bg-slate-800/40">
+                        <td className="p-4 text-slate-400">
+                          {new Date(tx.received_at).toLocaleString('ar-EG')}
+                        </td>
+                        <td className="p-4 font-sans font-bold text-white">
+                          {tx.payment_method}
+                        </td>
+                        <td className="p-4 text-amber-400 font-bold text-sm">
+                          {tx.amount} EGP
+                        </td>
+                        <td className="p-4 text-slate-300">
+                          {tx.sender_phone || 'غير محدد'}
+                        </td>
+                        <td className="p-4 text-[11px] text-slate-400 max-w-xs truncate font-sans">
+                          {tx.raw_sms}
+                        </td>
+                        <td className="p-4 font-sans">
+                          {tx.status === 'matched' ? (
+                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px]">
+                              مطابق لطلب
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 font-semibold text-[11px]">
+                              غير مطابق
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* --- ADD PRODUCT MODAL --- */}
+      {isAddProductOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 flex items-center justify-center">
+          <div className="relative w-full max-w-xl glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700/80">
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-800">
+              <h3 className="text-lg font-bold text-white">إضافة منتج جديد مع صور متعددة وتخصيص</h3>
+              <button onClick={() => setIsAddProductOpen(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddProduct} className="space-y-4 text-right">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">اسم المنتج بالعربي *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: جاكيت بيسبول التخرج"
+                  value={newProdTitleAr}
+                  onChange={(e) => setNewProdTitleAr(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">السعر (ج.م) *</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="650"
+                    value={newProdPrice}
+                    onChange={(e) => setNewProdPrice(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">الكمية بالمخزون</label>
+                  <input
+                    type="number"
+                    value={newProdStock}
+                    onChange={(e) => setNewProdStock(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">رابط الصورة الرئيسية للمنتج *</label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://images.unsplash.com/..."
+                  value={newProdImage}
+                  onChange={(e) => setNewProdImage(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">روابط صور إضافية للمعرض (مفصولة بسطر جديد)</label>
+                <textarea
+                  placeholder="https://images.unsplash.com/photo-1...&#10;https://images.unsplash.com/photo-2..."
+                  value={newProdImagesText}
+                  onChange={(e) => setNewProdImagesText(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none font-mono h-20"
+                ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">رابط صورة دليل المقاسات 📐 (Size Chart Image URL)</label>
+                <input
+                  type="url"
+                  placeholder="https://images.unsplash.com/size-chart..."
+                  value={newProdSizeChart}
+                  onChange={(e) => setNewProdSizeChart(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none font-mono"
+                />
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <label className="flex items-center gap-2 text-xs font-bold text-amber-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newProdHasCustomization}
+                    onChange={(e) => setNewProdHasCustomization(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-700"
+                  />
+                  <span>تفعيل خيار التطريز / طباعة اسم الطالب للعميل ✨</span>
+                </label>
+                {newProdHasCustomization && (
+                  <input
+                    type="text"
+                    placeholder="عنوان الحقل: اسم الطالب أو الكلية للتطريز..."
+                    value={newProdCustomLabel}
+                    onChange={(e) => setNewProdCustomLabel(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none"
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">المقاسات المتاحة (مفصولة بفاصلة)</label>
+                <input
+                  type="text"
+                  placeholder="S, M, L, XL, XXL"
+                  value={newProdSizes}
+                  onChange={(e) => setNewProdSizes(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30"
+              >
+                حفظ وإضافة المنتج فوراً
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- RECEIPT SCREENSHOT MODAL --- */}
+      {viewingReceiptUrl && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md p-4 flex items-center justify-center">
+          <div className="relative max-w-2xl w-full glass-modal rounded-3xl p-6 border border-slate-700 text-center space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <span>معاينة صورة إيصال الدفع 📸</span>
+              </h3>
+              <button onClick={() => setViewingReceiptUrl(null)} className="p-2 rounded-xl bg-slate-800 text-slate-400">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-2 rounded-2xl bg-slate-950 border border-slate-800 max-h-[70vh] overflow-auto flex items-center justify-center">
+              <img src={viewingReceiptUrl} alt="Receipt Screenshot" className="max-w-full rounded-xl object-contain" />
+            </div>
+
+            <div className="flex items-center justify-center gap-3">
+              <a
+                href={viewingReceiptUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold flex items-center gap-1.5"
+              >
+                <Download className="w-4 h-4" />
+                <span>تحميل الصورة بالحجم الكامل</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- PRINTABLE PDF REPORT MODAL --- */}
+      {isPdfModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md p-4 sm:p-8 flex items-center justify-center">
+          <div className="relative w-full max-w-4xl bg-white text-slate-900 rounded-3xl p-6 sm:p-10 shadow-2xl border border-slate-300 space-y-6 max-h-[90vh] overflow-y-auto">
+            
+            {/* Modal Top Actions */}
+            <div className="flex items-center justify-between border-b pb-4 print:hidden">
+              <div className="flex items-center gap-2">
+                <FileText className="w-6 h-6 text-amber-600" />
+                <h3 className="text-lg font-extrabold text-slate-900">تقرير المبيعات وحصر المقاسات الشامل</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg transition"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>طباعة / حفظ كـ PDF 🖨️</span>
+                </button>
+                <button onClick={() => setIsPdfModalOpen(false)} className="p-2 rounded-xl bg-slate-100 text-slate-600">
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Content */}
+            <div className="space-y-6 text-right dir-rtl font-sans" id="printable-report">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between border-b-2 border-amber-500 pb-4">
+                <div>
+                  <h1 className="text-2xl font-black text-slate-900">{settings.store_name}</h1>
+                  <p className="text-xs text-slate-600 mt-1">تقرير حصر الكميات والمقاسات للمصانع والطلبات المؤكدة</p>
+                </div>
+                <div className="text-left font-mono text-xs text-slate-600 space-y-1">
+                  <p>تاريخ التقرير: <strong>{new Date().toLocaleDateString('ar-EG')}</strong></p>
+                  <p>إجمالي الطلبات: <strong>{orders.length}</strong></p>
+                </div>
+              </div>
+
+              {/* Stats Summary Cards */}
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200">
+                  <p className="text-xs font-bold text-amber-800">إجمالي الطلبات المؤكدة</p>
+                  <p className="text-2xl font-black text-amber-900 mt-1">{totalVerifiedOrders}</p>
+                </div>
+                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+                  <p className="text-xs font-bold text-emerald-800">إجمالي المبيعات الإجمالية</p>
+                  <p className="text-2xl font-black text-emerald-900 mt-1">{totalGrossRevenue} ج.م</p>
+                </div>
+                <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200">
+                  <p className="text-xs font-bold text-indigo-800">عدد أصناف المنتجات</p>
+                  <p className="text-2xl font-black text-indigo-900 mt-1">{products.length}</p>
+                </div>
+              </div>
+
+              {/* SECTION 1: Itemized Product Size Breakdown Table */}
+              <div className="space-y-3">
+                <h3 className="text-base font-extrabold text-slate-900 border-r-4 border-amber-500 pr-3">
+                  1. بيان حصر القطع المطلوبة مقسماً حسب المقاسات (للتصنيع والمطبعة)
+                </h3>
+                
+                <div className="overflow-x-auto rounded-xl border border-slate-300">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-slate-100 text-slate-800 font-extrabold border-b border-slate-300">
+                      <tr>
+                        <th className="p-3">اسم المنتج</th>
+                        <th className="p-3 text-center">S</th>
+                        <th className="p-3 text-center">M</th>
+                        <th className="p-3 text-center">L</th>
+                        <th className="p-3 text-center">XL</th>
+                        <th className="p-3 text-center">XXL</th>
+                        <th className="p-3 text-center">أخرى</th>
+                        <th className="p-3 text-center">إجمالي القطع</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 font-bold">
+                      {productSizeStats.map((stat, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="p-3 font-extrabold text-slate-900">{stat.productTitle}</td>
+                          <td className="p-3 text-center text-amber-700 font-mono">{stat.sizeCounts['S'] || 0}</td>
+                          <td className="p-3 text-center text-amber-700 font-mono">{stat.sizeCounts['M'] || 0}</td>
+                          <td className="p-3 text-center text-amber-700 font-mono">{stat.sizeCounts['L'] || 0}</td>
+                          <td className="p-3 text-center text-amber-700 font-mono">{stat.sizeCounts['XL'] || 0}</td>
+                          <td className="p-3 text-center text-amber-700 font-mono">{stat.sizeCounts['XXL'] || 0}</td>
+                          <td className="p-3 text-center text-slate-600 font-mono">{stat.sizeCounts['بدون مقاس'] || 0}</td>
+                          <td className="p-3 text-center font-mono font-black text-amber-900 bg-amber-100/50">
+                            {stat.totalUnits} قطعة
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* SECTION 2: Detailed Customer Orders Table */}
+              <div className="space-y-3 pt-4">
+                <h3 className="text-base font-extrabold text-slate-900 border-r-4 border-amber-500 pr-3">
+                  2. القائمة التفصيلية لطلبات العملاء والتطريز
+                </h3>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-300">
+                  <table className="w-full text-right text-[11px]">
+                    <thead className="bg-slate-100 text-slate-800 font-extrabold border-b border-slate-300">
+                      <tr>
+                        <th className="p-2.5">الكود</th>
+                        <th className="p-2.5">العميل</th>
+                        <th className="p-2.5">الموبايل</th>
+                        <th className="p-2.5">طريقة الدفع</th>
+                        <th className="p-2.5">الأصناف والتطريز</th>
+                        <th className="p-2.5">الإجمالي</th>
+                        <th className="p-2.5">الحالة</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {orders.map((o) => (
+                        <tr key={o.id} className="hover:bg-slate-50">
+                          <td className="p-2.5 font-mono font-bold text-amber-800">#{o.order_code}</td>
+                          <td className="p-2.5 font-bold text-slate-900">{o.customer_name}</td>
+                          <td className="p-2.5 font-mono">{o.customer_phone}</td>
+                          <td className="p-2.5 font-medium">{o.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}</td>
+                          <td className="p-2.5">
+                            {getOrderEffectiveItems(o).map((it, i) => (
+                              <div key={i}>
+                                • {it.product_title} {it.selected_size ? `[${it.selected_size}]` : ''} × {it.quantity}
+                                {it.custom_text && <span className="text-amber-800 font-bold block"> (تطريز: {it.custom_text})</span>}
+                              </div>
+                            ))}
+                          </td>
+                          <td className="p-2.5 font-bold font-mono">{o.total_amount} ج.م</td>
+                          <td className="p-2.5 font-bold">{o.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="pt-6 border-t text-center text-xs text-slate-500 font-mono">
+                9th Batch Graduation Store • Built for Seamless Auto Verification & Management
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- DETAILED ORDER & SMS CONFIRMATION MODAL --- */}
+      {selectedOrderModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 flex items-center justify-center">
+          <div className="relative w-full max-w-3xl glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700 space-y-6 max-h-[90vh] overflow-y-auto text-right">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold">
+                  <FileCheck className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-white">تفاصيل الطلب والرسالة التأكيدية</h3>
+                    <span className="font-mono font-black text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/20 text-sm">
+                      #{selectedOrderModal.order_code}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    تاريخ التسجيل: {new Date(selectedOrderModal.created_at).toLocaleString('ar-EG')}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedOrderModal(null)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Status & Verification Mode Banner */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400">حالة الطلب الحالية:</span>
+                {selectedOrderModal.status === 'auto_verified' && (
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/30 flex items-center gap-1.5">
+                    <Bot className="w-4 h-4 text-emerald-400" />
+                    <span>🤖 مؤكد تلقائياً عبر الـ SMS</span>
+                  </span>
+                )}
+                {selectedOrderModal.status === 'manual_verified' && (
+                  <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 font-bold text-xs border border-cyan-500/30 flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-cyan-400" />
+                    <span>👤 مؤكد يدوياً بواسطة الإدارة</span>
+                  </span>
+                )}
+                {selectedOrderModal.status === 'pending' && (
+                  <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30 flex items-center gap-1.5 animate-pulse">
+                    <Clock className="w-4 h-4" />
+                    <span>⏳ معلق (بانتظار الـ SMS)</span>
+                  </span>
+                )}
+                {selectedOrderModal.status === 'ready_for_pickup' && (
+                  <span className="px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-xs border border-indigo-500/30 flex items-center gap-1.5">
+                    <Package className="w-4 h-4 text-indigo-400" />
+                    <span>📦 جاهز للاستلام بالمقر</span>
+                  </span>
+                )}
+                {selectedOrderModal.status === 'delivered' && (
+                  <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 font-bold text-xs border border-blue-500/30 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-blue-400" />
+                    <span>🎉 تم التسليم للعميل</span>
+                  </span>
+                )}
+                {selectedOrderModal.status === 'cancelled' && (
+                  <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 font-bold text-xs border border-rose-500/30 flex items-center gap-1.5">
+                    <XCircle className="w-4 h-4 text-rose-400" />
+                    <span>❌ ملغي</span>
+                  </span>
+                )}
+              </div>
+
+              {selectedOrderModal.verified_at && (
+                <div className="text-xs text-slate-400 font-mono flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>تاريخ التأكيد: {new Date(selectedOrderModal.verified_at).toLocaleString('ar-EG')}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Customer & Order Metadata Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Customer Box */}
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <h4 className="text-xs font-bold text-indigo-400 flex items-center gap-1.5">
+                  <User className="w-4 h-4" />
+                  <span>بيانات العميل واسم المستلم</span>
+                </h4>
+                <div className="space-y-1 text-xs">
+                  <p className="text-white font-bold text-sm">{selectedOrderModal.customer_name}</p>
+                  <p className="text-slate-300 font-mono flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                    <span>موبايل العميل: <strong>{selectedOrderModal.customer_phone}</strong></span>
+                  </p>
+                  {selectedOrderModal.sender_phone && selectedOrderModal.sender_phone !== selectedOrderModal.customer_phone && (
+                    <p className="text-amber-400 font-mono text-[11px]">
+                      رقم المحفظة الراسلة: {selectedOrderModal.sender_phone}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Payment Box */}
+              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <CreditCard className="w-4 h-4" />
+                  <span>تفاصيل وسيلة الدفع والمبلغ</span>
+                </h4>
+                <div className="space-y-1 text-xs">
+                  <p className="text-white font-bold">
+                    طريقة الدفع: {selectedOrderModal.payment_method === 'vodafone_cash' ? '🔴 فودافون كاش (Vodafone Cash)' : '🟣 InstaPay'}
+                  </p>
+                  <p className="text-emerald-400 font-black text-sm">
+                    إجمالي المبلغ: {selectedOrderModal.total_amount} ج.م
+                  </p>
+                  <p className="text-slate-300 font-mono text-[11px] flex items-center gap-1">
+                    <Hash className="w-3.5 h-3.5 text-slate-400" />
+                    <span>الرقم المرجعي بالطلب: <strong className="text-amber-300">{selectedOrderModal.transaction_ref || 'لم يدخل رقم مرجعي'}</strong></span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Order Items Breakdown with Embroidery Highlighting */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Package className="w-4 h-4 text-indigo-400" />
+                <span>المنتجات والمقاسات والتطريز المطلوب ({selectedOrderModal.items?.length || 0} صنف)</span>
+              </h4>
+
+              <div className="space-y-2">
+                {(!selectedOrderModal.items || selectedOrderModal.items.length === 0) ? (
+                  <div className="p-4 rounded-2xl bg-slate-900 border border-amber-500/30 text-amber-300 text-xs font-bold space-y-1">
+                    <p className="flex items-center gap-1.5 text-white text-sm">
+                      <Package className="w-4 h-4 text-amber-400" />
+                      <span>طلب منتج تخرج أساسي ({selectedOrderModal.total_amount} ج.م)</span>
+                    </p>
+                    <p className="text-slate-400 font-normal text-xs">
+                      تم تسجيل الطلب وإجمالي المبلغ المطلوب: <strong>{selectedOrderModal.total_amount} ج.م</strong>
+                    </p>
+                  </div>
+                ) : (
+                  selectedOrderModal.items.map((item, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between font-bold text-sm text-white">
+                        <span>{item.product_title} × {item.quantity}</span>
+                        <div className="flex items-center gap-2">
+                          {item.selected_size && (
+                            <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 font-mono text-xs border border-amber-500/30">
+                              المقاس: {item.selected_size}
+                            </span>
+                          )}
+                          <span className="text-amber-400 font-mono text-xs">{item.unit_price * item.quantity} ج.م</span>
+                        </div>
+                      </div>
+
+                      {item.custom_text ? (
+                        <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-indigo-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Sparkles className="w-4 h-4 text-amber-400" />
+                            <span>✨ الاسم / الكلية للتطريز:</span>
+                          </span>
+                          <span className="bg-slate-950 px-3 py-1 rounded-lg text-white font-black text-sm border border-amber-500/30 font-sans">
+                            &quot;{item.custom_text}&quot;
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-slate-500 italic">لا يوجد تخصيص أو تطريز لهذا المنتج</p>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {selectedOrderModal.notes && (
+                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
+                  <span className="font-bold text-amber-400">ملاحظات إضافية من العميل:</span> {selectedOrderModal.notes}
+                </div>
+              )}
+            </div>
+
+            {/* CONFIRMATION SMS & VERIFICATION AUDIT BOX */}
+            {(() => {
+              const matchedTx = findMatchedTransaction(selectedOrderModal);
+              return (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <MessageSquare className="w-4 h-4 text-emerald-400" />
+                    <span>توثيق التأكيد ورسالة الـ SMS المستلمة (SMS Verification Audit)</span>
+                  </h4>
+
+                  {matchedTx ? (
+                    <div className="p-5 rounded-2xl bg-slate-900 border border-emerald-500/40 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Bot className="w-5 h-5 text-emerald-400" />
+                          <span className="text-sm font-bold text-emerald-300">
+                            رسالة الـ SMS التي تم تأكيد واقتران الطلب بها تلقائياً:
+                          </span>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono text-[11px]">
+                          {matchedTx.payment_method}
+                        </span>
+                      </div>
+
+                      {/* RAW SMS CONTENT BOX */}
+                      <div className="bg-slate-950 p-4 rounded-xl border border-emerald-500/30 space-y-1.5 font-sans">
+                        <p className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span>نص الرسالة الخام المستلمة من المحفظة (Raw SMS):</span>
+                        </p>
+                        <p dir="rtl" className="text-xs text-white font-mono font-bold leading-relaxed bg-slate-900 p-3 rounded-lg border border-slate-800 select-all">
+                          {matchedTx.raw_sms}
+                        </p>
+                      </div>
+
+                      {/* Extracted SMS Data */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-mono">
+                        <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                          <span className="text-slate-400 block text-[10px]">المبلغ بالرسالة:</span>
+                          <strong className="text-amber-400">{matchedTx.amount} EGP</strong>
+                        </div>
+                        <div className="bg-slate-950 p-2 rounded-lg border border-slate-800">
+                          <span className="text-slate-400 block text-[10px]">رقم الراسل:</span>
+                          <strong className="text-slate-200">{matchedTx.sender_phone || 'غير محدد'}</strong>
+                        </div>
+                        <div className="bg-slate-950 p-2 rounded-lg border border-slate-800 col-span-2 sm:col-span-1">
+                          <span className="text-slate-400 block text-[10px]">وقت وصول الرسالة:</span>
+                          <strong className="text-emerald-300">{new Date(matchedTx.received_at).toLocaleTimeString('ar-EG')}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  ) : selectedOrderModal.status === 'manual_verified' ? (
+                    <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 space-y-2">
+                      <div className="flex items-center gap-2 text-cyan-300 text-xs font-bold">
+                        <UserCheck className="w-4 h-4 text-cyan-400" />
+                        <span>تم تأكيد هذا الطلب يدوياً بواسطة الإدارة (بدون مطابقة SMS تلقائية).</span>
+                      </div>
+
+                      {/* Option to manually associate an unmatched transaction */}
+                      {transactions.filter(t => t.status === 'unmatched').length > 0 && (
+                        <div className="pt-2 border-t border-cyan-500/20 space-y-1.5">
+                          <p className="text-[11px] text-slate-300 font-semibold">
+                            هل ترغب في ربط هذا الطلب بشرائح رسائل SMS غير مطابقة في النظام؟
+                          </p>
+                          <select
+                            onChange={(e) => {
+                              const txId = e.target.value;
+                              if (txId) {
+                                handleUpdateOrderStatus(selectedOrderModal.id, 'manual_verified', txId);
+                                alert('تم ربط رسالة الـ SMS بالطلب بنجاح!');
+                              }
+                            }}
+                            className="w-full bg-slate-950 text-xs text-amber-300 p-2 rounded-xl border border-slate-800 focus:outline-none"
+                          >
+                            <option value="">اختر رسالة SMS غير مطابقة لربطها...</option>
+                            {transactions.filter(t => t.status === 'unmatched').map(t => (
+                              <option key={t.id} value={t.id}>
+                                {new Date(t.received_at).toLocaleTimeString('ar-EG')} - {t.amount} ج.م - {t.raw_sms.slice(0, 45)}...
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs space-y-1">
+                      <p className="font-bold flex items-center gap-1.5">
+                        <Clock className="w-4 h-4" />
+                        <span>لم تصل رسالة SMS مطابقة لهذا الطلب بعد.</span>
+                      </p>
+                      <p className="text-slate-400 text-[11px]">
+                        عند قيام العميل بالتحويل ووصول رسالة الإشعار من فودافون كاش أو InstaPay للهاتف، سيتم تأكيد الطلب تلقائياً وتحديث الحالة.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* RECEIPT SCREENSHOT PREVIEW SECTION */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Eye className="w-4 h-4 text-indigo-400" />
+                <span>صورة إيصال الدفع / الاسكرين المرفق من العميل 📸</span>
+              </h4>
+
+              {selectedOrderModal.receipt_url ? (
+                <div className="p-4 bg-slate-900 rounded-2xl border border-indigo-500/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>تم إرفاق صورة إيصال التحويل بواسطة العميل أثناء تسجيل الطلب</span>
+                    </span>
+                    <button
+                      onClick={() => setViewingReceiptUrl(selectedOrderModal.receipt_url!)}
+                      className="px-3 py-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white text-xs font-bold border border-indigo-500/40 transition flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>معاينة مكبّرة 🔍</span>
+                    </button>
+                  </div>
+
+                  {/* DIRECT EMBEDDED IMAGE PREVIEW */}
+                  <div className="relative group bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-center max-h-[320px] overflow-hidden">
+                    <img
+                      src={selectedOrderModal.receipt_url}
+                      alt="إيصال التحويل المرفق من العميل"
+                      className="max-h-[300px] w-auto object-contain rounded-lg shadow-md cursor-pointer group-hover:scale-[1.02] transition-transform"
+                      onClick={() => setViewingReceiptUrl(selectedOrderModal.receipt_url!)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 text-slate-400 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-4 h-4 text-slate-500" />
+                    <span>لم يقم العميل برفع صورة إيصال (تم اعتماد رقم المتابعة والمرجعي أو الـ SMS تلقائياً)</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* MODAL QUICK MANAGEMENT ACTIONS */}
+            <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-slate-400 font-bold">تغيير الحالة:</span>
+                <button
+                  onClick={() => handleUpdateOrderStatus(selectedOrderModal.id, 'manual_verified')}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white font-bold text-xs border border-emerald-500/30 transition"
+                >
+                  تأكيد يدوي 👤
+                </button>
+
+                <button
+                  onClick={() => handleUpdateOrderStatus(selectedOrderModal.id, 'ready_for_pickup')}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white font-bold text-xs border border-indigo-500/30 transition"
+                >
+                  جاهز للاستلام 📦
+                </button>
+
+                <button
+                  onClick={() => handleUpdateOrderStatus(selectedOrderModal.id, 'delivered')}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white font-bold text-xs border border-blue-500/30 transition"
+                >
+                  تم التسليم 🎉
+                </button>
+
+                <button
+                  onClick={() => handleUpdateOrderStatus(selectedOrderModal.id, 'cancelled')}
+                  className="px-3 py-1.5 rounded-xl bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white font-bold text-xs border border-rose-500/30 transition"
+                >
+                  إلغاء الطلب ❌
+                </button>
+              </div>
+
+              <button
+                onClick={() => setSelectedOrderModal(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+              >
+                إغلاق ✖
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
