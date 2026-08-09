@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
-  const phone = searchParams.get('phone');
+  const phone = searchParams.get('phone') || searchParams.get('search');
   const orderId = searchParams.get('id');
 
   const orders = await fetchOrdersFromSupabase();
@@ -99,13 +99,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(found ? [found] : []);
   }
 
-  if (phone) {
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
+  if (phone && phone.trim()) {
+    const rawQuery = phone.trim().toLowerCase();
+    const cleanPhone = rawQuery.replace(/[^0-9]/g, '');
+
     const found = orders.filter(o => {
-      const p1 = o.customer_phone.replace(/[^0-9]/g, '');
+      const p1 = (o.customer_phone || '').replace(/[^0-9]/g, '');
       const p2 = (o.sender_phone || '').replace(/[^0-9]/g, '');
       const ref = (o.transaction_ref || '').toLowerCase();
-      return p1.includes(cleanPhone) || p2.includes(cleanPhone) || ref.includes(phone.trim().toLowerCase());
+      const oCode = (o.order_code || '').toLowerCase();
+
+      if (oCode === rawQuery || ref === rawQuery) return true;
+      if (cleanPhone.length >= 7) {
+        return p1.endsWith(cleanPhone) || p2.endsWith(cleanPhone) || p1 === cleanPhone;
+      }
+      return false;
     });
     return NextResponse.json(found);
   }

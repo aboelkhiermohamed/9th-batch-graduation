@@ -219,7 +219,7 @@ export default function StoreFrontPage() {
     }
   }, [cart, isCartLoaded]);
 
-  // Check URL params for tracker (e.g. return from /checkout)
+  // Check URL params for tracker or login modal (e.g. return from /checkout)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -230,6 +230,10 @@ export default function StoreFrontPage() {
           setSearchQuery(code);
           fetchTrackedOrders(code, true);
         }
+      }
+      if (params.get('login') === 'true') {
+        setIsCustomerAuthOpen(true);
+        setAuthErrorMessage('يرجى تسجيل الدخول أو إنشاء حساب جديد لإتمام الشراء والطلب 🎓');
       }
     }
   }, []);
@@ -1063,7 +1067,12 @@ export default function StoreFrontPage() {
                 <button
                   onClick={() => {
                     setIsCartOpen(false);
-                    router.push('/checkout');
+                    if (!customerSession) {
+                      setAuthErrorMessage('يرجى تسجيل الدخول أو إنشاء حساب جديد أولاً لإتمام الشراء والطلب 🎓');
+                      setIsCustomerAuthOpen(true);
+                    } else {
+                      router.push('/checkout');
+                    }
                   }}
                   className="w-full py-4 px-6 rounded-2xl gradient-purple-btn text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30"
                 >

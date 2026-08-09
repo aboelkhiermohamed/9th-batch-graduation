@@ -44,6 +44,7 @@ export default function CheckoutPage() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Form State
+  const [customerSession, setCustomerSession] = useState<{ phone_number: string; full_name: string } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('vodafone_cash');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -71,6 +72,7 @@ export default function CheckoutPage() {
         if (savedCustomer) {
           try {
             const cust = JSON.parse(savedCustomer);
+            setCustomerSession(cust);
             if (cust.full_name) setCustomerName(cust.full_name);
             if (cust.phone_number) setCustomerPhone(cust.phone_number);
           } catch(e) {}
@@ -342,7 +344,25 @@ export default function CheckoutPage() {
 
       {/* Main Content Container */}
       <main className="flex-1 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-10 w-full">
-        {cart.length === 0 ? (
+        {!customerSession ? (
+          <div className="max-w-md mx-auto text-center py-12 space-y-5 glass-modal p-8 rounded-3xl border border-slate-700/80 shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-xl font-extrabold text-white mb-2">تسجيل الدخول مطلوب لإتمام الطلب 🎓</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                عفواً، ينبغي عليك إنشاء حساب أو تسجيل الدخول لحسابك أولاً لإتمام عملية الشراء وإرسال الطلب
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/?login=true')}
+              className="w-full py-4 px-6 rounded-2xl gradient-purple-btn text-white font-extrabold text-sm shadow-xl shadow-indigo-600/30 transition"
+            >
+              تسجيل الدخول / إنشاء حساب جديد الان 👤
+            </button>
+          </div>
+        ) : cart.length === 0 ? (
           <div className="max-w-md mx-auto text-center py-16 space-y-4">
             <div className="w-20 h-20 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-600">
               <ShoppingBag className="w-10 h-10 stroke-1" />
