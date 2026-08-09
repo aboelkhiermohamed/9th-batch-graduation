@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Product } from '@/types';
 import { getMemoryProducts, setMemoryProducts, fetchProductsFromSupabase, saveProductToSupabase, supabase } from '@/lib/supabaseClient';
 
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'f' + Date.now().toString(16).padStart(11, '0') + '-4000-8000-000000000000';
+}
+
 export async function GET() {
   const products = await fetchProductsFromSupabase();
   return NextResponse.json(products);
@@ -14,21 +21,22 @@ export async function POST(req: NextRequest) {
 
     if (!title_ar || !price || !image_url) {
       return NextResponse.json(
-        { error: 'Missing required product fields' },
+        { error: 'جميع حقول المنتج الأساسية مطلوبة (الاسم بالعربي، السعر، وصورة المنتج)' },
         { status: 400 }
       );
     }
 
     const imgArray = Array.isArray(images) && images.length > 0 ? images : [image_url];
+    const newId = generateUUID();
 
     const newProduct: Product = {
-      id: 'prod-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      id: newId,
       title: title || title_ar,
       title_ar: title_ar,
       description: description || '',
       description_ar: description_ar || '',
       price: Number(price),
-      category: category || 'merch',
+      category: category || 'الملابس (Apparel)',
       image_url: image_url,
       images: imgArray,
       size_chart_url: size_chart_url || undefined,
@@ -46,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, product: newProduct });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'فشل إضافة المنتج' }, { status: 500 });
   }
 }
 
@@ -56,7 +64,7 @@ export async function PUT(req: NextRequest) {
     const { id, title_ar, price, stock, sizes, image_url, images, size_chart_url, has_customization, customization_label, is_active, category, addons } = body;
 
     if (!id) {
-      return NextResponse.json({ error: 'Missing product ID' }, { status: 400 });
+      return NextResponse.json({ error: 'معرف المنتج مطلوب' }, { status: 400 });
     }
 
     const products = getMemoryProducts();
@@ -121,7 +129,7 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get('id');
 
     if (!id) {
-      return NextResponse.json({ error: 'Missing product ID' }, { status: 400 });
+      return NextResponse.json({ error: 'معرف المنتج مطلوب' }, { status: 400 });
     }
 
     const products = getMemoryProducts();

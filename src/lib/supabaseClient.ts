@@ -139,6 +139,8 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
 }
 
 export async function saveProductToSupabase(product: Product): Promise<boolean> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id);
+
   const current = getMemoryProducts();
   const idx = current.findIndex(p => p.id === product.id);
   if (idx >= 0) {
@@ -166,6 +168,10 @@ export async function saveProductToSupabase(product: Product): Promise<boolean> 
       is_active: product.is_active
     };
 
+    if (isUuid) {
+      payload.id = product.id;
+    }
+
     if (product.addons && product.addons.length > 0) {
       payload.addons = product.addons;
     }
@@ -185,11 +191,17 @@ export async function saveProductToSupabase(product: Product): Promise<boolean> 
           .insert(payload)
           .select()
           .single();
-        if (retryData?.id) product.id = retryData.id;
+        if (retryData?.id) {
+          product.id = retryData.id;
+        }
       }
     } else if (data?.id) {
       product.id = data.id;
     }
+
+    // Refresh memory list with assigned UUID
+    const updatedList = getMemoryProducts().map(p => p.id === payload.id ? { ...p, id: product.id } : p);
+    setMemoryProducts(updatedList);
 
     return !error;
   } catch (err) {
