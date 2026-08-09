@@ -40,7 +40,10 @@ import {
   Hash,
   MessageCircle,
   FileCheck,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  Image as ImageIcon,
+  Ruler
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
 
