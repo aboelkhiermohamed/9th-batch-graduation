@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Product } from '@/types';
-import { getMemoryProducts, setMemoryProducts, fetchProductsFromSupabase, saveProductToSupabase } from '@/lib/supabaseClient';
+import { getMemoryProducts, setMemoryProducts, fetchProductsFromSupabase, saveProductToSupabase, supabase } from '@/lib/supabaseClient';
 
 export async function GET() {
   const products = await fetchProductsFromSupabase();
@@ -22,13 +22,13 @@ export async function POST(req: NextRequest) {
     const imgArray = Array.isArray(images) && images.length > 0 ? images : [image_url];
 
     const newProduct: Product = {
-      id: 'prod-' + Date.now(),
+      id: 'prod-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
       title: title || title_ar,
       title_ar: title_ar,
       description: description || '',
       description_ar: description_ar || '',
       price: Number(price),
-      category: category || 'General',
+      category: category || 'merch',
       image_url: image_url,
       images: imgArray,
       size_chart_url: size_chart_url || undefined,
@@ -42,8 +42,6 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString()
     };
 
-    const products = getMemoryProducts();
-    setMemoryProducts([newProduct, ...products]);
     await saveProductToSupabase(newProduct);
 
     return NextResponse.json({ success: true, product: newProduct });
@@ -86,6 +84,31 @@ export async function PUT(req: NextRequest) {
     });
 
     setMemoryProducts(updated);
+
+    if (supabase) {
+      try {
+        await supabase
+          .from('store_products')
+          .update({
+            title_ar,
+            price: Number(price),
+            stock: Number(stock),
+            sizes,
+            image_url,
+            images,
+            size_chart_url,
+            has_customization,
+            customization_label,
+            category,
+            addons,
+            is_active
+          })
+          .eq('id', id);
+      } catch (e) {
+        console.warn('Supabase product update warning:', e);
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -104,6 +127,14 @@ export async function DELETE(req: NextRequest) {
     const products = getMemoryProducts();
     const filtered = products.filter(p => p.id !== id);
     setMemoryProducts(filtered);
+
+    if (supabase) {
+      try {
+        await supabase.from('store_products').delete().eq('id', id);
+      } catch (e) {
+        console.warn('Supabase product delete warning:', e);
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

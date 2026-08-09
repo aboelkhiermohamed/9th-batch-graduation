@@ -97,33 +97,41 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
       .select('*')
       .order('created_at', { ascending: true });
 
-    if (error || !data || data.length === 0) {
-      return getMemoryProducts();
+    let dbProds: Product[] = [];
+    if (!error && data && data.length > 0) {
+      dbProds = data.map((p: any) => ({
+        id: p.id,
+        title: p.title || p.title_ar,
+        title_ar: p.title_ar || p.title,
+        description: p.description || '',
+        description_ar: p.description_ar || '',
+        price: Number(p.price || 0),
+        category: p.category || 'Apparel',
+        image_url: p.image_url || '',
+        images: Array.isArray(p.images) ? p.images : (typeof p.images === 'string' ? JSON.parse(p.images) : [p.image_url]),
+        size_chart_url: p.size_chart_url || undefined,
+        has_customization: Boolean(p.has_customization),
+        customization_label: p.customization_label || undefined,
+        sizes: Array.isArray(p.sizes) ? p.sizes : (typeof p.sizes === 'string' ? JSON.parse(p.sizes) : []),
+        addons: Array.isArray(p.addons) ? p.addons : (typeof p.addons === 'string' ? JSON.parse(p.addons) : []),
+        stock: Number(p.stock || 0),
+        is_active: Boolean(p.is_active),
+        created_at: p.created_at || new Date().toISOString(),
+        updated_at: p.updated_at || new Date().toISOString()
+      }));
     }
 
-    const prods: Product[] = data.map((p: any) => ({
-      id: p.id,
-      title: p.title || p.title_ar,
-      title_ar: p.title_ar || p.title,
-      description: p.description || '',
-      description_ar: p.description_ar || '',
-      price: Number(p.price || 0),
-      category: p.category || 'Apparel',
-      image_url: p.image_url || '',
-      images: Array.isArray(p.images) ? p.images : (typeof p.images === 'string' ? JSON.parse(p.images) : [p.image_url]),
-      size_chart_url: p.size_chart_url || undefined,
-      has_customization: Boolean(p.has_customization),
-      customization_label: p.customization_label || undefined,
-      sizes: Array.isArray(p.sizes) ? p.sizes : (typeof p.sizes === 'string' ? JSON.parse(p.sizes) : []),
-      addons: Array.isArray(p.addons) ? p.addons : (typeof p.addons === 'string' ? JSON.parse(p.addons) : []),
-      stock: Number(p.stock || 0),
-      is_active: Boolean(p.is_active),
-      created_at: p.created_at || new Date().toISOString(),
-      updated_at: p.updated_at || new Date().toISOString()
-    }));
+    const currentMemory = getMemoryProducts();
+    const dbIds = new Set(dbProds.map(p => p.id));
+    const extraLocal = currentMemory.filter(p => !dbIds.has(p.id));
+    const finalProducts = [...dbProds, ...extraLocal];
 
-    setMemoryProducts(prods);
-    return prods;
+    if (finalProducts.length > 0) {
+      setMemoryProducts(finalProducts);
+      return finalProducts;
+    }
+
+    return getMemoryProducts();
   } catch (err) {
     console.warn('Error reading products from Supabase:', err);
     return getMemoryProducts();
@@ -131,32 +139,58 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
 }
 
 export async function saveProductToSupabase(product: Product): Promise<boolean> {
+  const current = getMemoryProducts();
+  const idx = current.findIndex(p => p.id === product.id);
+  if (idx >= 0) {
+    current[idx] = product;
+  } else {
+    current.unshift(product);
+  }
+  setMemoryProducts([...current]);
+
   try {
+    const payload: any = {
+      title: product.title,
+      title_ar: product.title_ar,
+      description: product.description || '',
+      description_ar: product.description_ar || '',
+      price: product.price,
+      category: product.category,
+      image_url: product.image_url,
+      images: product.images || [product.image_url],
+      size_chart_url: product.size_chart_url || null,
+      has_customization: product.has_customization || false,
+      customization_label: product.customization_label || null,
+      sizes: product.sizes,
+      stock: product.stock,
+      is_active: product.is_active
+    };
+
+    if (product.addons && product.addons.length > 0) {
+      payload.addons = product.addons;
+    }
+
     const { data, error } = await supabase
       .from('store_products')
-      .insert({
-        title: product.title,
-        title_ar: product.title_ar,
-        description: product.description,
-        description_ar: product.description_ar,
-        price: product.price,
-        category: product.category,
-        image_url: product.image_url,
-        images: product.images || [product.image_url],
-        size_chart_url: product.size_chart_url || null,
-        has_customization: product.has_customization || false,
-        customization_label: product.customization_label || null,
-        sizes: product.sizes,
-        addons: product.addons || [],
-        stock: product.stock,
-        is_active: product.is_active
-      })
+      .insert(payload)
       .select()
       .single();
 
-    if (data?.id) {
+    if (error) {
+      console.warn('Supabase product insert warning:', error.message);
+      if (error.message.includes('addons')) {
+        delete payload.addons;
+        const { data: retryData } = await supabase
+          .from('store_products')
+          .insert(payload)
+          .select()
+          .single();
+        if (retryData?.id) product.id = retryData.id;
+      }
+    } else if (data?.id) {
       product.id = data.id;
     }
+
     return !error;
   } catch (err) {
     console.error('Failed to insert product into Supabase:', err);
