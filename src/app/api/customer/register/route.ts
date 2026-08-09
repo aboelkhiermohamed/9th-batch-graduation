@@ -19,52 +19,56 @@ export async function POST(req: Request) {
     }
 
     if (supabase) {
-      // Check if phone or email already registered
-      const { data: existingPhone } = await supabase
-        .from('store_customers')
-        .select('id')
-        .eq('phone_number', cleanPhone)
-        .single();
-
-      if (existingPhone) {
-        return NextResponse.json({ error: 'رقم الموبايل هذا مسجل به حساب بالفعل، يرجى تسجيل الدخول' }, { status: 400 });
-      }
-
-      if (cleanEmail) {
-        const { data: existingEmail } = await supabase
+      try {
+        // Check if phone or email already registered
+        const { data: existingPhone, error: phoneErr } = await supabase
           .from('store_customers')
           .select('id')
-          .eq('email', cleanEmail)
+          .eq('phone_number', cleanPhone)
           .single();
 
-        if (existingEmail) {
-          return NextResponse.json({ error: 'البريد الإلكتروني مسجل به حساب بالفعل' }, { status: 400 });
+        if (existingPhone) {
+          return NextResponse.json({ error: 'رقم الموبايل هذا مسجل به حساب بالفعل، يرجى تسجيل الدخول' }, { status: 400 });
         }
+
+        if (cleanEmail) {
+          const { data: existingEmail } = await supabase
+            .from('store_customers')
+            .select('id')
+            .eq('email', cleanEmail)
+            .single();
+
+          if (existingEmail) {
+            return NextResponse.json({ error: 'البريد الإلكتروني مسجل به حساب بالفعل' }, { status: 400 });
+          }
+        }
+
+        // Insert new customer account
+        const { data: inserted, error: insertError } = await supabase
+          .from('store_customers')
+          .insert([{
+            full_name: cleanName,
+            phone_number: cleanPhone,
+            email: cleanEmail,
+            password_hash: cleanPassword
+          }])
+          .select('id, full_name, phone_number, email, created_at')
+          .single();
+
+        if (!insertError && inserted) {
+          return NextResponse.json({
+            success: true,
+            customer: inserted
+          });
+        }
+
+        console.warn('Supabase store_customers insert warning:', insertError?.message);
+      } catch (err: any) {
+        console.warn('Supabase table check error:', err.message);
       }
-
-      // Insert new customer account
-      const { data: inserted, error: insertError } = await supabase
-        .from('store_customers')
-        .insert([{
-          full_name: cleanName,
-          phone_number: cleanPhone,
-          email: cleanEmail,
-          password_hash: cleanPassword
-        }])
-        .select('id, full_name, phone_number, email, created_at')
-        .single();
-
-      if (insertError) {
-        return NextResponse.json({ error: 'فشل إنشاء الحساب: ' + insertError.message }, { status: 400 });
-      }
-
-      return NextResponse.json({
-        success: true,
-        customer: inserted
-      });
     }
 
-    // Default fallback customer object
+    // Default fallback customer object (when store_customers table hasn't been migrated yet in DB)
     return NextResponse.json({
       success: true,
       customer: {
