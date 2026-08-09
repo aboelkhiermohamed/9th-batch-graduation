@@ -50,7 +50,13 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString()
     };
 
-    await saveProductToSupabase(newProduct);
+    const result = await saveProductToSupabase(newProduct);
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'فشل حفظ المنتج في قاعدة بيانات Supabase: ' + (result.error || '') },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json({ success: true, product: newProduct });
   } catch (err: any) {

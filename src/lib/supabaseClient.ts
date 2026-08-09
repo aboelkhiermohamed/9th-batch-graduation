@@ -138,7 +138,7 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
   }
 }
 
-export async function saveProductToSupabase(product: Product): Promise<boolean> {
+export async function saveProductToSupabase(product: Product): Promise<{ success: boolean; error?: string }> {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id);
 
   const current = getMemoryProducts();
@@ -149,6 +149,10 @@ export async function saveProductToSupabase(product: Product): Promise<boolean> 
     current.unshift(product);
   }
   setMemoryProducts([...current]);
+
+  if (!supabase) {
+    return { success: true };
+  }
 
   try {
     const payload: any = {
@@ -176,37 +180,52 @@ export async function saveProductToSupabase(product: Product): Promise<boolean> 
       payload.addons = product.addons;
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('store_products')
       .insert(payload)
       .select()
       .single();
 
-    if (error) {
-      console.warn('Supabase product insert warning:', error.message);
-      if (error.message.includes('addons')) {
-        delete payload.addons;
-        const { data: retryData } = await supabase
-          .from('store_products')
-          .insert(payload)
-          .select()
-          .single();
-        if (retryData?.id) {
-          product.id = retryData.id;
-        }
-      }
-    } else if (data?.id) {
-      product.id = data.id;
+    // Retry 1: If addons column is missing in DB schema
+    if (error && error.message.includes('addons')) {
+      delete payload.addons;
+      const res = await supabase
+        .from('store_products')
+        .insert(payload)
+        .select()
+        .single();
+      data = res.data;
+      error = res.error;
     }
 
-    // Refresh memory list with assigned UUID
-    const updatedList = getMemoryProducts().map(p => p.id === payload.id ? { ...p, id: product.id } : p);
-    setMemoryProducts(updatedList);
+    // Retry 2: If JSONB columns need stringification
+    if (error && (error.message.includes('json') || error.message.includes('array'))) {
+      payload.images = JSON.stringify(payload.images);
+      payload.sizes = JSON.stringify(payload.sizes);
+      const res = await supabase
+        .from('store_products')
+        .insert(payload)
+        .select()
+        .single();
+      data = res.data;
+      error = res.error;
+    }
 
-    return !error;
-  } catch (err) {
+    if (error) {
+      console.error('Supabase product insert error:', error);
+      return { success: false, error: error.message };
+    }
+
+    if (data?.id) {
+      product.id = data.id;
+      const updatedList = getMemoryProducts().map(p => p.id === payload.id ? { ...p, id: data.id } : p);
+      setMemoryProducts(updatedList);
+    }
+
+    return { success: true };
+  } catch (err: any) {
     console.error('Failed to insert product into Supabase:', err);
-    return false;
+    return { success: false, error: err.message || 'Error inserting product into Supabase' };
   }
 }
 
