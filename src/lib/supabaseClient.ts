@@ -186,29 +186,27 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
       .select()
       .single();
 
-    // Retry 1: If addons column is missing in DB schema
-    if (error && error.message.includes('addons')) {
-      delete payload.addons;
-      const res = await supabase
-        .from('store_products')
-        .insert(payload)
-        .select()
-        .single();
-      data = res.data;
-      error = res.error;
-    }
-
-    // Retry 2: If JSONB columns need stringification
-    if (error && (error.message.includes('json') || error.message.includes('array'))) {
-      payload.images = JSON.stringify(payload.images);
-      payload.sizes = JSON.stringify(payload.sizes);
-      const res = await supabase
-        .from('store_products')
-        .insert(payload)
-        .select()
-        .single();
-      data = res.data;
-      error = res.error;
+    // Smart Column Fallback Loop: Dynamically strip any column missing in Supabase DB schema
+    let attempts = 0;
+    while (error && attempts < 6) {
+      attempts++;
+      const match = error.message.match(/Could not find the '([^']+)' column/i) || error.message.match(/column "([^"]+)"/i);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        console.warn(`Stripping unmigrated column '${missingCol}' from product payload...`);
+        delete payload[missingCol];
+        const res = await supabase.from('store_products').insert(payload).select().single();
+        data = res.data;
+        error = res.error;
+      } else if (error.message.includes('json') || error.message.includes('array')) {
+        payload.images = typeof payload.images === 'object' ? JSON.stringify(payload.images) : payload.images;
+        payload.sizes = typeof payload.sizes === 'object' ? JSON.stringify(payload.sizes) : payload.sizes;
+        const res = await supabase.from('store_products').insert(payload).select().single();
+        data = res.data;
+        error = res.error;
+      } else {
+        break;
+      }
     }
 
     if (error) {
