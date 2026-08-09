@@ -356,33 +356,33 @@ export default function StoreFrontPage() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
       {/* --- TOP BANNER & HEADER --- */}
-      <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2">
           
           {/* Logo & Title */}
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-indigo-800 p-0.5 shadow-lg shadow-indigo-500/20">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-indigo-800 p-0.5 shadow-lg shadow-indigo-500/20 flex-shrink-0">
               <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                <Award className="w-6 h-6 text-amber-400 animate-pulse" />
+                <Award className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 animate-pulse" />
               </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight gradient-gold-text">
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-xl font-bold tracking-tight gradient-gold-text truncate max-w-[130px] xs:max-w-none">
                 {settings.store_name}
               </h1>
-              <p className="text-xs text-slate-400 flex items-center gap-1">
+              <p className="text-[10px] sm:text-xs text-slate-400 hidden xs:flex items-center gap-1 truncate">
                 <span>🎓 متجر الدفعة التاسعة الرسمي</span>
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
               </p>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
             {/* Track Order Button */}
             <button
               onClick={() => setIsTrackerOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700/60 text-sm font-medium text-slate-200 transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700/60 text-xs sm:text-sm font-medium text-slate-200 transition-all"
             >
               <Search className="w-4 h-4 text-indigo-400" />
               <span className="hidden sm:inline">متابعة حالة الطلب</span>
@@ -391,12 +391,12 @@ export default function StoreFrontPage() {
             {/* Cart Button */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative flex items-center gap-2.5 px-4 py-2 rounded-xl gradient-purple-btn text-white text-sm font-semibold shadow-lg shadow-indigo-600/30"
+              className="relative flex items-center gap-1.5 sm:gap-2.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl gradient-purple-btn text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/30"
             >
               <ShoppingBag className="w-4 h-4" />
               <span>السلة</span>
               {totalCartCount > 0 && (
-                <span className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-extrabold text-xs flex items-center justify-center border-2 border-slate-950 animate-bounce">
+                <span className="absolute -top-2 -left-2 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-amber-500 text-slate-950 font-extrabold text-[10px] sm:text-xs flex items-center justify-center border-2 border-slate-950 animate-bounce">
                   {totalCartCount}
                 </span>
               )}
@@ -405,7 +405,7 @@ export default function StoreFrontPage() {
             {/* Admin Dashboard Link */}
             <a
               href="/admin"
-              className="p-2 rounded-xl bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 text-xs transition"
+              className="p-1.5 sm:p-2 rounded-xl bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 text-[11px] sm:text-xs transition flex-shrink-0"
               title="لوحة التحكم"
             >
               🔒 الإدارة
@@ -824,56 +824,62 @@ export default function StoreFrontPage() {
                   return (
                     <div
                       key={`${item.product.id}-${item.selectedSize || 'nosize'}-${idx}`}
-                      className="flex items-center gap-4 p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60"
+                      className="p-3.5 sm:p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 space-y-3"
                     >
-                      <img
-                        src={item.product.image_url}
-                        alt={item.product.title_ar}
-                        className="w-16 h-16 rounded-xl object-cover bg-slate-950"
-                      />
-                      <div className="flex-1 space-y-1">
-                        <h4 className="text-sm font-bold text-white">
-                          {item.product.title_ar || item.product.title}
-                        </h4>
-                        {item.selectedSize && (
-                          <span className="inline-block text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">
-                            المقاس: {item.selectedSize}
-                          </span>
-                        )}
-                        {item.customText && (
-                          <p className="text-[11px] text-amber-300 font-medium">
-                            ✨ التطريز: &quot;{item.customText}&quot;
-                          </p>
-                        )}
-                        {item.selectedAddons && item.selectedAddons.length > 0 && (
-                          <div className="text-[11px] text-indigo-300 space-y-0.5">
-                            {item.selectedAddons.map(a => (
-                              <p key={a.id}>➕ {a.name} (+{a.price} ج.م)</p>
-                            ))}
-                          </div>
-                        )}
-                        <p className="text-xs font-semibold text-indigo-400">
-                          {itemUnitPrice} ج.م × {item.quantity} = {itemTotalPrice} ج.م
-                        </p>
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={item.product.image_url}
+                          alt={item.product.title_ar}
+                          className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover bg-slate-950 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <h4 className="text-xs sm:text-sm font-bold text-white leading-snug">
+                            {item.product.title_ar || item.product.title}
+                          </h4>
+                          {item.selectedSize && (
+                            <span className="inline-block text-[10px] sm:text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">
+                              المقاس: {item.selectedSize}
+                            </span>
+                          )}
+                          {item.customText && (
+                            <p className="text-[10px] sm:text-[11px] text-amber-300 font-medium truncate">
+                              ✨ التطريز: &quot;{item.customText}&quot;
+                            </p>
+                          )}
+                          {item.selectedAddons && item.selectedAddons.length > 0 && (
+                            <div className="text-[10px] sm:text-[11px] text-indigo-300 space-y-0.5">
+                              {item.selectedAddons.map(a => (
+                                <p key={a.id}>➕ {a.name} (+{a.price} ج.م)</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                    {/* Quantity Selector */}
-                    <div className="flex items-center gap-1.5 bg-slate-900 rounded-lg p-1 border border-slate-700">
-                      <button
-                        onClick={() => handleUpdateQuantity(idx, -1)}
-                        className="p-1 hover:bg-slate-800 text-slate-300 rounded"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="text-xs font-bold text-white px-1.5">{item.quantity}</span>
-                      <button
-                        onClick={() => handleUpdateQuantity(idx, 1)}
-                        className="p-1 hover:bg-slate-800 text-slate-300 rounded"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Bottom Row: Price & Quantity Controls */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                        <span className="text-xs font-black text-indigo-400 dir-ltr">
+                          {itemUnitPrice} ج.م × {item.quantity} = {itemTotalPrice} ج.م
+                        </span>
+
+                        {/* Quantity Selector */}
+                        <div className="flex items-center gap-1 bg-slate-900 rounded-lg p-1 border border-slate-700">
+                          <button
+                            onClick={() => handleUpdateQuantity(idx, -1)}
+                            className="p-1 hover:bg-slate-800 text-slate-300 rounded"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="text-xs font-bold text-white px-2">{item.quantity}</span>
+                          <button
+                            onClick={() => handleUpdateQuantity(idx, 1)}
+                            className="p-1 hover:bg-slate-800 text-slate-300 rounded"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
                 ))
               )}
             </div>
@@ -928,49 +934,49 @@ export default function StoreFrontPage() {
             </div>
 
             {/* Payment Method Selector Tabs */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3 mb-6">
               <button
                 type="button"
                 onClick={() => setPaymentMethod('vodafone_cash')}
-                className={`p-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 border transition-all ${
+                className={`p-3 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all ${
                   paymentMethod === 'vodafone_cash'
                     ? 'bg-rose-600/20 border-rose-500 text-rose-300 shadow-lg shadow-rose-600/10'
                     : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:bg-slate-800'
                 }`}
               >
-                <span className="w-3 h-3 rounded-full bg-rose-500"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0"></span>
                 <span>فودافون كاش (Vodafone Cash)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setPaymentMethod('instapay')}
-                className={`p-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 border transition-all ${
+                className={`p-3 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all ${
                   paymentMethod === 'instapay'
                     ? 'bg-purple-600/20 border-purple-500 text-purple-300 shadow-lg shadow-purple-600/10'
                     : 'bg-slate-800/60 border-slate-700/60 text-slate-400 hover:bg-slate-800'
                 }`}
               >
-                <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-500 flex-shrink-0"></span>
                 <span>إنستا باي (InstaPay)</span>
               </button>
             </div>
 
             {/* Transfer Instructions & Copy Box */}
             {paymentMethod === 'vodafone_cash' ? (
-              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 mb-6 space-y-3">
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 mb-6 space-y-3">
                 <div className="flex items-center justify-between text-xs text-slate-400">
                   <span>حول المبلغ على رقم فودافون كاش التالي:</span>
-                  <span className="text-rose-400 font-semibold">محفظة كاش</span>
+                  <span className="text-rose-400 font-semibold flex-shrink-0">محفظة كاش</span>
                 </div>
-                <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
-                  <span className="text-xl font-mono font-extrabold text-white tracking-widest">
+                <div className="flex flex-wrap xs:flex-nowrap items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                  <span className="text-base sm:text-xl font-mono font-extrabold text-white tracking-widest truncate dir-ltr select-all">
                     {activeVodafoneNumber}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleCopy(activeVodafoneNumber, 'voda')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition"
+                    className="w-full xs:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition flex-shrink-0"
                   >
                     {copiedText === 'voda' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copiedText === 'voda' ? 'تم النسخ' : 'نسخ الرقم'}</span>
@@ -978,19 +984,19 @@ export default function StoreFrontPage() {
                 </div>
               </div>
             ) : (
-              <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 mb-6 space-y-3">
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 mb-6 space-y-3">
                 <div className="flex items-center justify-between text-xs text-slate-400">
                   <span>حول المبلغ على حساب InstaPay IPA التالي:</span>
-                  <span className="text-purple-400 font-semibold">InstaPay</span>
+                  <span className="text-purple-400 font-semibold flex-shrink-0">InstaPay</span>
                 </div>
-                <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
-                  <span className="text-base font-mono font-bold text-white">
+                <div className="flex flex-wrap xs:flex-nowrap items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                  <span className="text-sm sm:text-base font-mono font-bold text-white truncate dir-ltr select-all">
                     {settings.instapay_ipa}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleCopy(settings.instapay_ipa, 'insta')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition"
+                    className="w-full xs:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition flex-shrink-0"
                   >
                     {copiedText === 'insta' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copiedText === 'insta' ? 'تم النسخ' : 'نسخ الحساب'}</span>
@@ -1011,7 +1017,7 @@ export default function StoreFrontPage() {
                   placeholder="أدخل اسمك الثلاثي"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
+                  className="w-full px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm"
                 />
               </div>
 
@@ -1025,12 +1031,12 @@ export default function StoreFrontPage() {
                   placeholder="010XXXXXXXX"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm font-mono"
+                  className="w-full px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-200 mb-1 flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-200 mb-1 flex flex-wrap items-center justify-between gap-1">
                   <span>الرقم المرجعي للمعاملة / رقم العملية <span className="text-rose-500 font-black">* (إجباري)</span></span>
                   <span className="text-[10px] text-amber-400 font-mono">Ref# / Transaction ID</span>
                 </label>
@@ -1040,7 +1046,7 @@ export default function StoreFrontPage() {
                   placeholder="أدخل الرقم المرجعي أو رقم العملية (مثال: Ref# 8554632e أو 123456789)"
                   value={transactionRef}
                   onChange={(e) => setTransactionRef(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-amber-500/60 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-sm font-mono shadow-inner shadow-amber-500/5"
+                  className="w-full px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl bg-slate-900 border border-amber-500/60 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs sm:text-sm font-mono shadow-inner shadow-amber-500/5"
                 />
               </div>
 

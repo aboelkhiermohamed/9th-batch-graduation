@@ -621,28 +621,28 @@ export default function AdminDashboardPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       {/* Admin Header */}
       <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
-              <ShieldCheck className="w-5 h-5" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 flex-shrink-0">
+              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <h1 className="text-base font-bold text-white">
+            <h1 className="text-xs sm:text-base font-bold text-white truncate">
               لوحة الإدارة - <span className="gradient-gold-text">{settings.store_name}</span>
             </h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <button
               onClick={fetchAllData}
-              className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"
+              className="p-1.5 sm:p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"
               title="تحديث البيانات"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
 
             <a
               href="/"
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] sm:text-xs font-semibold text-slate-300 flex-shrink-0"
             >
               المتجر الرئيسي ↗
             </a>
@@ -652,20 +652,20 @@ export default function AdminDashboardPage() {
                 sessionStorage.removeItem('admin_authenticated');
                 setIsAuthenticated(false);
               }}
-              className="p-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 text-xs transition"
+              className="p-1.5 sm:p-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 text-xs transition"
               title="خروج"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex border-t border-slate-800/60 overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex border-t border-slate-800/60 overflow-x-auto no-scrollbar scroll-smooth">
           {[
             { id: 'orders', label: `إدارة الطلبات (${orders.length})`, icon: ShoppingBag },
             { id: 'products', label: `المنتجات والمعرض (${products.length})`, icon: Package },
-            { id: 'gateway', label: `بوابة SMS والأجهزة المزامنة (${devices.filter(d => d.status === 'online').length} أونلاين)`, icon: Smartphone },
+            { id: 'gateway', label: `بوابة SMS والأجهزة (${devices.filter(d => d.status === 'online').length} أونلاين)`, icon: Smartphone },
             { id: 'settings', label: 'إعدادات الدفع والمحفظة', icon: Settings },
             { id: 'sms', label: `سجل الـ SMS (${transactions.length})`, icon: MessageSquare }
           ].map(tab => {
@@ -675,13 +675,13 @@ export default function AdminDashboardPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-5 py-3 font-bold text-xs sm:text-sm border-b-2 whitespace-nowrap transition-all ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 font-bold text-xs sm:text-sm border-b-2 whitespace-nowrap transition-all flex-shrink-0 ${
                   isActive
                     ? 'border-indigo-500 text-indigo-400 bg-slate-800/40'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>{tab.label}</span>
               </button>
             );
@@ -690,16 +690,16 @@ export default function AdminDashboardPage() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+      <main className="flex-1 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 w-full">
         
         {/* --- ORDERS TAB --- */}
         {activeTab === 'orders' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             
             {/* Filters Bar & PDF Export Button */}
-            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border border-slate-800">
-              <div className="flex-1 min-w-[240px] flex items-center gap-2 bg-slate-950 px-3.5 py-2.5 rounded-xl border border-slate-800">
-                <Search className="w-4 h-4 text-slate-500" />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800">
+              <div className="w-full sm:flex-1 flex items-center gap-2 bg-slate-950 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-slate-800">
+                <Search className="w-4 h-4 text-slate-500 flex-shrink-0" />
                 <input
                   type="text"
                   placeholder="ابحث بكود الطلب أو اسم العميل أو الموبايل..."
@@ -710,13 +710,13 @@ export default function AdminDashboardPage() {
               </div>
 
               {/* Status Filter Dropdown & Export PDF */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 font-semibold">حالة الطلب:</span>
+              <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 w-full sm:w-auto">
+                <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                  <span className="text-xs text-slate-400 font-semibold flex-shrink-0">حالة الطلب:</span>
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="bg-slate-950 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-800 focus:outline-none"
+                    className="w-full sm:w-auto bg-slate-950 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-800 focus:outline-none"
                   >
                     <option value="all">كل الطلبات</option>
                     <option value="pending">معلق (Pending)</option>
@@ -730,7 +730,7 @@ export default function AdminDashboardPage() {
 
                 <button
                   onClick={() => setIsPdfModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition flex-shrink-0"
                 >
                   <Printer className="w-4 h-4" />
                   <span>تصدير تقرير PDF احترافي 🖨️</span>
@@ -739,8 +739,8 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Orders Table */}
-            <div className="overflow-x-auto rounded-3xl border border-slate-800 bg-slate-900">
-              <table className="w-full text-right text-xs">
+            <div className="overflow-x-auto rounded-2xl sm:rounded-3xl border border-slate-800 bg-slate-900">
+              <table className="w-full text-right text-xs min-w-[850px]">
                 <thead className="bg-slate-950/80 text-slate-400 font-bold border-b border-slate-800">
                   <tr>
                     <th className="p-4">كود الطلب</th>
