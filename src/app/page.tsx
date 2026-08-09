@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   ShoppingBag, 
   Copy, 
@@ -45,6 +46,8 @@ const fireConfetti = (options?: any) => {
 };
 
 export default function StoreFrontPage() {
+  const router = useRouter();
+
   // Products & Settings State
   const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
@@ -53,6 +56,7 @@ export default function StoreFrontPage() {
   // Cart State
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCartLoaded, setIsCartLoaded] = useState(false);
 
   // Active Product Detail Modal State
   const [activeProductModal, setActiveProductModal] = useState<Product | null>(null);
@@ -62,7 +66,7 @@ export default function StoreFrontPage() {
   const [modalSelectedAddons, setModalSelectedAddons] = useState<ProductAddon[]>([]);
   const [isSizeChartModalOpen, setIsSizeChartModalOpen] = useState(false);
 
-  // Checkout Modal State
+  // Checkout Modal State (Legacy fallback / direct link)
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('vodafone_cash');
   const [customerName, setCustomerName] = useState('');
@@ -84,6 +88,42 @@ export default function StoreFrontPage() {
   const [trackedOrders, setTrackedOrders] = useState<Order[]>([]);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
   const [latestCreatedOrder, setLatestCreatedOrder] = useState<Order | null>(null);
+
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedCart = localStorage.getItem('graduation_store_cart');
+      if (savedCart) {
+        setCart(JSON.parse(savedCart));
+      }
+    } catch (e) {
+      console.error('Failed to load cart from localStorage', e);
+    } finally {
+      setIsCartLoaded(true);
+    }
+  }, []);
+
+  // Save cart to localStorage on change
+  useEffect(() => {
+    if (isCartLoaded) {
+      localStorage.setItem('graduation_store_cart', JSON.stringify(cart));
+    }
+  }, [cart, isCartLoaded]);
+
+  // Check URL params for tracker (e.g. return from /checkout)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tracker') === 'true') {
+        setIsTrackerOpen(true);
+        const code = params.get('code');
+        if (code) {
+          setSearchQuery(code);
+          fetchTrackedOrders(code, true);
+        }
+      }
+    }
+  }, []);
 
   // Fetch products and settings on mount
   useEffect(() => {
@@ -889,7 +929,10 @@ export default function StoreFrontPage() {
                 </div>
 
                 <button
-                  onClick={() => setIsCheckoutOpen(true)}
+                  onClick={() => {
+                    setIsCartOpen(false);
+                    router.push('/checkout');
+                  }}
                   className="w-full py-4 px-6 rounded-2xl gradient-purple-btn text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30"
                 >
                   <span>متابعة الدفع والتأكيد (ادفع الآن)</span>
