@@ -59,6 +59,7 @@ export default function StoreFrontPage() {
   const [modalActiveImageIndex, setModalActiveImageIndex] = useState(0);
   const [modalSelectedSize, setModalSelectedSize] = useState<string>('');
   const [modalCustomText, setModalCustomText] = useState<string>('');
+  const [modalSelectedAddons, setModalSelectedAddons] = useState<import('@/types').ProductAddon[]>([]);
   const [isSizeChartModalOpen, setIsSizeChartModalOpen] = useState(false);
 
   // Checkout Modal State
@@ -129,9 +130,9 @@ export default function StoreFrontPage() {
     setModalActiveImageIndex(0);
     setModalSelectedSize(product.sizes && product.sizes.length > 0 ? product.sizes[0] : '');
     setModalCustomText('');
+    setModalSelectedAddons([]);
   };
 
-  // Add to cart from modal
   const handleAddToCartFromModal = () => {
     if (!activeProductModal) return;
     const hasSizes = activeProductModal.sizes && activeProductModal.sizes.length > 0;
@@ -153,11 +154,13 @@ export default function StoreFrontPage() {
         product: activeProductModal,
         selectedSize: modalSelectedSize || undefined,
         customText: modalCustomText.trim() || undefined,
-        quantity: 1
+        quantity: 1,
+        selectedAddons: modalSelectedAddons.length > 0 ? [...modalSelectedAddons] : undefined
       }];
     });
 
     setActiveProductModal(null);
+    setModalSelectedAddons([]);
     setIsCartOpen(true);
   };
 
@@ -236,7 +239,10 @@ export default function StoreFrontPage() {
     });
   };
 
-  const cartTotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+  const cartTotal = cart.reduce((acc, item) => {
+    const addonsPrice = item.selectedAddons ? item.selectedAddons.reduce((sum, a) => sum + (a.price || 0), 0) : 0;
+    return acc + (item.product.price + addonsPrice) * item.quantity;
+  }, 0);
   const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   // Copy to clipboard helper
@@ -256,15 +262,25 @@ export default function StoreFrontPage() {
 
     setIsSubmittingOrder(true);
     try {
-      const orderItems = cart.map(item => ({
-        product_id: item.product.id,
-        product_title: item.product.title_ar || item.product.title,
-        selected_size: item.selectedSize,
-        customText: item.customText,
-        quantity: item.quantity,
-        unit_price: item.product.price,
-        product: item.product
-      }));
+      const orderItems = cart.map(item => {
+        const addonsPrice = item.selectedAddons ? item.selectedAddons.reduce((sum, a) => sum + (a.price || 0), 0) : 0;
+        const unitPrice = item.product.price + addonsPrice;
+        const addonsSummary = item.selectedAddons && item.selectedAddons.length > 0
+          ? item.selectedAddons.map(a => `${a.name} (+${a.price} ج.م)`).join('، ')
+          : undefined;
+
+        return {
+          product_id: item.product.id,
+          product_title: item.product.title_ar || item.product.title,
+          selected_size: item.selectedSize,
+          customText: item.customText,
+          customization_option: addonsSummary,
+          selected_addons: item.selectedAddons,
+          quantity: item.quantity,
+          unit_price: unitPrice,
+          product: item.product
+        };
+      });
 
       const res = await fetch('/api/orders', {
         method: 'POST',
@@ -556,153 +572,200 @@ export default function StoreFrontPage() {
       </main>
 
       {/* --- RICH INTERACTIVE PRODUCT DETAIL MODAL --- */}
-      {activeProductModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 flex items-center justify-center">
-          <div className="relative w-full max-w-3xl glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700/80 max-h-[90vh] overflow-y-auto">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-800">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>{activeProductModal.title_ar || activeProductModal.title}</span>
-                <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                  {activeProductModal.price} ج.م
-                </span>
-              </h3>
-              <button
-                onClick={() => setActiveProductModal(null)}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {activeProductModal && (() => {
+        const addonsExtra = modalSelectedAddons.reduce((sum, a) => sum + (a.price || 0), 0);
+        const modalTotalPrice = activeProductModal.price + addonsExtra;
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        return (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 flex items-center justify-center">
+            <div className="relative w-full max-w-3xl glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700/80 max-h-[90vh] overflow-y-auto">
               
-              {/* Left Column: Image Gallery Viewer */}
-              <div className="space-y-4">
-                <div className="relative aspect-[4/3] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800">
-                  <img
-                    src={
-                      (activeProductModal.images && activeProductModal.images[modalActiveImageIndex]) ||
-                      activeProductModal.image_url
-                    }
-                    alt={activeProductModal.title_ar}
-                    className="w-full h-full object-cover"
-                  />
-                  
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-800">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span>{activeProductModal.title_ar || activeProductModal.title}</span>
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                    {modalTotalPrice} ج.م
+                  </span>
+                </h3>
+                <button
+                  onClick={() => setActiveProductModal(null)}
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Left Column: Image Gallery Viewer */}
+                <div className="space-y-4">
+                  <div className="relative aspect-[4/3] bg-slate-900 rounded-2xl overflow-hidden border border-slate-800">
+                    <img
+                      src={
+                        (activeProductModal.images && activeProductModal.images[modalActiveImageIndex]) ||
+                        activeProductModal.image_url
+                      }
+                      alt={activeProductModal.title_ar}
+                      className="w-full h-full object-cover"
+                    />
+                    
+                    {activeProductModal.images && activeProductModal.images.length > 1 && (
+                      <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none">
+                        <button
+                          type="button"
+                          onClick={() => setModalActiveImageIndex(prev => (prev > 0 ? prev - 1 : activeProductModal.images!.length - 1))}
+                          className="p-2 rounded-full bg-slate-950/80 text-white pointer-events-auto border border-slate-700 hover:bg-slate-900"
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModalActiveImageIndex(prev => (prev < activeProductModal.images!.length - 1 ? prev + 1 : 0))}
+                          className="p-2 rounded-full bg-slate-950/80 text-white pointer-events-auto border border-slate-700 hover:bg-slate-900"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Gallery Thumbnails List */}
                   {activeProductModal.images && activeProductModal.images.length > 1 && (
-                    <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex justify-between pointer-events-none">
-                      <button
-                        type="button"
-                        onClick={() => setModalActiveImageIndex(prev => (prev > 0 ? prev - 1 : activeProductModal.images!.length - 1))}
-                        className="p-2 rounded-full bg-slate-950/80 text-white pointer-events-auto border border-slate-700 hover:bg-slate-900"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setModalActiveImageIndex(prev => (prev < activeProductModal.images!.length - 1 ? prev + 1 : 0))}
-                        className="p-2 rounded-full bg-slate-950/80 text-white pointer-events-auto border border-slate-700 hover:bg-slate-900"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {activeProductModal.images.map((imgUrl, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setModalActiveImageIndex(idx)}
+                          className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all flex-shrink-0 ${
+                            modalActiveImageIndex === idx ? 'border-amber-400 scale-105 shadow-md' : 'border-slate-800 opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          <img src={imgUrl} alt="Thumbnail" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
 
-                {/* Gallery Thumbnails List */}
-                {activeProductModal.images && activeProductModal.images.length > 1 && (
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                    {activeProductModal.images.map((imgUrl, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setModalActiveImageIndex(idx)}
-                        className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all flex-shrink-0 ${
-                          modalActiveImageIndex === idx ? 'border-amber-400 scale-105 shadow-md' : 'border-slate-800 opacity-60 hover:opacity-100'
-                        }`}
-                      >
-                        <img src={imgUrl} alt="Thumbnail" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
+                {/* Right Column: Customization Options & Details */}
+                <div className="space-y-5 text-right">
+                  <div>
+                    <p className="text-sm text-slate-300 leading-relaxed">
+                      {activeProductModal.description_ar || activeProductModal.description}
+                    </p>
                   </div>
-                )}
-              </div>
 
-              {/* Right Column: Customization Options & Details */}
-              <div className="space-y-5 text-right">
-                <div>
-                  <p className="text-sm text-slate-300 leading-relaxed">
-                    {activeProductModal.description_ar || activeProductModal.description}
-                  </p>
+                  {/* Size Selector */}
+                  {activeProductModal.sizes && activeProductModal.sizes.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-200">اختيار المقاس *</label>
+                        {activeProductModal.size_chart_url && (
+                          <button
+                            type="button"
+                            onClick={() => setIsSizeChartModalOpen(true)}
+                            className="text-xs text-amber-400 font-bold hover:underline flex items-center gap-1"
+                          >
+                            <Ruler className="w-3.5 h-3.5" />
+                            <span>دليل المقاسات 📐</span>
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {activeProductModal.sizes.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setModalSelectedSize(s)}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                              modalSelectedSize === s
+                                ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20 scale-105'
+                                : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
+                            }`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Embroidery / Name Customization Field */}
+                  {activeProductModal.has_customization && (
+                    <div className="space-y-2 p-4 rounded-2xl bg-slate-900 border border-amber-500/30">
+                      <label className="block text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        <span>{activeProductModal.customization_label || 'التطريز أو الطباعة المخصصة'}</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="أدخل الاسم أو الكلية (مثال: أحمد علي - حاسبات 2026)"
+                        value={modalCustomText}
+                        onChange={(e) => setModalCustomText(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  )}
+
+                  {/* Add-ons Checkboxes */}
+                  {activeProductModal.addons && activeProductModal.addons.length > 0 && (
+                    <div className="space-y-2 p-4 rounded-2xl bg-slate-900 border border-amber-500/30">
+                      <label className="block text-xs font-bold text-amber-300 flex items-center gap-1.5 mb-2">
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        <span>خيارات وإضافات مخصصة (Add-ons):</span>
+                      </label>
+                      <div className="space-y-2">
+                        {activeProductModal.addons.map((addon) => {
+                          const isChecked = modalSelectedAddons.some(a => a.id === addon.id);
+                          return (
+                            <label
+                              key={addon.id}
+                              className={`flex items-center justify-between p-3 rounded-xl border text-xs font-medium cursor-pointer transition-all ${
+                                isChecked
+                                  ? 'bg-amber-500/10 border-amber-500/50 text-amber-200'
+                                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setModalSelectedAddons(prev => [...prev, addon]);
+                                    } else {
+                                      setModalSelectedAddons(prev => prev.filter(a => a.id !== addon.id));
+                                    }
+                                  }}
+                                  className="w-4 h-4 rounded text-amber-500 bg-slate-900 border-slate-700 focus:ring-amber-500"
+                                />
+                                <span>{addon.name}</span>
+                              </div>
+                              <span className="font-bold font-mono text-amber-400">+{addon.price} ج.م</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add to cart submit */}
+                  <button
+                    type="button"
+                    onClick={handleAddToCartFromModal}
+                    className="w-full py-4 px-6 rounded-2xl gradient-purple-btn text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30"
+                  >
+                    <Plus className="w-5 h-5" />
+                    <span>إضافة المنتج للسلة ({modalTotalPrice} ج.م)</span>
+                  </button>
                 </div>
-
-                {/* Size Selector */}
-                {activeProductModal.sizes && activeProductModal.sizes.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-200">اختيار المقاس *</label>
-                      {activeProductModal.size_chart_url && (
-                        <button
-                          type="button"
-                          onClick={() => setIsSizeChartModalOpen(true)}
-                          className="text-xs text-amber-400 font-bold hover:underline flex items-center gap-1"
-                        >
-                          <Ruler className="w-3.5 h-3.5" />
-                          <span>دليل المقاسات 📐</span>
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {activeProductModal.sizes.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => setModalSelectedSize(s)}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                            modalSelectedSize === s
-                              ? 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/20 scale-105'
-                              : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
-                          }`}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Embroidery / Name Customization Field */}
-                {activeProductModal.has_customization && (
-                  <div className="space-y-2 p-4 rounded-2xl bg-slate-900 border border-amber-500/30">
-                    <label className="block text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-amber-400" />
-                      <span>{activeProductModal.customization_label || 'التطريز أو الطباعة المخصصة'}</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="أدخل الاسم أو الكلية (مثال: أحمد علي - حاسبات 2026)"
-                      value={modalCustomText}
-                      onChange={(e) => setModalCustomText(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                )}
-
-                {/* Add to cart submit */}
-                <button
-                  type="button"
-                  onClick={handleAddToCartFromModal}
-                  className="w-full py-4 px-6 rounded-2xl gradient-purple-btn text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30"
-                >
-                  <Plus className="w-5 h-5" />
-                  <span>إضافة المنتج للسلة بالمواصفات المحددة</span>
-                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* --- SIZE CHART VIEWER MODAL --- */}
       {isSizeChartModalOpen && activeProductModal?.size_chart_url && (
@@ -753,34 +816,46 @@ export default function StoreFrontPage() {
                   <p className="text-xs">اختر المنتجات من الصفحة الرئيسية وأضفها هنا</p>
                 </div>
               ) : (
-                cart.map((item, idx) => (
-                  <div
-                    key={`${item.product.id}-${item.selectedSize || 'nosize'}-${idx}`}
-                    className="flex items-center gap-4 p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60"
-                  >
-                    <img
-                      src={item.product.image_url}
-                      alt={item.product.title_ar}
-                      className="w-16 h-16 rounded-xl object-cover bg-slate-950"
-                    />
-                    <div className="flex-1 space-y-1">
-                      <h4 className="text-sm font-bold text-white">
-                        {item.product.title_ar || item.product.title}
-                      </h4>
-                      {item.selectedSize && (
-                        <span className="inline-block text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">
-                          المقاس: {item.selectedSize}
-                        </span>
-                      )}
-                      {item.customText && (
-                        <p className="text-[11px] text-amber-300 font-medium">
-                          ✨ التطريز: &quot;{item.customText}&quot;
+                cart.map((item, idx) => {
+                  const addonsExtra = item.selectedAddons ? item.selectedAddons.reduce((s, a) => s + (a.price || 0), 0) : 0;
+                  const itemUnitPrice = item.product.price + addonsExtra;
+                  const itemTotalPrice = itemUnitPrice * item.quantity;
+
+                  return (
+                    <div
+                      key={`${item.product.id}-${item.selectedSize || 'nosize'}-${idx}`}
+                      className="flex items-center gap-4 p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60"
+                    >
+                      <img
+                        src={item.product.image_url}
+                        alt={item.product.title_ar}
+                        className="w-16 h-16 rounded-xl object-cover bg-slate-950"
+                      />
+                      <div className="flex-1 space-y-1">
+                        <h4 className="text-sm font-bold text-white">
+                          {item.product.title_ar || item.product.title}
+                        </h4>
+                        {item.selectedSize && (
+                          <span className="inline-block text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">
+                            المقاس: {item.selectedSize}
+                          </span>
+                        )}
+                        {item.customText && (
+                          <p className="text-[11px] text-amber-300 font-medium">
+                            ✨ التطريز: &quot;{item.customText}&quot;
+                          </p>
+                        )}
+                        {item.selectedAddons && item.selectedAddons.length > 0 && (
+                          <div className="text-[11px] text-indigo-300 space-y-0.5">
+                            {item.selectedAddons.map(a => (
+                              <p key={a.id}>➕ {a.name} (+{a.price} ج.م)</p>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-xs font-semibold text-indigo-400">
+                          {itemUnitPrice} ج.م × {item.quantity} = {itemTotalPrice} ج.م
                         </p>
-                      )}
-                      <p className="text-xs font-semibold text-indigo-400">
-                        {item.product.price} ج.م × {item.quantity} = {item.product.price * item.quantity} ج.م
-                      </p>
-                    </div>
+                      </div>
 
                     {/* Quantity Selector */}
                     <div className="flex items-center gap-1.5 bg-slate-900 rounded-lg p-1 border border-slate-700">

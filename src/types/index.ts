@@ -2,13 +2,20 @@
 
 export type PaymentMethod = 'vodafone_cash' | 'instapay';
 
-export type OrderStatus = 
-  | 'pending'           // Waiting for payment transfer SMS
-  | 'auto_verified'     // System matched payment via SMS automatically
-  | 'manual_verified'   // Admin manually approved payment
-  | 'ready_for_pickup'  // Package packed & ready at pickup venue ("تابع جروب التليجرام")
-  | 'delivered'         // Handed over to customer
-  | 'cancelled';        // Cancelled or invalid
+export type OrderStatus =
+  | 'pending'
+  | 'auto_verified'
+  | 'manual_verified'
+  | 'ready_for_pickup'
+  | 'delivered'
+  | 'cancelled';
+
+// Add-on option that can be attached to a product (e.g. "تطريز اسم: +50 ج.م")
+export interface ProductAddon {
+  id: string;
+  name: string;   // e.g. "تطريز اسم الطالب"
+  price: number;  // Extra price added on top of base product price
+}
 
 export interface Product {
   id: string;
@@ -19,11 +26,12 @@ export interface Product {
   price: number;
   category: string;
   image_url: string;
-  images?: string[]; // Multiple product gallery images
-  size_chart_url?: string; // Optional Size Chart Image URL
-  has_customization?: boolean; // Enable custom text/embroidery input
-  customization_label?: string; // e.g., "الاسم أو الكلية على الجاكيت"
-  sizes: string[]; // e.g. ["S", "M", "L", "XL", "XXL"]
+  images?: string[];
+  size_chart_url?: string;
+  has_customization?: boolean;
+  customization_label?: string;
+  sizes: string[];
+  addons?: ProductAddon[]; // Optional add-ons with extra prices
   stock: number;
   is_active: boolean;
   created_at: string;
@@ -38,8 +46,9 @@ export interface OrderItem {
   selected_size?: string;
   quantity: number;
   unit_price: number;
-  custom_text?: string; // Custom embroidery/printed name typed by customer
-  customization_option?: string; // Custom option chosen
+  custom_text?: string;
+  customization_option?: string;
+  selected_addons?: ProductAddon[]; // Selected add-ons for this item
   product?: Product;
 }
 
@@ -53,7 +62,7 @@ export interface Order {
   total_amount: number;
   sender_phone?: string;
   transaction_ref?: string;
-  receipt_url?: string; // Screenshot / receipt uploaded by customer
+  receipt_url?: string;
   notes?: string;
   matched_transaction_id?: string;
   verified_at?: string;
@@ -103,5 +112,5 @@ export interface CartItem {
   customText?: string;
   customizationOption?: string;
   quantity: number;
+  selectedAddons?: ProductAddon[];
 }
-

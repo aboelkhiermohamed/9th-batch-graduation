@@ -83,13 +83,21 @@ export default function AdminDashboardPage() {
   const [newProdPrice, setNewProdPrice] = useState('');
   const [newProdCategory, setNewProdCategory] = useState('الملابس');
   const [newProdStock, setNewProdStock] = useState('100');
-  const [newProdImage, setNewProdImage] = useState('');
-  const [newProdImagesText, setNewProdImagesText] = useState('');
+  const [newProdImage, setNewProdImage] = useState(''); // final URL after upload
+  const [newProdImagePreview, setNewProdImagePreview] = useState('');
+  const [newProdImageUploading, setNewProdImageUploading] = useState(false);
+  const [newProdGalleryUrls, setNewProdGalleryUrls] = useState<string[]>([]); // final URLs
+  const [newProdGalleryPreviews, setNewProdGalleryPreviews] = useState<string[]>([]);
+  const [newProdGalleryUploading, setNewProdGalleryUploading] = useState(false);
   const [newProdSizeChart, setNewProdSizeChart] = useState('');
+  const [newProdSizeChartPreview, setNewProdSizeChartPreview] = useState('');
+  const [newProdSizeChartUploading, setNewProdSizeChartUploading] = useState(false);
   const [newProdHasCustomization, setNewProdHasCustomization] = useState(true);
   const [newProdCustomLabel, setNewProdCustomLabel] = useState('اسم الطالب أو الكلية للتطريز على القطعة');
   const [newProdSizes, setNewProdSizes] = useState('S, M, L, XL, XXL');
   const [newProdDescAr, setNewProdDescAr] = useState('');
+  // Add-ons: list of {id, name, price}
+  const [newProdAddons, setNewProdAddons] = useState<{id: string; name: string; price: string}[]>([]);
 
   // Settings form state
   const [vodaInput, setVodaInput] = useState('');
@@ -308,26 +316,81 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Upload a single image file to Supabase Storage products bucket
+  const uploadProductImage = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('bucket', 'products');
+    fd.append('folder', 'catalog');
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (res.ok && data.url) return data.url;
+    throw new Error(data.error || 'Upload failed');
+  };
+
+  // Handle main image file pick
+  const handleMainImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setNewProdImagePreview(URL.createObjectURL(file));
+    setNewProdImageUploading(true);
+    try {
+      const url = await uploadProductImage(file);
+      setNewProdImage(url);
+    } catch { alert('فشل رفع الصورة الرئيسية'); }
+    finally { setNewProdImageUploading(false); }
+  };
+
+  // Handle gallery images pick (multiple)
+  const handleGalleryImagesPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setNewProdGalleryPreviews(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]);
+    setNewProdGalleryUploading(true);
+    try {
+      const urls = await Promise.all(files.map(uploadProductImage));
+      setNewProdGalleryUrls(prev => [...prev, ...urls]);
+    } catch { alert('فشل رفع إحدى صور المعرض'); }
+    finally { setNewProdGalleryUploading(false); }
+  };
+
+  // Handle size chart image pick
+  const handleSizeChartPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setNewProdSizeChartPreview(URL.createObjectURL(file));
+    setNewProdSizeChartUploading(true);
+    try {
+      const url = await uploadProductImage(file);
+      setNewProdSizeChart(url);
+    } catch { alert('فشل رفع صورة دليل المقاسات'); }
+    finally { setNewProdSizeChartUploading(false); }
+  };
+
+  // Add-on helpers
+  const addNewAddon = () => setNewProdAddons(prev => [...prev, { id: Date.now().toString(), name: '', price: '0' }]);
+  const removeAddon = (id: string) => setNewProdAddons(prev => prev.filter(a => a.id !== id));
+  const updateAddon = (id: string, field: 'name' | 'price', value: string) =>
+    setNewProdAddons(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
+
   // Add Product
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProdTitleAr || !newProdPrice || !newProdImage) {
-      alert('يرجى إكمال الحقول الأساسية للمنتج');
+      alert('يرجى إكمال الحقول الأساسية للمنتج (الاسم، السعر، الصورة الرئيسية)');
+      return;
+    }
+    if (newProdImageUploading || newProdGalleryUploading || newProdSizeChartUploading) {
+      alert('انتظر اكتمال رفع الصور أولاً');
       return;
     }
 
     try {
-      const sizesArray = newProdSizes
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean);
-
-      const extraImages = newProdImagesText
-        .split('\n')
-        .map(url => url.trim())
-        .filter(Boolean);
-
-      const imagesArray = extraImages.length > 0 ? [newProdImage, ...extraImages] : [newProdImage];
+      const sizesArray = newProdSizes.split(',').map(s => s.trim()).filter(Boolean);
+      const allImages = newProdGalleryUrls.length > 0 ? [newProdImage, ...newProdGalleryUrls] : [newProdImage];
+      const addonsPayload = newProdAddons
+        .filter(a => a.name.trim())
+        .map(a => ({ id: a.id, name: a.name.trim(), price: Number(a.price) || 0 }));
 
       const res = await fetch('/api/admin/products', {
         method: 'POST',
@@ -338,12 +401,13 @@ export default function AdminDashboardPage() {
           category: newProdCategory,
           stock: Number(newProdStock),
           image_url: newProdImage,
-          images: imagesArray,
-          size_chart_url: newProdSizeChart.trim() || undefined,
+          images: allImages,
+          size_chart_url: newProdSizeChart || undefined,
           has_customization: newProdHasCustomization,
           customization_label: newProdCustomLabel.trim() || undefined,
           sizes: sizesArray,
-          description_ar: newProdDescAr
+          description_ar: newProdDescAr,
+          addons: addonsPayload,
         })
       });
 
@@ -352,9 +416,16 @@ export default function AdminDashboardPage() {
         setNewProdTitleAr('');
         setNewProdPrice('');
         setNewProdImage('');
-        setNewProdImagesText('');
+        setNewProdImagePreview('');
+        setNewProdGalleryUrls([]);
+        setNewProdGalleryPreviews([]);
         setNewProdSizeChart('');
+        setNewProdSizeChartPreview('');
+        setNewProdAddons([]);
         fetchAllData();
+      } else {
+        const err = await res.json();
+        alert('فشل إضافة المنتج: ' + (err.error || ''));
       }
     } catch (err) {
       alert('فشل إضافة المنتج');
@@ -1305,75 +1376,122 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <form onSubmit={handleAddProduct} className="space-y-4 text-right">
+            <form onSubmit={handleAddProduct} className="space-y-4 text-right max-h-[75vh] overflow-y-auto pr-1">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">اسم المنتج بالعربي *</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">\u0627\u0633\u0645 \u0627\u0644\u0645\u0646\u062a\u062c \u0628\u0627\u0644\u0639\u0631\u0628\u064a *</label>
                 <input
                   type="text"
                   required
-                  placeholder="مثال: جاكيت بيسبول التخرج"
+                  placeholder="\u0645\u062b\u0627\u0644: \u062c\u0627\u0643\u064a\u062a \u0628\u064a\u0633\u0628\u0648\u0644 \u0627\u0644\u062a\u062e\u0631\u062c"
                   value={newProdTitleAr}
                   onChange={(e) => setNewProdTitleAr(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">السعر (ج.م) *</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">\u0627\u0644\u0633\u0639\u0631 (\u062c.\u0645) *</label>
                   <input
                     type="number"
                     required
                     placeholder="650"
                     value={newProdPrice}
                     onChange={(e) => setNewProdPrice(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">الكمية بالمخزون</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">\u0627\u0644\u0643\u0645\u064a\u0629 \u0628\u0627\u0644\u0645\u062e\u0632\u0648\u0646</label>
                   <input
                     type="number"
                     value={newProdStock}
                     onChange={(e) => setNewProdStock(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
 
+              {/* Main Image Upload */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">رابط الصورة الرئيسية للمنتج *</label>
-                <input
-                  type="url"
-                  required
-                  placeholder="https://images.unsplash.com/..."
-                  value={newProdImage}
-                  onChange={(e) => setNewProdImage(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none font-mono"
-                />
+                <label className="block text-xs font-semibold text-slate-300 mb-1">\u0627\u0644\u0635\u0648\u0631\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 \u0644\u0644\u0645\u0646\u062a\u062c *</label>
+                <div className="relative">
+                  {newProdImagePreview ? (
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-700">
+                      <img src={newProdImagePreview} alt="preview" className="w-16 h-16 rounded-lg object-cover border border-slate-700 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        {newProdImageUploading ? (
+                          <p className="text-xs text-amber-400 font-bold animate-pulse">\u062c\u0627\u0631\u064a \u0627\u0644\u0631\u0641\u0639 \u0639\u0644\u0649 Supabase...</p>
+                        ) : (
+                          <p className="text-xs text-emerald-400 font-bold">\u2705 \u062a\u0645 \u0631\u0641\u0639 \u0627\u0644\u0635\u0648\u0631\u0629 \u0628\u0646\u062c\u0627\u062d</p>
+                        )}
+                        <p className="text-[10px] text-slate-500 truncate">{newProdImage}</p>
+                      </div>
+                      <button type="button" onClick={() => { setNewProdImage(''); setNewProdImagePreview(''); }} className="text-rose-400 hover:text-rose-300 text-xs">\u062d\u0630\u0641</button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 p-4 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-amber-500/60 cursor-pointer transition">
+                      <input type="file" accept="image/*" onChange={handleMainImagePick} className="hidden" />
+                      <Upload className="w-5 h-5 text-amber-400" />
+                      <span className="text-sm text-slate-300 font-medium">\u0627\u0636\u063a\u0637 \u0644\u0631\u0641\u0639 \u0627\u0644\u0635\u0648\u0631\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629</span>
+                    </label>
+                  )}
+                </div>
               </div>
 
+              {/* Gallery Images Upload */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">روابط صور إضافية للمعرض (مفصولة بسطر جديد)</label>
-                <textarea
-                  placeholder="https://images.unsplash.com/photo-1...&#10;https://images.unsplash.com/photo-2..."
-                  value={newProdImagesText}
-                  onChange={(e) => setNewProdImagesText(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none font-mono h-20"
-                ></textarea>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">\u0635\u0648\u0631 \u0625\u0636\u0627\u0641\u064a\u0629 \u0644\u0644\u0645\u0639\u0631\u0636 (\u064a\u0645\u0643\u0646 \u0627\u062e\u062a\u064a\u0627\u0631 \u0623\u0643\u062b\u0631 \u0645\u0646 \u0635\u0648\u0631\u0629)</label>
+                <div className="space-y-2">
+                  {newProdGalleryPreviews.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {newProdGalleryPreviews.map((src, i) => (
+                        <div key={i} className="relative">
+                          <img src={src} alt="" className="w-14 h-14 rounded-lg object-cover border border-slate-700" />
+                          {i < newProdGalleryUrls.length ? (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                              <Check className="w-2.5 h-2.5 text-white" />
+                            </span>
+                          ) : (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full animate-spin border border-amber-300" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-indigo-500/60 cursor-pointer transition">
+                    <input type="file" accept="image/*" multiple onChange={handleGalleryImagesPick} className="hidden" />
+                    <ImageIcon className="w-4 h-4 text-indigo-400" />
+                    <span className="text-xs text-slate-300">{newProdGalleryPreviews.length > 0 ? `\u0625\u0636\u0627\u0641\u0629 \u0645\u0632\u064a\u062f \u0645\u0646 \u0627\u0644\u0635\u0648\u0631 (${newProdGalleryPreviews.length} \u0645\u062d\u062f\u062f\u0629)` : '\u0627\u062e\u062a\u0631 \u0635\u0648\u0631 \u0625\u0636\u0627\u0641\u064a\u0629 \u0644\u0644\u0645\u0639\u0631\u0636 (اختياري)'}</span>
+                  </label>
+                </div>
               </div>
 
+              {/* Size Chart Upload */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">رابط صورة دليل المقاسات 📐 (Size Chart Image URL)</label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/size-chart..."
-                  value={newProdSizeChart}
-                  onChange={(e) => setNewProdSizeChart(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none font-mono"
-                />
+                <label className="block text-xs font-semibold text-slate-300 mb-1">\u0635\u0648\u0631\u0629 \u062f\u0644\u064a\u0644 \u0627\u0644\u0645\u0642\u0627\u0633\u0627\u062a \ud83d\udccf (Size Chart) \u2014 \u0627\u062e\u062a\u064a\u0627\u0631\u064a</label>
+                {newProdSizeChartPreview ? (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-700">
+                    <img src={newProdSizeChartPreview} alt="size chart" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
+                    <div className="flex-1">
+                      {newProdSizeChartUploading ? (
+                        <p className="text-xs text-amber-400 animate-pulse">\u062c\u0627\u0631\u064a \u0627\u0644\u0631\u0641\u0639...</p>
+                      ) : (
+                        <p className="text-xs text-emerald-400 font-bold">\u2705 \u062a\u0645 \u0631\u0641\u0639 \u062f\u0644\u064a\u0644 \u0627\u0644\u0645\u0642\u0627\u0633\u0627\u062a</p>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => { setNewProdSizeChart(''); setNewProdSizeChartPreview(''); }} className="text-rose-400 text-xs">\u062d\u0630\u0641</button>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-slate-500 cursor-pointer transition">
+                    <input type="file" accept="image/*" onChange={handleSizeChartPick} className="hidden" />
+                    <Ruler className="w-4 h-4 text-slate-400" />
+                    <span className="text-xs text-slate-400">\u0627\u0636\u063a\u0637 \u0644\u0631\u0641\u0639 \u062c\u062f\u0648\u0644 \u0627\u0644\u0645\u0642\u0627\u0633\u0627\u062a (اختياري)</span>
+                  </label>
+                )}
               </div>
 
+              {/* Customization Toggle */}
               <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
                 <label className="flex items-center gap-2 text-xs font-bold text-amber-300 cursor-pointer">
                   <input
@@ -1382,12 +1500,12 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setNewProdHasCustomization(e.target.checked)}
                     className="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-700"
                   />
-                  <span>تفعيل خيار التطريز / طباعة اسم الطالب للعميل ✨</span>
+                  <span>\u062a\u0641\u0639\u064a\u0644 \u062e\u064a\u0627\u0631 \u0627\u0644\u062a\u0637\u0631\u064a\u0632 / \u0637\u0628\u0627\u0639\u0629 \u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628 \u0644\u0644\u0639\u0645\u064a\u0644 \u2728</span>
                 </label>
                 {newProdHasCustomization && (
                   <input
                     type="text"
-                    placeholder="عنوان الحقل: اسم الطالب أو الكلية للتطريز..."
+                    placeholder="\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u062d\u0642\u0644: \u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628 \u0623\u0648 \u0627\u0644\u0643\u0644\u064a\u0629 \u0644\u0644\u062a\u0637\u0631\u064a\u0632..."
                     value={newProdCustomLabel}
                     onChange={(e) => setNewProdCustomLabel(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none"
@@ -1395,8 +1513,9 @@ export default function AdminDashboardPage() {
                 )}
               </div>
 
+              {/* Sizes */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">المقاسات المتاحة (مفصولة بفاصلة)</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">\u0627\u0644\u0645\u0642\u0627\u0633\u0627\u062a \u0627\u0644\u0645\u062a\u0627\u062d\u0629 (\u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0627\u0635\u0644\u0629) — \u0623\u062a\u0631\u0643\u0647\u0627 \u0641\u0627\u0631\u063a\u0629 \u0644\u0648 \u0644\u0627 \u064a\u0648\u062c\u062f \u0645\u0642\u0627\u0633\u0627\u062a</label>
                 <input
                   type="text"
                   placeholder="S, M, L, XL, XXL"
@@ -1406,13 +1525,75 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
+              {/* ===== ADD-ONS SECTION ===== */}
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-amber-500/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-400 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4" />
+                      \u0625\u0636\u0627\u0641\u0627\u062a \u0627\u062e\u062a\u064a\u0627\u0631\u064a\u0629 (Add-ons)
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">\u062e\u064a\u0627\u0631\u0627\u062a \u0625\u0636\u0627\u0641\u064a\u0629 \u064a\u062e\u062a\u0627\u0631\u0647\u0627 \u0627\u0644\u0639\u0645\u064a\u0644 \u0648\u062a\u064f\u0636\u0627\u0641 \u0644\u0633\u0639\u0631 \u0627\u0644\u0645\u0646\u062a\u062c (\u0645\u062b\u0644: \u062a\u0637\u0631\u064a\u0632 \u0627\u0633\u0645 +50\u062c.\u0645)</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addNewAddon}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    \u0625\u0636\u0627\u0641\u0629 Add-on
+                  </button>
+                </div>
+
+                {newProdAddons.length === 0 ? (
+                  <p className="text-center text-xs text-slate-500 py-2">\u0644\u0627 \u062a\u0648\u062c\u062f \u0625\u0636\u0627\u0641\u0627\u062a \u062d\u062a\u0649 \u0627\u0644\u0622\u0646 — \u0627\u0636\u063a\u0637 "+ \u0625\u0636\u0627\u0641\u0629 Add-on" \u0644\u0625\u0636\u0627\u0641\u0629 \u062e\u064a\u0627\u0631</p>
+                ) : (
+                  <div className="space-y-2">
+                    {newProdAddons.map((addon) => (
+                      <div key={addon.id} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="\u0627\u0633\u0645 \u0627\u0644\u0625\u0636\u0627\u0641\u0629 (\u0645\u062b\u0644: \u062a\u0637\u0631\u064a\u0632 \u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628)"
+                          value={addon.name}
+                          onChange={(e) => updateAddon(addon.id, 'name', e.target.value)}
+                          className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-500"
+                        />
+                        <div className="relative flex items-center">
+                          <input
+                            type="number"
+                            placeholder="0"
+                            min="0"
+                            value={addon.price}
+                            onChange={(e) => updateAddon(addon.id, 'price', e.target.value)}
+                            className="w-20 px-2 py-2 rounded-xl bg-slate-950 border border-slate-700 text-amber-300 text-xs font-mono focus:outline-none focus:border-amber-500 text-center"
+                          />
+                          <span className="absolute -left-5 text-[10px] text-slate-400 font-bold">\u062c.\u0645</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeAddon(addon.id)}
+                          className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition flex-shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <button
                 type="submit"
-                className="w-full py-3.5 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30"
+                disabled={newProdImageUploading || newProdGalleryUploading || newProdSizeChartUploading || !newProdImage}
+                className="w-full py-3.5 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                حفظ وإضافة المنتج فوراً
+                {(newProdImageUploading || newProdGalleryUploading || newProdSizeChartUploading)
+                  ? '\u062c\u0627\u0631\u064a \u0631\u0641\u0639 \u0627\u0644\u0635\u0648\u0631... \u23f3'
+                  : '\u062d\u0641\u0638 \u0648\u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0645\u0646\u062a\u062c \u0641\u0648\u0631\u0627\u064b'
+                }
               </button>
             </form>
+
           </div>
         </div>
       )}

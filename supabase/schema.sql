@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS public.store_products (
     has_customization BOOLEAN NOT NULL DEFAULT false, -- Enable custom text input
     customization_label VARCHAR(255) DEFAULT 'الاسم أو الكلية على القطعة',
     sizes JSONB DEFAULT '[]'::jsonb, -- e.g. ["S", "M", "L", "XL", "XXL"]
+    addons JSONB DEFAULT '[]'::jsonb, -- Array of optional add-ons e.g. [{"id":"1","name":"تطريز","price":50}]
     stock INTEGER NOT NULL DEFAULT 100,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,

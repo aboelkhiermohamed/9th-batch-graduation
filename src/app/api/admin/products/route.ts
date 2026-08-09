@@ -10,7 +10,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, title_ar, description, description_ar, price, category, image_url, images, size_chart_url, has_customization, customization_label, sizes, stock } = body;
+    const { title, title_ar, description, description_ar, price, category, image_url, images, size_chart_url, has_customization, customization_label, sizes, stock, addons } = body;
 
     if (!title_ar || !price || !image_url) {
       return NextResponse.json(
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
       has_customization: Boolean(has_customization),
       customization_label: customization_label || undefined,
       sizes: Array.isArray(sizes) ? sizes : [],
+      addons: Array.isArray(addons) ? addons : [],
       stock: Number(stock || 100),
       is_active: true,
       created_at: new Date().toISOString(),
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, title_ar, price, stock, sizes, image_url, images, size_chart_url, has_customization, customization_label, is_active, category } = body;
+    const { id, title_ar, price, stock, sizes, image_url, images, size_chart_url, has_customization, customization_label, is_active, category, addons } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Missing product ID' }, { status: 400 });
@@ -76,6 +77,7 @@ export async function PUT(req: NextRequest) {
           has_customization: has_customization !== undefined ? Boolean(has_customization) : p.has_customization,
           customization_label: customization_label !== undefined ? customization_label : p.customization_label,
           category: category || p.category,
+          addons: addons !== undefined ? addons : p.addons,
           is_active: is_active !== undefined ? is_active : p.is_active,
           updated_at: new Date().toISOString()
         };

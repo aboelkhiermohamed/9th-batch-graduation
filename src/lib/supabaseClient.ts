@@ -115,6 +115,7 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
       has_customization: Boolean(p.has_customization),
       customization_label: p.customization_label || undefined,
       sizes: Array.isArray(p.sizes) ? p.sizes : (typeof p.sizes === 'string' ? JSON.parse(p.sizes) : []),
+      addons: Array.isArray(p.addons) ? p.addons : (typeof p.addons === 'string' ? JSON.parse(p.addons) : []),
       stock: Number(p.stock || 0),
       is_active: Boolean(p.is_active),
       created_at: p.created_at || new Date().toISOString(),
@@ -146,6 +147,7 @@ export async function saveProductToSupabase(product: Product): Promise<boolean> 
         has_customization: product.has_customization || false,
         customization_label: product.customization_label || null,
         sizes: product.sizes,
+        addons: product.addons || [],
         stock: product.stock,
         is_active: product.is_active
       })
