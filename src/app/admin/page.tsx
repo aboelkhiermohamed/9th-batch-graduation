@@ -109,6 +109,14 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
+  // Detect if running locally (has port) or on production Vercel (no port)
+  const isLocalDev = typeof window !== 'undefined' && !!window.location.port;
+  const localPort = typeof window !== 'undefined' ? (window.location.port || '3000') : '3000';
+  // The URL to show in the gateway config card
+  const gatewayBaseUrl = isLocalDev
+    ? `http://192.168.1.4:${localPort}`
+    : originUrl; // on Vercel this is https://xxx.vercel.app
+
   // Check login on load
   useEffect(() => {
     const savedAuth = sessionStorage.getItem('admin_authenticated');
@@ -923,32 +931,32 @@ export default function AdminDashboardPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-amber-400 font-bold flex items-center gap-1.5 text-xs sm:text-sm">
                       <Sparkles className="w-4 h-4 text-amber-400" />
-                      <span>رابط الـ IP المحلي المباشر لتطبيق الموبايل (Local Network IP):</span>
+                      <span>{isLocalDev ? 'رابط الـ IP المحلي المباشر لتطبيق الموبايل (Local Network IP):' : 'رابط السيرفر (Vercel Production URL):'}</span>
                     </span>
                     <button
                       type="button"
                       onClick={() => {
-                        const portMatch = originUrl.match(/:(\d+)/);
-                        const currentPort = portMatch ? portMatch[1] : '3000';
-                        const lanUrl = `http://192.168.1.4:${currentPort}`;
-                        navigator.clipboard.writeText(lanUrl);
+                        navigator.clipboard.writeText(gatewayBaseUrl);
                         setCopiedBaseUrl(true);
                         setTimeout(() => setCopiedBaseUrl(false), 2000);
                       }}
                       className="flex items-center gap-1 text-xs text-amber-400 font-bold hover:underline"
                     >
                       {copiedBaseUrl ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedBaseUrl ? 'تم نسخ الـ IP بنجاح! ✓' : 'نسخ رابط الـ IP 📋'}</span>
+                      <span>{copiedBaseUrl ? 'تم النسخ! ✓' : 'نسخ الرابط 📋'}</span>
                     </button>
                   </div>
 
                   <div dir="ltr" className="bg-slate-900 p-3 rounded-xl border border-amber-500/30 font-mono text-amber-300 font-extrabold text-base text-left select-all flex items-center justify-between">
-                    <span>http://192.168.1.4:{originUrl.match(/:(\d+)/)?.[1] || '3000'}</span>
+                    <span>{gatewayBaseUrl}</span>
                     <span className="text-xs text-slate-400 font-sans font-normal">(ضع هذا الرابط في تطبيق الأندرويد)</span>
                   </div>
 
                   <p className="text-[11px] text-slate-300">
-                    💡 <strong>تنبيه هائم جداً لتطبيق الأندرويد:</strong> ضع هذا الرابط بالكامل <code className="text-amber-300 font-mono">http://192.168.1.4:{originUrl.match(/:(\d+)/)?.[1] || '3000'}</code> في خانة <strong>Base Server URL</strong> داخل التطبيق بدلاً من <code className="text-rose-400">localhost</code> لكي يستطيع هاتف الأندرويد الاتصال بالكمبيوتر عبر الشبكة المحلية (Wi-Fi).
+                    {isLocalDev
+                      ? <>💡 <strong>تنبيه هام:</strong> ضع هذا الرابط في خانة <strong>Base Server URL</strong> داخل التطبيق بدلاً من <code className="text-rose-400">localhost</code> لكي يستطيع هاتف الأندرويد الاتصال بالكمبيوتر عبر الشبكة المحلية (Wi-Fi).</>
+                      : <>✅ <strong>أنت على Vercel:</strong> استخدم هذا الرابط مباشرة في تطبيق الأندرويد — سيعمل من أي شبكة إنترنت وليس فقط الشبكة المحلية.</>
+                    }
                   </p>
                 </div>
 
@@ -959,9 +967,8 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        const port = originUrl.match(/:(\d+)/)?.[1] || '3000';
-                        navigator.clipboard.writeText(`http://192.168.1.4:${port}/api/sms`);
-                        alert('تم نسخ رابط الـ SMS Endpoint المباشر بنجاح!');
+                        navigator.clipboard.writeText(`${gatewayBaseUrl}/api/sms`);
+                        alert('تم نسخ رابط الـ SMS Endpoint بنجاح!');
                       }}
                       className="text-[11px] text-emerald-400 font-bold hover:underline flex items-center gap-1"
                     >
@@ -970,7 +977,7 @@ export default function AdminDashboardPage() {
                     </button>
                   </div>
                   <div dir="ltr" className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 font-mono text-emerald-400 text-xs text-left truncate select-all">
-                    http://192.168.1.4:{originUrl.match(/:(\d+)/)?.[1] || '3000'}/api/sms
+                    {gatewayBaseUrl}/api/sms
                   </div>
                 </div>
 
@@ -981,9 +988,8 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        const port = originUrl.match(/:(\d+)/)?.[1] || '3000';
-                        navigator.clipboard.writeText(`http://192.168.1.4:${port}/api/admin/devices`);
-                        alert('تم نسخ رابط الـ Device Ping Endpoint المباشر بنجاح!');
+                        navigator.clipboard.writeText(`${gatewayBaseUrl}/api/admin/devices`);
+                        alert('تم نسخ رابط الـ Device Ping Endpoint بنجاح!');
                       }}
                       className="text-[11px] text-emerald-400 font-bold hover:underline flex items-center gap-1"
                     >
@@ -992,7 +998,7 @@ export default function AdminDashboardPage() {
                     </button>
                   </div>
                   <div dir="ltr" className="bg-slate-900 p-2.5 rounded-xl border border-slate-800 font-mono text-emerald-400 text-xs text-left truncate select-all">
-                    http://192.168.1.4:{originUrl.match(/:(\d+)/)?.[1] || '3000'}/api/admin/devices
+                    {gatewayBaseUrl}/api/admin/devices
                   </div>
                 </div>
 
