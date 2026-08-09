@@ -304,22 +304,25 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
       .select()
       .single();
 
-    // Fallback: If receipt_url column is not created in Supabase yet, retry without receipt_url
-    if (orderError && orderPayload.receipt_url) {
-      console.warn('Supabase store_orders insert warning (retrying without receipt_url):', orderError.message);
-      delete orderPayload.receipt_url;
-      const retryRes = await supabase
-        .from('store_orders')
-        .insert(orderPayload)
-        .select()
-        .single();
-      insertedOrder = retryRes.data;
-      orderError = retryRes.error;
+    // Smart Column Fallback Loop for store_orders
+    let attempts = 0;
+    while (orderError && attempts < 5) {
+      attempts++;
+      const match = orderError.message.match(/Could not find the '([^']+)' column/i) || orderError.message.match(/column "([^"]+)"/i);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        console.warn(`Stripping missing column '${missingCol}' from order payload...`);
+        delete orderPayload[missingCol];
+        const res = await supabase.from('store_orders').insert(orderPayload).select().single();
+        insertedOrder = res.data;
+        orderError = res.error;
+      } else {
+        break;
+      }
     }
 
     if (orderError) {
-      console.warn('Supabase store_orders insert final error:', orderError.message);
-      // Still return true because order is already saved in memory!
+      console.warn('Supabase store_orders insert warning:', orderError.message);
     }
 
     if (insertedOrder?.id) {
