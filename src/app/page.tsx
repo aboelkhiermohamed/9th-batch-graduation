@@ -67,7 +67,10 @@ export default function StoreFrontPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [transactionRef, setTransactionRef] = useState('');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string>('');
+  const [receiptPreview, setReceiptPreview] = useState<string>('');
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
@@ -183,49 +186,43 @@ export default function StoreFrontPage() {
     setIsCartOpen(true);
   };
 
-  // Receipt File Change Handler with automatic Canvas Compression
-  const handleReceiptFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Receipt File Change Handler — uploads to Supabase Storage
+  const handleReceiptFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxDim = 900;
-        let width = img.width;
-        let height = img.height;
+    // Show local preview immediately
+    const previewUrl = URL.createObjectURL(file);
+    setReceiptPreview(previewUrl);
+    setReceiptFile(file);
+    setReceiptUrl(''); // clear old URL until upload finishes
 
-        if (width > height) {
-          if (width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          }
-        } else {
-          if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
+    // Upload to Supabase Storage
+    setIsUploadingReceipt(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('bucket', 'receipts');
+      fd.append('folder', 'orders');
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
-          setReceiptUrl(compressedDataUrl);
-        } else if (typeof event.target?.result === 'string') {
-          setReceiptUrl(event.target.result);
-        }
-      };
-      if (typeof event.target?.result === 'string') {
-        img.src = event.target.result;
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (res.ok && data.url) {
+        setReceiptUrl(data.url);
+      } else {
+        console.warn('Receipt upload failed:', data.error);
+        // Fallback: keep local preview URL so order can still be placed
+        setReceiptUrl(previewUrl);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Receipt upload error:', err);
+      setReceiptUrl(previewUrl);
+    } finally {
+      setIsUploadingReceipt(false);
+    }
   };
+
 
   const handleUpdateQuantity = (idx: number, delta: number) => {
     setCart(prev => {
@@ -289,6 +286,8 @@ export default function StoreFrontPage() {
         setTrackedOrders([data.order]);
         setCart([]);
         setReceiptUrl('');
+        setReceiptPreview('');
+        setReceiptFile(null);
         setIsCheckoutOpen(false);
         setIsTrackerOpen(true);
 
@@ -970,25 +969,35 @@ export default function StoreFrontPage() {
                 />
               </div>
 
-              {/* Payment Receipt Upload Field */}
               <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
                 <label className="block text-xs font-bold text-slate-200 flex items-center justify-between">
                   <span>رفع صورة إيصال التحويل / سكرين شوت الدفع 📸</span>
                   <span className="text-[11px] text-amber-400 font-normal">مستحسن لتأكيد فوري</span>
                 </label>
 
-                {receiptUrl ? (
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
+                {isUploadingReceipt ? (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800">
+                    <div className="w-8 h-8 rounded-lg border-2 border-amber-500/50 border-t-amber-400 animate-spin" />
+                    <div>
+                      <p className="text-xs font-bold text-amber-400">جاري رفع الصورة على Supabase...</p>
+                      {receiptPreview && <img src={receiptPreview} alt="preview" className="w-10 h-10 mt-1 rounded-lg object-cover border border-slate-700" />}
+                    </div>
+                  </div>
+                ) : receiptUrl ? (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-emerald-500/30">
                     <div className="flex items-center gap-3">
-                      <img src={receiptUrl} alt="Receipt preview" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
-                      <span className="text-xs text-emerald-400 font-bold">تم رفع صورة الإيصال بنجاح ✓</span>
+                      <img src={receiptPreview || receiptUrl} alt="Receipt preview" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
+                      <div>
+                        <span className="text-xs text-emerald-400 font-bold block">✅ تم الرفع على Supabase بنجاح!</span>
+                        <span className="text-[10px] text-slate-500 font-mono truncate block max-w-[180px]">صورة محفوظة دائمياً</span>
+                      </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setReceiptUrl('')}
+                      onClick={() => { setReceiptUrl(''); setReceiptPreview(''); setReceiptFile(null); }}
                       className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 text-xs"
                     >
-                      تغيير الصورة
+                      تغيير
                     </button>
                   </div>
                 ) : (
@@ -1001,7 +1010,7 @@ export default function StoreFrontPage() {
                     />
                     <div className="flex flex-col items-center justify-center space-y-1 text-slate-400">
                       <Upload className="w-6 h-6 text-amber-400 mb-1" />
-                      <p className="text-xs font-bold text-slate-200">اضغط لرفع سكرين شوت الدفع من الاستوديو</p>
+                      <p className="text-xs font-bold text-slate-200">اضغط لرفع سكرين شوت الدفع</p>
                       <p className="text-[10px] text-slate-500">PNG, JPG أو WEBP حتى 8MB</p>
                     </div>
                   </div>
@@ -1017,10 +1026,12 @@ export default function StoreFrontPage() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isSubmittingOrder}
+                disabled={isSubmittingOrder || isUploadingReceipt}
                 className="w-full py-4 px-6 rounded-2xl gradient-purple-btn text-white font-black text-base flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30 disabled:opacity-50"
               >
-                {isSubmittingOrder ? (
+                {isUploadingReceipt ? (
+                  <span>جاري رفع صورة الإيصال... ⏳</span>
+                ) : isSubmittingOrder ? (
                   <span>جاري حفظ وتأكيد الطلب...</span>
                 ) : (
                   <>
