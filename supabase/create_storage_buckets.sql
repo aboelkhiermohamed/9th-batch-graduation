@@ -26,23 +26,28 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- 3. Storage RLS Policies for 'receipts' bucket
-CREATE POLICY IF NOT EXISTS "Public read receipts"
+DROP POLICY IF EXISTS "Public read receipts" ON storage.objects;
+CREATE POLICY "Public read receipts"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'receipts');
 
-CREATE POLICY IF NOT EXISTS "Anyone can upload receipts"
+DROP POLICY IF EXISTS "Anyone can upload receipts" ON storage.objects;
+CREATE POLICY "Anyone can upload receipts"
   ON storage.objects FOR INSERT
   WITH CHECK (bucket_id = 'receipts');
 
 -- 4. Storage RLS Policies for 'products' bucket
-CREATE POLICY IF NOT EXISTS "Public read product images"
+DROP POLICY IF EXISTS "Public read product images" ON storage.objects;
+CREATE POLICY "Public read product images"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'products');
 
-CREATE POLICY IF NOT EXISTS "Anyone can upload product images"
+DROP POLICY IF EXISTS "Anyone can upload product images" ON storage.objects;
+CREATE POLICY "Anyone can upload product images"
   ON storage.objects FOR INSERT
   WITH CHECK (bucket_id = 'products');
 
-CREATE POLICY IF NOT EXISTS "Anyone can delete product images"
+DROP POLICY IF EXISTS "Anyone can delete product images" ON storage.objects;
+CREATE POLICY "Anyone can delete product images"
   ON storage.objects FOR DELETE
   USING (bucket_id = 'products');
