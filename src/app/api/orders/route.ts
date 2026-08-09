@@ -9,6 +9,13 @@ import {
 } from '@/lib/supabaseClient';
 import { matchOrderWithUnmatchedTransactions } from '@/lib/matchingEngine';
 
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'f' + Date.now().toString(16).padStart(11, '0') + '-4000-8000-000000000000';
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -21,7 +28,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const orderId = 'ord-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+    const orderId = generateUUID();
     const orderCode = 'GRAD-' + Math.floor(10000 + Math.random() * 90000);
 
     let totalAmount = 0;
@@ -31,7 +38,7 @@ export async function POST(req: NextRequest) {
       totalAmount += price * qty;
 
       return {
-        id: `item-${orderId}-${idx}`,
+        id: generateUUID(),
         order_id: orderId,
         product_id: item.product_id || item.product?.id,
         product_title: item.product_title || item.product?.title_ar || item.product?.title,

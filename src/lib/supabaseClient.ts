@@ -328,17 +328,24 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
 
     // Insert items into store_order_items
     if (order.items && order.items.length > 0) {
-      const productsList = getMemoryProducts();
-      const defaultUuid = 'a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6';
+      const productsList = await fetchProductsFromSupabase();
+      const firstValidProdUuid = productsList.find(p => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id))?.id || 'a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6';
 
-      const itemsPayload = order.items.map(item => {
+      const itemsPayload = order.items.map((item) => {
         let pId = item.product_id || item.product?.id;
         if (!pId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pId)) {
           const match = productsList.find(p => p.title_ar === item.product_title || p.title === item.product_title);
-          pId = (match && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(match.id)) ? match.id : defaultUuid;
+          pId = (match && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(match.id)) ? match.id : firstValidProdUuid;
         }
 
+        const itemId = (item.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id))
+          ? item.id
+          : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'f' + Date.now().toString(16).padStart(11, '0') + '-4000-8000-000000000000');
+
+        item.order_id = order.id;
+
         return {
+          id: itemId,
           order_id: order.id,
           product_id: pId,
           product_title: item.product_title || item.product?.title_ar || item.product?.title || 'منتج التخرج',
@@ -351,12 +358,25 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
       });
 
       if (itemsPayload.length > 0) {
-        const { error: itemsError } = await supabase
+        let { error: itemsError } = await supabase
           .from('store_order_items')
           .insert(itemsPayload);
 
-        if (itemsError) {
-          console.warn('Supabase store_order_items insert warning:', itemsError.message);
+        // Smart Fallback Loop for store_order_items missing columns
+        let attempts = 0;
+        while (itemsError && attempts < 5) {
+          attempts++;
+          const match = itemsError.message.match(/Could not find the '([^']+)' column/i) || itemsError.message.match(/column "([^"]+)"/i);
+          if (match && match[1]) {
+            const missingCol = match[1];
+            console.warn(`Stripping missing column '${missingCol}' from order items payload...`);
+            itemsPayload.forEach(p => delete (p as any)[missingCol]);
+            const res = await supabase.from('store_order_items').insert(itemsPayload);
+            itemsError = res.error;
+          } else {
+            console.warn('Supabase store_order_items insert warning:', itemsError.message);
+            break;
+          }
         }
       }
     }
