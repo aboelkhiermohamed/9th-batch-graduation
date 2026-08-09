@@ -1381,11 +1381,11 @@ export default function AdminDashboardPage() {
 
             <form onSubmit={handleAddProduct} className="space-y-4 text-right max-h-[75vh] overflow-y-auto pr-1">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">\u0627\u0633\u0645 \u0627\u0644\u0645\u0646\u062a\u062c \u0628\u0627\u0644\u0639\u0631\u0628\u064a *</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">اسم المنتج بالعربي *</label>
                 <input
                   type="text"
                   required
-                  placeholder="\u0645\u062b\u0627\u0644: \u062c\u0627\u0643\u064a\u062a \u0628\u064a\u0633\u0628\u0648\u0644 \u0627\u0644\u062a\u062e\u0631\u062c"
+                  placeholder="مثال: جاكيت بيسبول التخرج"
                   value={newProdTitleAr}
                   onChange={(e) => setNewProdTitleAr(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
@@ -1394,7 +1394,7 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">\u0627\u0644\u0633\u0639\u0631 (\u062c.\u0645) *</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">السعر (ج.م) *</label>
                   <input
                     type="number"
                     required
@@ -1405,7 +1405,7 @@ export default function AdminDashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">\u0627\u0644\u0643\u0645\u064a\u0629 \u0628\u0627\u0644\u0645\u062e\u0632\u0648\u0646</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">الكمية بالمخزون</label>
                   <input
                     type="number"
                     value={newProdStock}
@@ -1417,26 +1417,26 @@ export default function AdminDashboardPage() {
 
               {/* Main Image Upload */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">\u0627\u0644\u0635\u0648\u0631\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 \u0644\u0644\u0645\u0646\u062a\u062c *</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">الصورة الرئيسية للمنتج *</label>
                 <div className="relative">
                   {newProdImagePreview ? (
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-700">
                       <img src={newProdImagePreview} alt="preview" className="w-16 h-16 rounded-lg object-cover border border-slate-700 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         {newProdImageUploading ? (
-                          <p className="text-xs text-amber-400 font-bold animate-pulse">\u062c\u0627\u0631\u064a \u0627\u0644\u0631\u0641\u0639 \u0639\u0644\u0649 Supabase...</p>
+                          <p className="text-xs text-amber-400 font-bold animate-pulse">جاري الرفع على Supabase...</p>
                         ) : (
-                          <p className="text-xs text-emerald-400 font-bold">\u2705 \u062a\u0645 \u0631\u0641\u0639 \u0627\u0644\u0635\u0648\u0631\u0629 \u0628\u0646\u062c\u0627\u062d</p>
+                          <p className="text-xs text-emerald-400 font-bold">✅ تم رفع الصورة بنجاح</p>
                         )}
                         <p className="text-[10px] text-slate-500 truncate">{newProdImage}</p>
                       </div>
-                      <button type="button" onClick={() => { setNewProdImage(''); setNewProdImagePreview(''); }} className="text-rose-400 hover:text-rose-300 text-xs">\u062d\u0630\u0641</button>
+                      <button type="button" onClick={() => { setNewProdImage(''); setNewProdImagePreview(''); }} className="text-rose-400 hover:text-rose-300 text-xs">حذف</button>
                     </div>
                   ) : (
                     <label className="flex items-center justify-center gap-2 p-4 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-amber-500/60 cursor-pointer transition">
                       <input type="file" accept="image/*" onChange={handleMainImagePick} className="hidden" />
                       <Upload className="w-5 h-5 text-amber-400" />
-                      <span className="text-sm text-slate-300 font-medium">\u0627\u0636\u063a\u0637 \u0644\u0631\u0641\u0639 \u0627\u0644\u0635\u0648\u0631\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629</span>
+                      <span className="text-sm text-slate-300 font-medium">اضغط لرفع الصورة الرئيسية</span>
                     </label>
                   )}
                 </div>
@@ -1444,7 +1444,7 @@ export default function AdminDashboardPage() {
 
               {/* Gallery Images Upload */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">\u0635\u0648\u0631 \u0625\u0636\u0627\u0641\u064a\u0629 \u0644\u0644\u0645\u0639\u0631\u0636 (\u064a\u0645\u0643\u0646 \u0627\u062e\u062a\u064a\u0627\u0631 \u0623\u0643\u062b\u0631 \u0645\u0646 \u0635\u0648\u0631\u0629)</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">صور إضافية للمعرض (يمكن اختيار أكثر من صورة)</label>
                 <div className="space-y-2">
                   {newProdGalleryPreviews.length > 0 && (
                     <div className="flex flex-wrap gap-2">
@@ -1465,31 +1465,31 @@ export default function AdminDashboardPage() {
                   <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-indigo-500/60 cursor-pointer transition">
                     <input type="file" accept="image/*" multiple onChange={handleGalleryImagesPick} className="hidden" />
                     <ImageIcon className="w-4 h-4 text-indigo-400" />
-                    <span className="text-xs text-slate-300">{newProdGalleryPreviews.length > 0 ? `\u0625\u0636\u0627\u0641\u0629 \u0645\u0632\u064a\u062f \u0645\u0646 \u0627\u0644\u0635\u0648\u0631 (${newProdGalleryPreviews.length} \u0645\u062d\u062f\u062f\u0629)` : '\u0627\u062e\u062a\u0631 \u0635\u0648\u0631 \u0625\u0636\u0627\u0641\u064a\u0629 \u0644\u0644\u0645\u0639\u0631\u0636 (اختياري)'}</span>
+                    <span className="text-xs text-slate-300">{newProdGalleryPreviews.length > 0 ? `إضافة مزيد من الصور (${newProdGalleryPreviews.length} محددة)` : 'اختر صور إضافية للمعرض (اختياري)'}</span>
                   </label>
                 </div>
               </div>
 
               {/* Size Chart Upload */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">\u0635\u0648\u0631\u0629 \u062f\u0644\u064a\u0644 \u0627\u0644\u0645\u0642\u0627\u0633\u0627\u062a \ud83d\udccf (Size Chart) \u2014 \u0627\u062e\u062a\u064a\u0627\u0631\u064a</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">صورة دليل المقاسات 📐 (Size Chart) — اختياري</label>
                 {newProdSizeChartPreview ? (
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-700">
                     <img src={newProdSizeChartPreview} alt="size chart" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
                     <div className="flex-1">
                       {newProdSizeChartUploading ? (
-                        <p className="text-xs text-amber-400 animate-pulse">\u062c\u0627\u0631\u064a \u0627\u0644\u0631\u0641\u0639...</p>
+                        <p className="text-xs text-amber-400 animate-pulse">جاري الرفع...</p>
                       ) : (
-                        <p className="text-xs text-emerald-400 font-bold">\u2705 \u062a\u0645 \u0631\u0641\u0639 \u062f\u0644\u064a\u0644 \u0627\u0644\u0645\u0642\u0627\u0633\u0627\u062a</p>
+                        <p className="text-xs text-emerald-400 font-bold">✅ تم رفع دليل المقاسات</p>
                       )}
                     </div>
-                    <button type="button" onClick={() => { setNewProdSizeChart(''); setNewProdSizeChartPreview(''); }} className="text-rose-400 text-xs">\u062d\u0630\u0641</button>
+                    <button type="button" onClick={() => { setNewProdSizeChart(''); setNewProdSizeChartPreview(''); }} className="text-rose-400 text-xs">حذف</button>
                   </div>
                 ) : (
                   <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-slate-500 cursor-pointer transition">
                     <input type="file" accept="image/*" onChange={handleSizeChartPick} className="hidden" />
                     <Ruler className="w-4 h-4 text-slate-400" />
-                    <span className="text-xs text-slate-400">\u0627\u0636\u063a\u0637 \u0644\u0631\u0641\u0639 \u062c\u062f\u0648\u0644 \u0627\u0644\u0645\u0642\u0627\u0633\u0627\u062a (اختياري)</span>
+                    <span className="text-xs text-slate-400">اضغط لرفع جدول المقاسات (اختياري)</span>
                   </label>
                 )}
               </div>
@@ -1503,12 +1503,12 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setNewProdHasCustomization(e.target.checked)}
                     className="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-700"
                   />
-                  <span>\u062a\u0641\u0639\u064a\u0644 \u062e\u064a\u0627\u0631 \u0627\u0644\u062a\u0637\u0631\u064a\u0632 / \u0637\u0628\u0627\u0639\u0629 \u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628 \u0644\u0644\u0639\u0645\u064a\u0644 \u2728</span>
+                  <span>تفعيل خيار التطريز / طباعة اسم الطالب للعميل ✨</span>
                 </label>
                 {newProdHasCustomization && (
                   <input
                     type="text"
-                    placeholder="\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u062d\u0642\u0644: \u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628 \u0623\u0648 \u0627\u0644\u0643\u0644\u064a\u0629 \u0644\u0644\u062a\u0637\u0631\u064a\u0632..."
+                    placeholder="عنوان الحقل: اسم الطالب أو الكلية للتطريز..."
                     value={newProdCustomLabel}
                     onChange={(e) => setNewProdCustomLabel(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none"
@@ -1518,7 +1518,7 @@ export default function AdminDashboardPage() {
 
               {/* Sizes */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">\u0627\u0644\u0645\u0642\u0627\u0633\u0627\u062a \u0627\u0644\u0645\u062a\u0627\u062d\u0629 (\u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0627\u0635\u0644\u0629) — \u0623\u062a\u0631\u0643\u0647\u0627 \u0641\u0627\u0631\u063a\u0629 \u0644\u0648 \u0644\u0627 \u064a\u0648\u062c\u062f \u0645\u0642\u0627\u0633\u0627\u062a</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">المقاسات المتاحة (مفصولة بفاصلة) — أتركها فارغة لو لا يوجد مقاسات</label>
                 <input
                   type="text"
                   placeholder="S, M, L, XL, XXL"
@@ -1534,9 +1534,9 @@ export default function AdminDashboardPage() {
                   <div>
                     <h4 className="text-sm font-bold text-amber-400 flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4" />
-                      \u0625\u0636\u0627\u0641\u0627\u062a \u0627\u062e\u062a\u064a\u0627\u0631\u064a\u0629 (Add-ons)
+                      إضافات اختيارية (Add-ons)
                     </h4>
-                    <p className="text-[11px] text-slate-400 mt-0.5">\u062e\u064a\u0627\u0631\u0627\u062a \u0625\u0636\u0627\u0641\u064a\u0629 \u064a\u062e\u062a\u0627\u0631\u0647\u0627 \u0627\u0644\u0639\u0645\u064a\u0644 \u0648\u062a\u064f\u0636\u0627\u0641 \u0644\u0633\u0639\u0631 \u0627\u0644\u0645\u0646\u062a\u062c (\u0645\u062b\u0644: \u062a\u0637\u0631\u064a\u0632 \u0627\u0633\u0645 +50\u062c.\u0645)</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">خيارات إضافية يختارها العميل وتُضاف لسعر المنتج (مثل: تطريز اسم +50 ج.م)</p>
                   </div>
                   <button
                     type="button"
@@ -1544,19 +1544,19 @@ export default function AdminDashboardPage() {
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold transition"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    \u0625\u0636\u0627\u0641\u0629 Add-on
+                    إضافة Add-on
                   </button>
                 </div>
 
                 {newProdAddons.length === 0 ? (
-                  <p className="text-center text-xs text-slate-500 py-2">\u0644\u0627 \u062a\u0648\u062c\u062f \u0625\u0636\u0627\u0641\u0627\u062a \u062d\u062a\u0649 \u0627\u0644\u0622\u0646 — \u0627\u0636\u063a\u0637 "+ \u0625\u0636\u0627\u0641\u0629 Add-on" \u0644\u0625\u0636\u0627\u0641\u0629 \u062e\u064a\u0627\u0631</p>
+                  <p className="text-center text-xs text-slate-500 py-2">لا توجد إضافات حتى الآن — اضغط "+ إضافة Add-on" لإضافة خيار</p>
                 ) : (
                   <div className="space-y-2">
                     {newProdAddons.map((addon) => (
                       <div key={addon.id} className="flex items-center gap-2">
                         <input
                           type="text"
-                          placeholder="\u0627\u0633\u0645 \u0627\u0644\u0625\u0636\u0627\u0641\u0629 (\u0645\u062b\u0644: \u062a\u0637\u0631\u064a\u0632 \u0627\u0633\u0645 \u0627\u0644\u0637\u0627\u0644\u0628)"
+                          placeholder="اسم الإضافة (مثل: تطريز اسم الطالب)"
                           value={addon.name}
                           onChange={(e) => updateAddon(addon.id, 'name', e.target.value)}
                           className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-500"
@@ -1570,7 +1570,7 @@ export default function AdminDashboardPage() {
                             onChange={(e) => updateAddon(addon.id, 'price', e.target.value)}
                             className="w-20 px-2 py-2 rounded-xl bg-slate-950 border border-slate-700 text-amber-300 text-xs font-mono focus:outline-none focus:border-amber-500 text-center"
                           />
-                          <span className="absolute -left-5 text-[10px] text-slate-400 font-bold">\u062c.\u0645</span>
+                          <span className="absolute -left-5 text-[10px] text-slate-400 font-bold">ج.م</span>
                         </div>
                         <button
                           type="button"
@@ -1591,8 +1591,8 @@ export default function AdminDashboardPage() {
                 className="w-full py-3.5 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {(newProdImageUploading || newProdGalleryUploading || newProdSizeChartUploading)
-                  ? '\u062c\u0627\u0631\u064a \u0631\u0641\u0639 \u0627\u0644\u0635\u0648\u0631... \u23f3'
-                  : '\u062d\u0641\u0638 \u0648\u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0645\u0646\u062a\u062c \u0641\u0648\u0631\u0627\u064b'
+                  ? 'جاري رفع الصور... ⏳'
+                  : 'حفظ وإضافة المنتج فوراً'
                 }
               </button>
             </form>
