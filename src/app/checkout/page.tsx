@@ -289,11 +289,62 @@ export default function CheckoutPage() {
             </div>
             <div className="flex items-center justify-between text-xs pt-1">
               <span className="text-slate-400">حالة الطلب الآن:</span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30">
-                <Clock className="w-3.5 h-3.5" />
-                <span>معلق وفي انتظار التأكيد</span>
-              </span>
+              {createdOrder.status === 'auto_verified' ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/30">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>🤖 مؤكد تلقائياً</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>معلق وفي انتظار التأكيد</span>
+                </span>
+              )}
             </div>
+
+            {/* ORDER ITEMS & ADDONS LIST */}
+            {createdOrder.items && createdOrder.items.length > 0 && (
+              <div className="pt-3 border-t border-slate-800 space-y-2">
+                <p className="text-xs font-bold text-amber-400">محتويات الطلب والإضافات ({createdOrder.items.length}):</p>
+                <div className="space-y-1.5">
+                  {createdOrder.items.map((item, i) => (
+                    <div key={i} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1">
+                      <div className="flex justify-between font-bold text-white">
+                        <span>{item.product_title} × {item.quantity}</span>
+                        {item.selected_size && (
+                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[11px]">
+                            المقاس: {item.selected_size}
+                          </span>
+                        )}
+                      </div>
+                      {item.custom_text && (
+                        <p className="text-[11px] text-amber-400 font-medium">
+                          ✨ التطريز: &quot;{item.custom_text}&quot;
+                        </p>
+                      )}
+                      {item.customization_option && (
+                        <p className="text-[11px] text-emerald-400 font-medium">
+                          💎 الإضافات: {item.customization_option}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* RECEIPT PREVIEW IF ATTACHED */}
+            {createdOrder.receipt_url && (
+              <div className="pt-3 border-t border-slate-800 space-y-2">
+                <p className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>صورة إيصال التحويل المرفقة:</span>
+                </p>
+                <div className="bg-slate-950 p-2 rounded-xl border border-slate-800 flex justify-center">
+                  <img src={createdOrder.receipt_url} alt="Receipt" className="max-h-48 object-contain rounded-lg" />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="pt-2 flex flex-col sm:flex-row gap-3">

@@ -931,6 +931,11 @@ export default function AdminDashboardPage() {
                                     ✨ التطريز: &quot;{item.custom_text}&quot;
                                   </p>
                                 )}
+                                {item.customization_option && (
+                                  <p className="text-[11px] text-emerald-400 font-medium mt-0.5">
+                                    💎 الإضافات: {item.customization_option}
+                                  </p>
+                                )}
                               </div>
                             ))
                           )}
@@ -2226,7 +2231,7 @@ export default function AdminDashboardPage() {
                         </div>
                       </div>
 
-                      {item.custom_text ? (
+                      {item.custom_text && (
                         <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-indigo-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center justify-between">
                           <span className="flex items-center gap-1.5">
                             <Sparkles className="w-4 h-4 text-amber-400" />
@@ -2236,8 +2241,17 @@ export default function AdminDashboardPage() {
                             &quot;{item.custom_text}&quot;
                           </span>
                         </div>
-                      ) : (
-                        <p className="text-[11px] text-slate-500 italic">لا يوجد تخصيص أو تطريز لهذا المنتج</p>
+                      )}
+                      {item.customization_option && (
+                        <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-500/15 to-teal-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <Sparkles className="w-4 h-4 text-emerald-400" />
+                            <span>💎 الإضافات المطلوبة (Add-ons):</span>
+                          </span>
+                          <span className="bg-slate-950 px-3 py-1 rounded-lg text-emerald-300 font-bold text-xs border border-emerald-500/30">
+                            {item.customization_option}
+                          </span>
+                        </div>
                       )}
                     </div>
                   ))
