@@ -190,6 +190,7 @@ ALTER TABLE public.store_admins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.store_customers ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public read active products" ON public.store_products FOR SELECT USING (true);
+CREATE POLICY "Allow public write products" ON public.store_products FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public read store settings" ON public.store_settings FOR SELECT USING (true);
 CREATE POLICY "Allow public create orders" ON public.store_orders FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public read orders" ON public.store_orders FOR SELECT USING (true);

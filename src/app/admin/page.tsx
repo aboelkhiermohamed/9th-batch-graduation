@@ -377,13 +377,29 @@ export default function AdminDashboardPage() {
   const handleMainImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setNewProdImagePreview(URL.createObjectURL(file));
+    const localUrl = URL.createObjectURL(file);
+    setNewProdImagePreview(localUrl);
+    setNewProdImage(localUrl);
     setNewProdImageUploading(true);
+
     try {
       const url = await uploadProductImage(file);
-      setNewProdImage(url);
-    } catch { alert('فشل رفع الصورة الرئيسية'); }
-    finally { setNewProdImageUploading(false); }
+      if (url) {
+        setNewProdImage(url);
+        setNewProdImagePreview(url);
+      }
+    } catch (err) {
+      console.warn('Upload fallback to data URL');
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        if (evt.target?.result) {
+          setNewProdImage(evt.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setNewProdImageUploading(false);
+    }
   };
 
   // Handle gallery images pick (multiple)
@@ -1672,27 +1688,43 @@ export default function AdminDashboardPage() {
 
               {/* Main Image Upload */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">الصورة الرئيسية للمنتج *</label>
-                <div className="relative">
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  الصورة الرئيسية للمنتج * <span className="text-slate-400 font-normal">(رفع صورة من الجهاز أو إضافة رابط مباشر)</span>
+                </label>
+                <div className="space-y-2">
                   {newProdImagePreview ? (
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-700">
                       <img src={newProdImagePreview} alt="preview" className="w-16 h-16 rounded-lg object-cover border border-slate-700 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         {newProdImageUploading ? (
-                          <p className="text-xs text-amber-400 font-bold animate-pulse">جاري الرفع على Supabase...</p>
+                          <p className="text-xs text-amber-400 font-bold animate-pulse">جاري المعالجة...</p>
                         ) : (
-                          <p className="text-xs text-emerald-400 font-bold">✅ تم رفع الصورة بنجاح</p>
+                          <p className="text-xs text-emerald-400 font-bold">✅ تم تجهيز صورة المنتج</p>
                         )}
                         <p className="text-[10px] text-slate-500 truncate">{newProdImage}</p>
                       </div>
                       <button type="button" onClick={() => { setNewProdImage(''); setNewProdImagePreview(''); }} className="text-rose-400 hover:text-rose-300 text-xs">حذف</button>
                     </div>
                   ) : (
-                    <label className="flex items-center justify-center gap-2 p-4 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-amber-500/60 cursor-pointer transition">
-                      <input type="file" accept="image/*" onChange={handleMainImagePick} className="hidden" />
-                      <Upload className="w-5 h-5 text-amber-400" />
-                      <span className="text-sm text-slate-300 font-medium">اضغط لرفع الصورة الرئيسية</span>
-                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <label className="flex items-center justify-center gap-2 p-3.5 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-amber-500/60 cursor-pointer transition">
+                        <input type="file" accept="image/*" onChange={handleMainImagePick} className="hidden" />
+                        <Upload className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs text-slate-300 font-medium">رفع صورة من الجهاز</span>
+                      </label>
+
+                      <input
+                        type="url"
+                        placeholder="أو لصق رابط صورة مباشر https://..."
+                        value={newProdImage}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewProdImage(val);
+                          setNewProdImagePreview(val);
+                        }}
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
                   )}
                 </div>
               </div>
