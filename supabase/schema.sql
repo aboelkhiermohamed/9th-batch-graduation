@@ -168,8 +168,9 @@ CREATE TABLE IF NOT EXISTS public.store_admins (
 CREATE TABLE IF NOT EXISTS public.store_customers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     phone_number VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(255),
     full_name VARCHAR(255) NOT NULL,
-    password_hash VARCHAR(255),
+    password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

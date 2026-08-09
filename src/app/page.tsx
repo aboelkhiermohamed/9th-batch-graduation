@@ -90,11 +90,23 @@ export default function StoreFrontPage() {
   const [latestCreatedOrder, setLatestCreatedOrder] = useState<Order | null>(null);
 
   // Customer Auth & My Account State
-  const [customerSession, setCustomerSession] = useState<{ phone_number: string; full_name: string } | null>(null);
+  const [customerSession, setCustomerSession] = useState<{ phone_number: string; full_name: string; email?: string } | null>(null);
   const [isCustomerAuthOpen, setIsCustomerAuthOpen] = useState(false);
   const [isCustomerOrdersOpen, setIsCustomerOrdersOpen] = useState(false);
-  const [customerAuthPhone, setCustomerAuthPhone] = useState('');
-  const [customerAuthName, setCustomerAuthName] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authErrorMessage, setAuthErrorMessage] = useState('');
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+
+  // Login Form Inputs
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Register Form Inputs
+  const [registerFullName, setRegisterFullName] = useState('');
+  const [registerPhone, setRegisterPhone] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+
   const [customerOrdersList, setCustomerOrdersList] = useState<Order[]>([]);
   const [isCustomerOrdersLoading, setIsCustomerOrdersLoading] = useState(false);
 
@@ -136,33 +148,67 @@ export default function StoreFrontPage() {
 
   const handleCustomerLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerAuthPhone.trim()) {
-      alert('يرجى إدخال رقم الموبايل');
-      return;
-    }
-    const cleanPhone = customerAuthPhone.trim();
-    const cleanName = customerAuthName.trim() || 'عميل المتجر';
+    setAuthErrorMessage('');
+    setIsAuthSubmitting(true);
 
     try {
-      const res = await fetch('/api/customer/auth', {
+      const res = await fetch('/api/customer/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: cleanPhone, full_name: cleanName })
+        body: JSON.stringify({
+          identifier: loginIdentifier.trim(),
+          password: loginPassword.trim()
+        })
       });
+
       const data = await res.json();
-      const sess = data.customer || { phone_number: cleanPhone, full_name: cleanName };
-      setCustomerSession(sess);
-      localStorage.setItem('graduation_customer_session', JSON.stringify(sess));
-      setIsCustomerAuthOpen(false);
-      setIsCustomerOrdersOpen(true);
-      fetchCustomerOrders(cleanPhone);
-    } catch (e) {
-      const sess = { phone_number: cleanPhone, full_name: cleanName };
-      setCustomerSession(sess);
-      localStorage.setItem('graduation_customer_session', JSON.stringify(sess));
-      setIsCustomerAuthOpen(false);
-      setIsCustomerOrdersOpen(true);
-      fetchCustomerOrders(cleanPhone);
+      if (res.ok && data.success && data.customer) {
+        setCustomerSession(data.customer);
+        localStorage.setItem('graduation_customer_session', JSON.stringify(data.customer));
+        setIsCustomerAuthOpen(false);
+        setIsCustomerOrdersOpen(true);
+        fetchCustomerOrders(data.customer.phone_number);
+      } else {
+        setAuthErrorMessage(data.error || 'اسم المستخدم أو كلمة المرور غير صحيحة');
+      }
+    } catch (err: any) {
+      setAuthErrorMessage('حدث خطأ في الاتصال، يرجى إعادة المحاولة');
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  };
+
+  const handleCustomerRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthErrorMessage('');
+    setIsAuthSubmitting(true);
+
+    try {
+      const res = await fetch('/api/customer/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: registerFullName.trim(),
+          phone_number: registerPhone.trim(),
+          email: registerEmail.trim() || undefined,
+          password: registerPassword.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.customer) {
+        setCustomerSession(data.customer);
+        localStorage.setItem('graduation_customer_session', JSON.stringify(data.customer));
+        setIsCustomerAuthOpen(false);
+        setIsCustomerOrdersOpen(true);
+        fetchCustomerOrders(data.customer.phone_number);
+      } else {
+        setAuthErrorMessage(data.error || 'فشل إنشاء الحساب');
+      }
+    } catch (err: any) {
+      setAuthErrorMessage('حدث خطأ في الاتصال أثناء إنشاء الحساب');
+    } finally {
+      setIsAuthSubmitting(false);
     }
   };
 
@@ -1374,18 +1420,20 @@ export default function StoreFrontPage() {
         </div>
       )}
 
-      {/* --- CUSTOMER AUTH LOGIN MODAL --- */}
+      {/* --- CUSTOMER AUTHENTICATION MODAL (LOGIN & SIGN UP) --- */}
       {isCustomerAuthOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 flex items-center justify-center">
           <div className="relative w-full max-w-md glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700/80 space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+            
+            {/* Header & Close */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
-                  <Eye className="w-5 h-5" />
+                  <ShieldCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">تسجيل دخول العميل 🎓</h3>
-                  <p className="text-xs text-slate-400">استعرض سجل طلباتك وتتبع حالتها فورياً</p>
+                  <h3 className="text-lg font-bold text-white">حساب العملاء 🎓</h3>
+                  <p className="text-xs text-slate-400">سجل دخولك أو أنشئ حساباً لمتابعة طلباتك</p>
                 </div>
               </div>
               <button onClick={() => setIsCustomerAuthOpen(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400">
@@ -1393,37 +1441,145 @@ export default function StoreFrontPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCustomerLoginSubmit} className="space-y-4 text-right">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">اسمك بالكامل (اختياري)</label>
-                <input
-                  type="text"
-                  placeholder="أدخل اسمك"
-                  value={customerAuthName}
-                  onChange={(e) => setCustomerAuthName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">رقم الموبايل المسجل به الطلبات *</label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="010XXXXXXXX"
-                  value={customerAuthPhone}
-                  onChange={(e) => setCustomerAuthPhone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
+            {/* Auth Mode Tabs (Login vs Register) */}
+            <div className="grid grid-cols-2 p-1 bg-slate-900 rounded-2xl border border-slate-800">
               <button
-                type="submit"
-                className="w-full py-3.5 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30 transition"
+                type="button"
+                onClick={() => { setAuthMode('login'); setAuthErrorMessage(''); }}
+                className={`py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all ${
+                  authMode === 'login'
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
               >
-                تسجيل الدخول واستعراض طلباتي 🚀
+                تسجيل الدخول (Sign In)
               </button>
-            </form>
+              <button
+                type="button"
+                onClick={() => { setAuthMode('register'); setAuthErrorMessage(''); }}
+                className={`py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all ${
+                  authMode === 'register'
+                    ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                إنشاء حساب جديد ✨
+              </button>
+            </div>
+
+            {authErrorMessage && (
+              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold text-center">
+                {authErrorMessage}
+              </div>
+            )}
+
+            {/* LOGIN FORM */}
+            {authMode === 'login' ? (
+              <form onSubmit={handleCustomerLoginSubmit} className="space-y-4 text-right">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    رقم الموبايل أو البريد الإلكتروني *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="أدخل رقم الموبايل أو الإيميل"
+                    value={loginIdentifier}
+                    onChange={(e) => setLoginIdentifier(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    كلمة المرور *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="أدخل كلمة السر"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isAuthSubmitting}
+                  className="w-full py-3.5 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30 disabled:opacity-50 transition"
+                >
+                  {isAuthSubmitting ? 'جاري التحقق...' : 'تسجيل الدخول 🚀'}
+                </button>
+              </form>
+            ) : (
+              /* REGISTER FORM */
+              <form onSubmit={handleCustomerRegisterSubmit} className="space-y-4 text-right">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    الاسم الثلاثي بالكامل *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="أدخل اسمك الثلاثي"
+                    value={registerFullName}
+                    onChange={(e) => setRegisterFullName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    رقم الموبايل (مهم لمتابعة واستلام الطلب) *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="010XXXXXXXX"
+                    value={registerPhone}
+                    onChange={(e) => setRegisterPhone(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    البريد الإلكتروني (اختياري)
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="name@example.com"
+                    value={registerEmail}
+                    onChange={(e) => setRegisterEmail(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500 dir-ltr text-right"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    كلمة المرور للحساب *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="أكثر من 4 أرقام أو حروف"
+                    value={registerPassword}
+                    onChange={(e) => setRegisterPassword(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isAuthSubmitting}
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/20 disabled:opacity-50 transition"
+                >
+                  {isAuthSubmitting ? 'جاري إنشاء الحساب...' : 'إنشاء حساب جديد الآن ✨'}
+                </button>
+              </form>
+            )}
+
           </div>
         </div>
       )}

@@ -67,6 +67,15 @@ export default function CheckoutPage() {
           setCart(JSON.parse(savedCart));
         }
 
+        const savedCustomer = localStorage.getItem('graduation_customer_session');
+        if (savedCustomer) {
+          try {
+            const cust = JSON.parse(savedCustomer);
+            if (cust.full_name) setCustomerName(cust.full_name);
+            if (cust.phone_number) setCustomerPhone(cust.phone_number);
+          } catch(e) {}
+        }
+
         const setRes = await fetch('/api/admin/settings');
         if (setRes.ok) {
           const setts = await setRes.json();
