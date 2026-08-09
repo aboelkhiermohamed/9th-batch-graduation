@@ -8,7 +8,9 @@ import {
   getMemoryTransactions,
   setMemoryTransactions,
   fetchOrdersFromSupabase,
-  updateOrderStatusInSupabase
+  fetchTransactionsFromSupabase,
+  updateOrderStatusInSupabase,
+  supabase
 } from './supabaseClient';
 
 export interface MatchResult {
@@ -145,5 +147,95 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
     matched: false,
     message: `No matching pending order found for amount ${tx.amount} EGP`
   };
+}
+
+/**
+ * Attempts to match a newly submitted Order against existing UNMATCHED incoming SMS transactions.
+ * Handles the scenario where SMS arrived BEFORE order submission (e.g. while customer was on checkout page).
+ */
+export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Promise<{ matched: boolean; matchedTx?: IncomingTransaction }> {
+  try {
+    const transactions = await fetchTransactionsFromSupabase();
+    const unmatchedTxs = transactions.filter(t => t.status === 'unmatched' || !t.matched_order_id);
+
+    if (unmatchedTxs.length === 0) {
+      return { matched: false };
+    }
+
+    const cleanCustomerPhone = normalizePhoneNumber(newOrder.customer_phone);
+    const cleanSenderPhone = newOrder.sender_phone ? normalizePhoneNumber(newOrder.sender_phone) : cleanCustomerPhone;
+    const cleanRef = newOrder.transaction_ref ? newOrder.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+
+    let matchedTx: IncomingTransaction | undefined = undefined;
+
+    // 1. Priority 1: Match by Transaction Reference Number (الرقم المرجعي)
+    if (cleanRef) {
+      matchedTx = unmatchedTxs.find(tx => {
+        if (tx.transaction_ref) {
+          const tRef = tx.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (tRef === cleanRef || (cleanRef.length > 5 && (tRef.includes(cleanRef) || cleanRef.includes(tRef)))) return true;
+        }
+        if (tx.raw_sms) {
+          const rawClean = tx.raw_sms.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (rawClean.includes(cleanRef)) return true;
+        }
+        return false;
+      });
+    }
+
+    // 2. Priority 2: Amount + Phone Match
+    if (!matchedTx) {
+      for (const tx of unmatchedTxs) {
+        const amountDiff = Math.abs(Number(newOrder.total_amount) - Number(tx.amount));
+        const isAmountMatch = amountDiff < 0.01 || tx.amount === 0;
+
+        const cleanTxPhone = tx.sender_phone ? normalizePhoneNumber(tx.sender_phone) : '';
+
+        const phoneMatches =
+          (cleanTxPhone && cleanCustomerPhone && (cleanTxPhone === cleanCustomerPhone || cleanTxPhone.endsWith(cleanCustomerPhone.slice(-7)))) ||
+          (cleanTxPhone && cleanSenderPhone && (cleanTxPhone === cleanSenderPhone || cleanTxPhone.endsWith(cleanSenderPhone.slice(-7)))) ||
+          (tx.raw_sms && cleanCustomerPhone && cleanCustomerPhone.length >= 7 && tx.raw_sms.includes(cleanCustomerPhone.slice(-8))) ||
+          (tx.raw_sms && cleanSenderPhone && cleanSenderPhone.length >= 7 && tx.raw_sms.includes(cleanSenderPhone.slice(-8)));
+
+        if (isAmountMatch && phoneMatches) {
+          matchedTx = tx;
+          break;
+        }
+      }
+    }
+
+    // 3. Priority 3: Amount match if only 1 unmatched transaction has that exact amount
+    if (!matchedTx) {
+      const amountMatches = unmatchedTxs.filter(
+        tx => Math.abs(Number(tx.amount) - Number(newOrder.total_amount)) < 0.01
+      );
+      if (amountMatches.length === 1) {
+        matchedTx = amountMatches[0];
+      }
+    }
+
+    if (matchedTx) {
+      newOrder.status = 'auto_verified';
+      newOrder.matched_transaction_id = matchedTx.id;
+      newOrder.verified_at = new Date().toISOString();
+      newOrder.updated_at = new Date().toISOString();
+
+      // Mark transaction as matched
+      matchedTx.status = 'matched';
+      matchedTx.matched_order_id = newOrder.id;
+
+      // Update memory state
+      const currentTxs = getMemoryTransactions();
+      const updatedTxs = currentTxs.map(t => t.id === matchedTx!.id ? { ...t, status: 'matched' as const, matched_order_id: newOrder.id } : t);
+      setMemoryTransactions(updatedTxs);
+
+      return { matched: true, matchedTx };
+    }
+
+    return { matched: false };
+  } catch (err) {
+    console.error('Error matching order with unmatched transactions:', err);
+    return { matched: false };
+  }
 }
 

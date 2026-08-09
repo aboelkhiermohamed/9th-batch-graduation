@@ -7,6 +7,7 @@ import {
   fetchOrdersFromSupabase, 
   updateOrderStatusInSupabase 
 } from '@/lib/supabaseClient';
+import { matchOrderWithUnmatchedTransactions } from '@/lib/matchingEngine';
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,6 +60,9 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
       items: orderItems
     };
+
+    // 0. Auto-verify immediately if the payment SMS arrived BEFORE order submission (while on checkout page)
+    await matchOrderWithUnmatchedTransactions(newOrder);
 
     // 1. Save locally
     const existingOrders = getMemoryOrders();
