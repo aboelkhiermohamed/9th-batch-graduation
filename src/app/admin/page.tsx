@@ -50,15 +50,18 @@ import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } fro
 export default function AdminDashboardPage() {
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [currentAdmin, setCurrentAdmin] = useState<{ id: string; username: string; display_name: string; role: string } | null>(null);
 
-  // Active Tab: 'orders' | 'products' | 'settings' | 'sms' | 'gateway'
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'settings' | 'sms' | 'gateway'>('orders');
+  // Active Tab: 'orders' | 'products' | 'admins' | 'settings' | 'sms' | 'gateway'
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'admins' | 'settings' | 'sms' | 'gateway'>('orders');
 
   // Data state
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [adminsList, setAdminsList] = useState<any[]>([]);
   const [settings, setSettings] = useState<StoreSettings>({
     id: 'default',
     store_name: '9th batch graduation',
@@ -70,6 +73,13 @@ export default function AdminDashboardPage() {
   const [transactions, setTransactions] = useState<IncomingTransaction[]>([]);
   const [devices, setDevices] = useState<GatewayDevice[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Admin Users Management Form State
+  const [isAddAdminOpen, setIsAddAdminOpen] = useState(false);
+  const [newAdminUsername, setNewAdminUsername] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminRole, setNewAdminRole] = useState<'superadmin' | 'admin'>('admin');
 
   // PDF Export Modal State
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
@@ -99,7 +109,6 @@ export default function AdminDashboardPage() {
   const [newProdCustomLabel, setNewProdCustomLabel] = useState('اسم الطالب أو الكلية للتطريز على القطعة');
   const [newProdSizes, setNewProdSizes] = useState('S, M, L, XL, XXL');
   const [newProdDescAr, setNewProdDescAr] = useState('');
-  // Add-ons: list of {id, name, price}
   const [newProdAddons, setNewProdAddons] = useState<{id: string; name: string; price: string}[]>([]);
 
   // Settings form state
@@ -120,24 +129,26 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
-  // Detect if running locally (has port) or on production Vercel (no port)
   const isLocalDev = typeof window !== 'undefined' && !!window.location.port;
   const localPort = typeof window !== 'undefined' ? (window.location.port || '3000') : '3000';
-  // The URL to show in the gateway config card
   const gatewayBaseUrl = isLocalDev
     ? `http://192.168.1.4:${localPort}`
-    : originUrl; // on Vercel this is https://xxx.vercel.app
+    : originUrl;
 
   // Check login on load
   useEffect(() => {
     const savedAuth = sessionStorage.getItem('admin_authenticated');
+    const savedProfile = sessionStorage.getItem('admin_profile');
     if (savedAuth === 'true') {
       setIsAuthenticated(true);
+      if (savedProfile) {
+        try { setCurrentAdmin(JSON.parse(savedProfile)); } catch(e) {}
+      }
       fetchAllData();
     }
   }, []);
 
-  // Periodic poll for devices when gateway tab is active (Fast 3s poll for real-time testing)
+  // Periodic poll for devices when gateway tab is active
   useEffect(() => {
     let interval: any;
     if (isAuthenticated && activeTab === 'gateway') {
@@ -149,15 +160,35 @@ export default function AdminDashboardPage() {
     return () => clearInterval(interval);
   }, [isAuthenticated, activeTab]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'admin123' || password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('admin_authenticated', 'true');
-      setAuthError('');
-      fetchAllData();
-    } else {
-      setAuthError('كلمة المرور غير صحيحة');
+    setAuthError('');
+
+    try {
+      const res = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.admin) {
+        setIsAuthenticated(true);
+        setCurrentAdmin(data.admin);
+        sessionStorage.setItem('admin_authenticated', 'true');
+        sessionStorage.setItem('admin_profile', JSON.stringify(data.admin));
+        fetchAllData();
+      } else {
+        setAuthError(data.error || 'اسم المستخدم أو كلمة المرور غير صحيحة');
+      }
+    } catch (err: any) {
+      if (password === 'admin123' || password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+        setIsAuthenticated(true);
+        sessionStorage.setItem('admin_authenticated', 'true');
+        fetchAllData();
+      } else {
+        setAuthError('تعذر الاتصال بالسيرفر لتسجيل الدخول');
+      }
     }
   };
 
@@ -170,15 +201,25 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const fetchAdmins = async () => {
+    try {
+      const res = await fetch('/api/admin/users');
+      if (res.ok) setAdminsList(await res.json());
+    } catch (err) {
+      console.warn('Failed to fetch admins', err);
+    }
+  };
+
   const fetchAllData = async () => {
     setIsLoading(true);
     try {
-      const [ordRes, prodRes, setRes, smsRes, devRes] = await Promise.all([
+      const [ordRes, prodRes, setRes, smsRes, devRes, admRes] = await Promise.all([
         fetch('/api/orders'),
         fetch('/api/admin/products'),
         fetch('/api/admin/settings'),
         fetch('/api/sms'),
-        fetch('/api/admin/devices')
+        fetch('/api/admin/devices'),
+        fetch('/api/admin/users')
       ]);
 
       if (ordRes.ok) setOrders(await ordRes.json());
@@ -194,6 +235,7 @@ export default function AdminDashboardPage() {
       }
       if (smsRes.ok) setTransactions(await smsRes.json());
       if (devRes.ok) setDevices(await devRes.json());
+      if (admRes.ok) setAdminsList(await admRes.json());
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
@@ -522,6 +564,51 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleAddAdminSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminUsername.trim() || !newAdminPassword.trim() || !newAdminName.trim()) {
+      alert('يرجى تعبئة كافة الحقول المطلوبة');
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: newAdminUsername.trim(),
+          password: newAdminPassword.trim(),
+          display_name: newAdminName.trim(),
+          role: newAdminRole
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('تمت إضافة المشرف بنجاح! 🔑');
+        setIsAddAdminOpen(false);
+        setNewAdminUsername('');
+        setNewAdminPassword('');
+        setNewAdminName('');
+        fetchAdmins();
+      } else {
+        alert(data.error || 'فشل إضافة المشرف');
+      }
+    } catch (e: any) {
+      alert('حدث خطأ أثناء إضافة المشرف');
+    }
+  };
+
+  const handleDeleteAdminSubmit = async (id: string) => {
+    if (!confirm('هل أنت تأكد من حذف هذا المشرف؟')) return;
+    try {
+      const res = await fetch(`/api/admin/users?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setAdminsList(prev => prev.filter(a => a.id !== id));
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+  };
+
   const handleClearAllDevices = async () => {
     if (!confirm('هل أنت تأكد من مسح جميع الأجهزة المسجلة؟')) return;
     try {
@@ -590,7 +677,21 @@ export default function AdminDashboardPage() {
           <form onSubmit={handleLogin} className="space-y-4 text-right">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
-                كلمة السر للوحة التحكم
+                اسم المستخدم (Username)
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="أدخل اسم المستخدم (الافتراضي: admin)"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                كلمة المرور (Password)
               </label>
               <input
                 type="password"
@@ -1233,6 +1334,160 @@ export default function AdminDashboardPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* --- ADMINS MANAGEMENT TAB --- */}
+        {activeTab === 'admins' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 glass-card p-6 rounded-3xl border border-slate-800">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <UserCheck className="w-6 h-6 text-amber-400" />
+                  <span>إدارة مشرفي ورؤساء لوحة التحكم (Admins Management)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">يمكنك إضافة حسابات إدارية جديدة وتحديد صلاحياتهم للتحكم بالطلبات والمنتجات</p>
+              </div>
+
+              <button
+                onClick={() => setIsAddAdminOpen(true)}
+                className="flex items-center gap-2 px-5 py-3 rounded-2xl gradient-purple-btn text-white font-bold text-xs sm:text-sm shadow-xl shadow-indigo-600/30 transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إضافة مشرف جديد +</span>
+              </button>
+            </div>
+
+            <div className="glass-card rounded-3xl border border-slate-800 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-right text-xs sm:text-sm">
+                  <thead className="bg-slate-950/80 text-slate-400 font-bold border-b border-slate-800">
+                    <tr>
+                      <th className="p-4">الاسم الظاهر</th>
+                      <th className="p-4">اسم المستخدم (Username)</th>
+                      <th className="p-4">الصلاحية (Role)</th>
+                      <th className="p-4">تاريخ الإضافة</th>
+                      <th className="p-4">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono">
+                    {adminsList.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-slate-500">
+                          لا يوجد مشرفون مسجلون حالياً سوى الحساب الرئيسي
+                        </td>
+                      </tr>
+                    ) : (
+                      adminsList.map(adm => (
+                        <tr key={adm.id} className="hover:bg-slate-800/40 transition">
+                          <td className="p-4 font-bold text-white font-sans">
+                            {adm.display_name}
+                          </td>
+                          <td className="p-4 text-amber-400 font-bold">
+                            @{adm.username}
+                          </td>
+                          <td className="p-4 font-sans">
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                              adm.role === 'superadmin' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                            }`}>
+                              {adm.role === 'superadmin' ? '👑 مدير عام (Super Admin)' : '🛡️ مشرف طلبات (Admin)'}
+                            </span>
+                          </td>
+                          <td className="p-4 text-slate-400 text-xs">
+                            {new Date(adm.created_at || Date.now()).toLocaleDateString('ar-EG')}
+                          </td>
+                          <td className="p-4">
+                            {adm.username !== 'admin' && (
+                              <button
+                                onClick={() => handleDeleteAdminSubmit(adm.id)}
+                                className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
+                                title="حذف المشرف"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- ADD ADMIN MODAL --- */}
+        {isAddAdminOpen && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 flex items-center justify-center">
+            <div className="relative w-full max-w-md glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700/80 space-y-6">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-amber-400" />
+                  <span>إضافة حساب مشرف جديد</span>
+                </h3>
+                <button onClick={() => setIsAddAdminOpen(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400">
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddAdminSubmit} className="space-y-4 text-right">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">الاسم الكامل / الوظيفي *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="مثال: أحمد علي - مشرف تتبع الطلبات"
+                    value={newAdminName}
+                    onChange={(e) => setNewAdminName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">اسم المستخدم للإنضمام (Username) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="مثال: ahmed_admin"
+                    value={newAdminUsername}
+                    onChange={(e) => setNewAdminUsername(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500 dir-ltr text-right"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">كلمة المرور للحساب (Password) *</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="كلمة السر الخاصة به"
+                    value={newAdminPassword}
+                    onChange={(e) => setNewAdminPassword(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">صلاحيات الحساب (Role)</label>
+                  <select
+                    value={newAdminRole}
+                    onChange={(e) => setNewAdminRole(e.target.value as any)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="admin">مشرف طلبات عادي (Moderator)</option>
+                    <option value="superadmin">👑 مدير عام (Super Admin)</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30 transition"
+                >
+                  تأكيد وإنشاء الحساب الإداري
+                </button>
+              </form>
             </div>
           </div>
         )}

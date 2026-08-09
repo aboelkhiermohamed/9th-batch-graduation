@@ -114,3 +114,20 @@ export interface CartItem {
   quantity: number;
   selectedAddons?: ProductAddon[];
 }
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  display_name: string;
+  role: 'superadmin' | 'admin';
+  is_active: boolean;
+  password?: string;
+  created_at: string;
+}
+
+export interface CustomerUser {
+  id?: string;
+  phone_number: string;
+  full_name: string;
+  created_at?: string;
+}

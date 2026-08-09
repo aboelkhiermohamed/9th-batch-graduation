@@ -153,6 +153,31 @@ VALUES
 )
 ON CONFLICT DO NOTHING;
 
+-- 7. ADMIN USERS TABLE
+CREATE TABLE IF NOT EXISTS public.store_admins (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'admin', -- 'superadmin', 'admin'
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 8. CUSTOMERS TABLE
+CREATE TABLE IF NOT EXISTS public.store_customers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone_number VARCHAR(50) NOT NULL UNIQUE,
+    full_name VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- INSERT INITIAL DEFAULT SUPER ADMIN
+INSERT INTO public.store_admins (username, password_hash, display_name, role)
+VALUES ('admin', 'admin123', 'المدير العام (Super Admin)', 'superadmin')
+ON CONFLICT (username) DO NOTHING;
+
 -- RLS POLICIES
 ALTER TABLE public.store_products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.store_settings ENABLE ROW LEVEL SECURITY;
@@ -160,6 +185,8 @@ ALTER TABLE public.store_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.store_order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.store_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.store_devices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.store_admins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.store_customers ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public read active products" ON public.store_products FOR SELECT USING (true);
 CREATE POLICY "Allow public read store settings" ON public.store_settings FOR SELECT USING (true);
@@ -168,6 +195,8 @@ CREATE POLICY "Allow public read orders" ON public.store_orders FOR SELECT USING
 CREATE POLICY "Allow public create order items" ON public.store_order_items FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public read order items" ON public.store_order_items FOR SELECT USING (true);
 CREATE POLICY "Allow public device read and ping" ON public.store_devices FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow admin read and write admins" ON public.store_admins FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow customer read and write customers" ON public.store_customers FOR ALL USING (true) WITH CHECK (true);
 
 -- Admin Full Access Policies
 CREATE POLICY "Allow admin full access products" ON public.store_products FOR ALL USING (true) WITH CHECK (true);

@@ -89,19 +89,82 @@ export default function StoreFrontPage() {
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
   const [latestCreatedOrder, setLatestCreatedOrder] = useState<Order | null>(null);
 
-  // Load cart from localStorage on mount
+  // Customer Auth & My Account State
+  const [customerSession, setCustomerSession] = useState<{ phone_number: string; full_name: string } | null>(null);
+  const [isCustomerAuthOpen, setIsCustomerAuthOpen] = useState(false);
+  const [isCustomerOrdersOpen, setIsCustomerOrdersOpen] = useState(false);
+  const [customerAuthPhone, setCustomerAuthPhone] = useState('');
+  const [customerAuthName, setCustomerAuthName] = useState('');
+  const [customerOrdersList, setCustomerOrdersList] = useState<Order[]>([]);
+  const [isCustomerOrdersLoading, setIsCustomerOrdersLoading] = useState(false);
+
+  // Load cart and customer session from localStorage on mount
   useEffect(() => {
     try {
       const savedCart = localStorage.getItem('graduation_store_cart');
       if (savedCart) {
         setCart(JSON.parse(savedCart));
       }
+      const savedCustomer = localStorage.getItem('graduation_customer_session');
+      if (savedCustomer) {
+        const sess = JSON.parse(savedCustomer);
+        setCustomerSession(sess);
+        fetchCustomerOrders(sess.phone_number);
+      }
     } catch (e) {
-      console.error('Failed to load cart from localStorage', e);
+      console.error('Failed to load storage in storefront', e);
     } finally {
       setIsCartLoaded(true);
     }
   }, []);
+
+  const fetchCustomerOrders = async (phone: string) => {
+    if (!phone) return;
+    setIsCustomerOrdersLoading(true);
+    try {
+      const res = await fetch(`/api/orders?search=${encodeURIComponent(phone)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCustomerOrdersList(data);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch customer orders', e);
+    } finally {
+      setIsCustomerOrdersLoading(false);
+    }
+  };
+
+  const handleCustomerLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerAuthPhone.trim()) {
+      alert('يرجى إدخال رقم الموبايل');
+      return;
+    }
+    const cleanPhone = customerAuthPhone.trim();
+    const cleanName = customerAuthName.trim() || 'عميل المتجر';
+
+    try {
+      const res = await fetch('/api/customer/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number: cleanPhone, full_name: cleanName })
+      });
+      const data = await res.json();
+      const sess = data.customer || { phone_number: cleanPhone, full_name: cleanName };
+      setCustomerSession(sess);
+      localStorage.setItem('graduation_customer_session', JSON.stringify(sess));
+      setIsCustomerAuthOpen(false);
+      setIsCustomerOrdersOpen(true);
+      fetchCustomerOrders(cleanPhone);
+    } catch (e) {
+      const sess = { phone_number: cleanPhone, full_name: cleanName };
+      setCustomerSession(sess);
+      localStorage.setItem('graduation_customer_session', JSON.stringify(sess));
+      setIsCustomerAuthOpen(false);
+      setIsCustomerOrdersOpen(true);
+      fetchCustomerOrders(cleanPhone);
+    }
+  };
 
   // Save cart to localStorage on change
   useEffect(() => {
@@ -419,6 +482,29 @@ export default function StoreFrontPage() {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+            {/* Customer Account / Login Button */}
+            {customerSession ? (
+              <button
+                onClick={() => {
+                  fetchCustomerOrders(customerSession.phone_number);
+                  setIsCustomerOrdersOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs sm:text-sm font-bold text-amber-300 transition-all"
+              >
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <span className="hidden xs:inline">حسابي ({customerSession.full_name || customerSession.phone_number})</span>
+                <span className="xs:hidden">حسابي</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsCustomerAuthOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-xs sm:text-sm font-bold text-indigo-300 transition-all"
+              >
+                <Eye className="w-4 h-4 text-indigo-400" />
+                <span>تسجيل دخول 👤</span>
+              </button>
+            )}
+
             {/* Track Order Button */}
             <button
               onClick={() => setIsTrackerOpen(true)}
@@ -1278,6 +1364,176 @@ export default function StoreFrontPage() {
                       <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-indigo-300 flex items-center justify-between">
                         <span>مكان التسليم: <strong className="text-amber-400">{settings.pickup_note}</strong></span>
                         <span className="text-[11px] text-slate-400">{new Date(order.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- CUSTOMER AUTH LOGIN MODAL --- */}
+      {isCustomerAuthOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 flex items-center justify-center">
+          <div className="relative w-full max-w-md glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700/80 space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">تسجيل دخول العميل 🎓</h3>
+                  <p className="text-xs text-slate-400">استعرض سجل طلباتك وتتبع حالتها فورياً</p>
+                </div>
+              </div>
+              <button onClick={() => setIsCustomerAuthOpen(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCustomerLoginSubmit} className="space-y-4 text-right">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">اسمك بالكامل (اختياري)</label>
+                <input
+                  type="text"
+                  placeholder="أدخل اسمك"
+                  value={customerAuthName}
+                  onChange={(e) => setCustomerAuthName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">رقم الموبايل المسجل به الطلبات *</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="010XXXXXXXX"
+                  value={customerAuthPhone}
+                  onChange={(e) => setCustomerAuthPhone(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30 transition"
+              >
+                تسجيل الدخول واستعراض طلباتي 🚀
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- CUSTOMER MY ORDERS MODAL (حسابي وطلباتي) --- */}
+      {isCustomerOrdersOpen && customerSession && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 flex items-center justify-center">
+          <div className="relative w-full max-w-2xl glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700/80 space-y-6">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">حسابي وطلباتي 👤</h3>
+                  <p className="text-xs text-slate-400">
+                    أهلاً بك <strong className="text-amber-400">{customerSession.full_name}</strong> ({customerSession.phone_number})
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('graduation_customer_session');
+                    setCustomerSession(null);
+                    setIsCustomerOrdersOpen(false);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs border border-rose-500/20 transition"
+                >
+                  خروج
+                </button>
+                <button
+                  onClick={() => setIsCustomerOrdersOpen(false)}
+                  className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Orders List */}
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              {isCustomerOrdersLoading ? (
+                <div className="py-12 text-center text-slate-400 space-y-2">
+                  <span className="w-6 h-6 rounded-full border-2 border-amber-400 border-t-transparent animate-spin inline-block"></span>
+                  <p className="text-xs font-semibold">جاري جلب سجل طلباتك...</p>
+                </div>
+              ) : customerOrdersList.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 space-y-3">
+                  <Package className="w-12 h-12 stroke-1 mx-auto text-slate-600" />
+                  <p className="text-sm font-bold text-slate-300">لا توجد طلبات مسجلة برقم الموبايل هذا ({customerSession.phone_number})</p>
+                  <button
+                    onClick={() => {
+                      setIsCustomerOrdersOpen(false);
+                      router.push('/');
+                    }}
+                    className="px-5 py-2.5 rounded-xl gradient-purple-btn text-white text-xs font-bold shadow-lg"
+                  >
+                    تصفح متجر المنتجات واحجز الآن
+                  </button>
+                </div>
+              ) : (
+                customerOrdersList.map((order) => {
+                  const isVerified = order.status === 'auto_verified' || order.status === 'manual_verified';
+                  const isReady = order.status === 'ready_for_pickup';
+                  const isDelivered = order.status === 'delivered';
+
+                  return (
+                    <div key={order.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 text-right">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                        <div>
+                          <span className="text-xs text-slate-400">كود الطلب:</span>
+                          <span className="text-base font-extrabold text-amber-400 mr-2 font-mono">#{order.order_code}</span>
+                        </div>
+
+                        {/* Status Badge */}
+                        {isVerified && (
+                          <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/40">
+                            ✅ تم تأكيد الدفع بنجاح
+                          </span>
+                        )}
+                        {isReady && (
+                          <span className="px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-xs border border-indigo-500/40">
+                            📦 جاهز للاستلام بالمقر
+                          </span>
+                        )}
+                        {isDelivered && (
+                          <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 font-bold text-xs border border-purple-500/40">
+                            🎉 تم التسليم بنجاح
+                          </span>
+                        )}
+                        {!isVerified && !isReady && !isDelivered && (
+                          <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40">
+                            ⏳ قيد المراجعة والتأكيد
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-slate-400">تاريخ الطلب: <strong className="text-white">{new Date(order.created_at).toLocaleDateString('ar-EG')}</strong></p>
+                          <p className="text-slate-400">الرقم المرجعي: <strong className="text-amber-300 font-mono">{order.transaction_ref || 'غير مدخل'}</strong></p>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-slate-400">المبلغ الإجمالي: <strong className="text-indigo-400 font-bold text-sm">{order.total_amount} ج.م</strong></p>
+                          <p className="text-slate-400">طريقة الدفع: <strong className="text-white">{order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}</strong></p>
+                        </div>
                       </div>
                     </div>
                   );
