@@ -9,18 +9,31 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { vodafone_cash_numbers, instapay_ipa, pickup_note, store_name } = body;
+    const { 
+      vodafone_cash_enabled, 
+      instapay_enabled, 
+      vodafone_cash_numbers, 
+      instapay_ipa, 
+      instapay_ipas, 
+      pickup_note, 
+      store_name 
+    } = body;
 
     const current = await fetchSettingsFromSupabase();
 
     const updated = {
       ...current,
       store_name: store_name || current.store_name,
+      vodafone_cash_enabled: vodafone_cash_enabled !== undefined ? Boolean(vodafone_cash_enabled) : (current.vodafone_cash_enabled ?? true),
+      instapay_enabled: instapay_enabled !== undefined ? Boolean(instapay_enabled) : (current.instapay_enabled ?? true),
       vodafone_cash_numbers: Array.isArray(vodafone_cash_numbers) 
         ? vodafone_cash_numbers 
         : current.vodafone_cash_numbers,
-      instapay_ipa: instapay_ipa || current.instapay_ipa,
-      pickup_note: pickup_note || current.pickup_note,
+      instapay_ipa: instapay_ipa || (Array.isArray(instapay_ipas) && instapay_ipas[0]) || current.instapay_ipa,
+      instapay_ipas: Array.isArray(instapay_ipas)
+        ? instapay_ipas
+        : (instapay_ipa ? [instapay_ipa] : current.instapay_ipas || [current.instapay_ipa]),
+      pickup_note: pickup_note !== undefined ? pickup_note : current.pickup_note,
       updated_at: new Date().toISOString()
     };
 

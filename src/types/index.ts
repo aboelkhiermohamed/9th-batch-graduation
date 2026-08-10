@@ -15,6 +15,8 @@ export interface ProductAddon {
   id: string;
   name: string;   // e.g. "تطريز اسم الطالب"
   price: number;  // Extra price added on top of base product price
+  image_url?: string; // Image URL for the add-on
+  description?: string; // Optional description
 }
 
 export interface Product {
@@ -74,8 +76,11 @@ export interface Order {
 export interface StoreSettings {
   id: string;
   store_name: string;
+  vodafone_cash_enabled?: boolean;
+  instapay_enabled?: boolean;
   vodafone_cash_numbers: string[];
   instapay_ipa: string;
+  instapay_ipas?: string[];
   pickup_note: string;
   updated_at: string;
 }

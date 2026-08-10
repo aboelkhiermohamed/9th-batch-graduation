@@ -10,8 +10,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export const DEFAULT_SETTINGS: StoreSettings = {
   id: 'default',
   store_name: '9th batch graduation',
+  vodafone_cash_enabled: true,
+  instapay_enabled: true,
   vodafone_cash_numbers: ['01015339426'],
   instapay_ipa: '9thbatch@instapay',
+  instapay_ipas: ['9thbatch@instapay'],
   pickup_note: 'تابع جروب التليجرام',
   updated_at: new Date().toISOString()
 };
@@ -34,6 +37,22 @@ export const DEFAULT_PRODUCTS: Product[] = [
     has_customization: true,
     customization_label: 'اسم الطالب أو الكلية للتطريز على الجاكيت',
     sizes: ['S', 'M', 'L', 'XL', 'XXL'],
+    addons: [
+      {
+        id: 'add-1',
+        name: 'تطريز ذهبي خاص بالاسم على الكم',
+        price: 50,
+        image_url: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=300&auto=format&fit=crop&q=80',
+        description: 'تطريز بخيوط ذهبية فائقة الجودة للاسم والكلية'
+      },
+      {
+        id: 'add-2',
+        name: 'علبة هدايا فاخرة بشعار التخرج',
+        price: 45,
+        image_url: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=300&auto=format&fit=crop&q=80',
+        description: 'تغليف هدايا ملكي مميز للذكرى'
+      }
+    ],
     stock: 100,
     is_active: true,
     created_at: new Date().toISOString(),
@@ -239,13 +258,19 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
       return getMemorySettings();
     }
 
+    const defaultIpa = data.instapay_ipa || '9thbatch@instapay';
     const settings: StoreSettings = {
       id: data.id,
       store_name: data.store_name,
+      vodafone_cash_enabled: data.vodafone_cash_enabled !== undefined ? Boolean(data.vodafone_cash_enabled) : true,
+      instapay_enabled: data.instapay_enabled !== undefined ? Boolean(data.instapay_enabled) : true,
       vodafone_cash_numbers: Array.isArray(data.vodafone_cash_numbers) 
         ? data.vodafone_cash_numbers 
         : (typeof data.vodafone_cash_numbers === 'string' ? JSON.parse(data.vodafone_cash_numbers) : ['01015339426']),
-      instapay_ipa: data.instapay_ipa,
+      instapay_ipa: defaultIpa,
+      instapay_ipas: Array.isArray(data.instapay_ipas)
+        ? data.instapay_ipas
+        : (typeof data.instapay_ipas === 'string' ? JSON.parse(data.instapay_ipas) : [defaultIpa]),
       pickup_note: data.pickup_note,
       updated_at: data.updated_at || new Date().toISOString()
     };
@@ -265,8 +290,11 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       .upsert({
         id: 'default',
         store_name: settings.store_name,
+        vodafone_cash_enabled: settings.vodafone_cash_enabled !== undefined ? settings.vodafone_cash_enabled : true,
+        instapay_enabled: settings.instapay_enabled !== undefined ? settings.instapay_enabled : true,
         vodafone_cash_numbers: settings.vodafone_cash_numbers,
-        instapay_ipa: settings.instapay_ipa,
+        instapay_ipa: settings.instapay_ipa || (settings.instapay_ipas && settings.instapay_ipas[0]) || '9thbatch@instapay',
+        instapay_ipas: settings.instapay_ipas || [settings.instapay_ipa],
         pickup_note: settings.pickup_note,
         updated_at: new Date().toISOString()
       });

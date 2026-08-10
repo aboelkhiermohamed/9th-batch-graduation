@@ -532,28 +532,14 @@ export default function StoreFrontPage() {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-            {/* Customer Account / Login Button */}
-            {customerSession ? (
-              <button
-                onClick={() => {
-                  fetchCustomerOrders(customerSession.phone_number);
-                  setIsCustomerOrdersOpen(true);
-                }}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs sm:text-sm font-bold text-amber-300 transition-all"
-              >
-                <ShieldCheck className="w-4 h-4 text-amber-400" />
-                <span className="hidden xs:inline">حسابي ({customerSession.full_name || customerSession.phone_number})</span>
-                <span className="xs:hidden">حسابي</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setIsCustomerAuthOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-xs sm:text-sm font-bold text-indigo-300 transition-all"
-              >
-                <Eye className="w-4 h-4 text-indigo-400" />
-                <span>تسجيل دخول 👤</span>
-              </button>
-            )}
+            {/* Customer Account / Profile Button */}
+            <button
+              onClick={() => router.push('/profile')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs sm:text-sm font-bold text-amber-300 transition-all"
+            >
+              <ShieldCheck className="w-4 h-4 text-amber-400" />
+              <span>{customerSession ? `حسابي (${customerSession.full_name || 'البروفايل'})` : 'بروفايل العميل 👤'}</span>
+            </button>
 
             {/* Track Order Button */}
             <button
@@ -733,11 +719,11 @@ export default function StoreFrontPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleOpenProductModal(product)}
-                      className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition border border-slate-700"
-                      title="عرض المعرض والتطريز"
+                      onClick={() => router.push(`/product/${product.id}`)}
+                      className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 transition border border-slate-700 flex items-center gap-1 text-xs font-semibold"
+                      title="فتح في صفحة كاملة"
                     >
-                      <Eye className="w-4 h-4" />
+                      <ExternalLink className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -894,13 +880,13 @@ export default function StoreFrontPage() {
                         return (
                           <label
                             key={addon.id}
-                            className={`flex items-center justify-between p-3 rounded-xl border text-xs font-medium cursor-pointer transition-all ${
+                            className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-medium cursor-pointer transition-all ${
                               isChecked
-                                ? 'bg-amber-500/10 border-amber-500/50 text-amber-200'
+                                ? 'bg-amber-500/10 border-amber-500/50 text-amber-200 shadow-md shadow-amber-500/10'
                                 : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
                             }`}
                           >
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2.5">
                               <input
                                 type="checkbox"
                                 checked={isChecked}
@@ -913,9 +899,15 @@ export default function StoreFrontPage() {
                                 }}
                                 className="w-4 h-4 rounded text-amber-500 bg-slate-900 border-slate-700 focus:ring-amber-500"
                               />
-                              <span>{addon.name}</span>
+                              {addon.image_url && (
+                                <img src={addon.image_url} alt={addon.name} className="w-9 h-9 rounded-lg object-cover border border-slate-800 flex-shrink-0" />
+                              )}
+                              <div>
+                                <span className="font-bold block text-slate-100">{addon.name}</span>
+                                {addon.description && <span className="text-[10px] text-slate-400 block">{addon.description}</span>}
+                              </div>
                             </div>
-                            <span className="font-bold font-mono text-amber-400">+{addon.price} ج.م</span>
+                            <span className="font-bold font-mono text-emerald-400">+{addon.price} ج.م</span>
                           </label>
                         );
                       })}

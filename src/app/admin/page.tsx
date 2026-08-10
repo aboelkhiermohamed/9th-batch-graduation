@@ -109,9 +109,11 @@ export default function AdminDashboardPage() {
   const [newProdCustomLabel, setNewProdCustomLabel] = useState('اسم الطالب أو الكلية للتطريز على القطعة');
   const [newProdSizes, setNewProdSizes] = useState('S, M, L, XL, XXL');
   const [newProdDescAr, setNewProdDescAr] = useState('');
-  const [newProdAddons, setNewProdAddons] = useState<{id: string; name: string; price: string}[]>([]);
+  const [newProdAddons, setNewProdAddons] = useState<{id: string; name: string; price: string; image_url?: string; description?: string}[]>([]);
 
   // Settings form state
+  const [vodaEnabled, setVodaEnabled] = useState(true);
+  const [instaEnabled, setInstaEnabled] = useState(true);
   const [vodaInput, setVodaInput] = useState('');
   const [instaInput, setInstaInput] = useState('');
   const [pickupInput, setPickupInput] = useState('');
@@ -228,8 +230,12 @@ export default function AdminDashboardPage() {
         const s = await setRes.json();
         if (s) {
           setSettings(s);
-          setVodaInput(s.vodafone_cash_numbers?.join(', ') || '01015339426');
-          setInstaInput(s.instapay_ipa || '');
+          setVodaEnabled(s.vodafone_cash_enabled !== false);
+          setInstaEnabled(s.instapay_enabled !== false);
+          const vNums = Array.isArray(s.vodafone_cash_numbers) ? s.vodafone_cash_numbers.join(', ') : (s.vodafone_cash_numbers || '01015339426');
+          setVodaInput(vNums);
+          const iIPAs = Array.isArray(s.instapay_ipas) ? s.instapay_ipas.join(', ') : (s.instapay_ipa || '');
+          setInstaInput(iIPAs);
           setPickupInput(s.pickup_note || '');
         }
       }
@@ -429,9 +435,9 @@ export default function AdminDashboardPage() {
   };
 
   // Add-on helpers
-  const addNewAddon = () => setNewProdAddons(prev => [...prev, { id: Date.now().toString(), name: '', price: '0' }]);
+  const addNewAddon = () => setNewProdAddons(prev => [...prev, { id: Date.now().toString(), name: '', price: '0', image_url: '', description: '' }]);
   const removeAddon = (id: string) => setNewProdAddons(prev => prev.filter(a => a.id !== id));
-  const updateAddon = (id: string, field: 'name' | 'price', value: string) =>
+  const updateAddon = (id: string, field: 'name' | 'price' | 'image_url' | 'description', value: string) =>
     setNewProdAddons(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
 
   // Add Product
@@ -451,7 +457,13 @@ export default function AdminDashboardPage() {
       const allImages = newProdGalleryUrls.length > 0 ? [newProdImage, ...newProdGalleryUrls] : [newProdImage];
       const addonsPayload = newProdAddons
         .filter(a => a.name.trim())
-        .map(a => ({ id: a.id, name: a.name.trim(), price: Number(a.price) || 0 }));
+        .map(a => ({ 
+          id: a.id, 
+          name: a.name.trim(), 
+          price: Number(a.price) || 0,
+          image_url: a.image_url ? a.image_url.trim() : undefined,
+          description: a.description ? a.description.trim() : undefined
+        }));
 
       const res = await fetch('/api/admin/products', {
         method: 'POST',
@@ -502,12 +514,20 @@ export default function AdminDashboardPage() {
         .map(n => n.trim())
         .filter(Boolean);
 
+      const instaArray = instaInput
+        .split(',')
+        .map(n => n.trim())
+        .filter(Boolean);
+
       const res = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          vodafone_cash_enabled: vodaEnabled,
+          instapay_enabled: instaEnabled,
           vodafone_cash_numbers: vodaArray.length > 0 ? vodaArray : ['01015339426'],
-          instapay_ipa: instaInput.trim(),
+          instapay_ipa: instaArray[0] || '9thbatch@instapay',
+          instapay_ipas: instaArray.length > 0 ? instaArray : ['9thbatch@instapay'],
           pickup_note: pickupInput.trim()
         })
       });
@@ -515,7 +535,7 @@ export default function AdminDashboardPage() {
       if (res.ok) {
         const data = await res.json();
         setSettings(data.settings);
-        alert('تم حفظ الإعدادات بنجاح');
+        alert('تم حفظ إعدادات وأرقام التحويل بنجاح! 💾');
       }
     } catch (err) {
       alert('فشل حفظ الإعدادات');
@@ -1524,31 +1544,96 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            <form onSubmit={handleSaveSettings} className="space-y-5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  رقم / أرقام فودافون كاش (مفصولة بفاصلة)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={vodaInput}
-                  onChange={(e) => setVodaInput(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-indigo-500"
-                />
+            <form onSubmit={handleSaveSettings} className="space-y-6">
+              
+              {/* Vodafone Cash Settings */}
+              <div className="p-4 rounded-2xl bg-slate-900 border border-rose-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-rose-500"></span>
+                    <h4 className="text-sm font-bold text-white">إعدادات فودافون كاش (Vodafone Cash)</h4>
+                  </div>
+                  <label className="flex items-center gap-2 text-xs font-bold text-rose-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={vodaEnabled}
+                      onChange={(e) => setVodaEnabled(e.target.checked)}
+                      className="w-4 h-4 rounded text-rose-500 bg-slate-950 border-slate-700"
+                    />
+                    <span>{vodaEnabled ? 'مفعّل بالمتجر ✅' : 'معطّل بالمتجر ❌'}</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    أرقام محفظة فودافون كاش (يمكنك إدخال أكثر من رقم مفصولة بفاصلة)
+                  </label>
+                  <input
+                    type="text"
+                    required={vodaEnabled}
+                    placeholder="01015339426, 01099998888"
+                    value={vodaInput}
+                    onChange={(e) => setVodaInput(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+
+                {/* Display Parsed Badges */}
+                {vodaInput.split(',').filter(n => n.trim()).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <span className="text-[11px] text-slate-400 font-semibold ml-1">الأرقام المعروضة للعميل:</span>
+                    {vodaInput.split(',').map(n => n.trim()).filter(Boolean).map((num, i) => (
+                      <span key={i} className="px-2.5 py-0.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-mono font-bold">
+                        📞 {num}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  عنوان حساب InstaPay (IPA / Phone)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={instaInput}
-                  onChange={(e) => setInstaInput(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-indigo-500"
-                />
+              {/* InstaPay Settings */}
+              <div className="p-4 rounded-2xl bg-slate-900 border border-purple-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+                    <h4 className="text-sm font-bold text-white">إعدادات إنستا باي (InstaPay)</h4>
+                  </div>
+                  <label className="flex items-center gap-2 text-xs font-bold text-purple-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={instaEnabled}
+                      onChange={(e) => setInstaEnabled(e.target.checked)}
+                      className="w-4 h-4 rounded text-purple-500 bg-slate-950 border-slate-700"
+                    />
+                    <span>{instaEnabled ? 'مفعّل بالمتجر ✅' : 'معطّل بالمتجر ❌'}</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    عنوان / أرقام حساب InstaPay (يمكنك إدخال أكثر من حساب مفصولة بفاصلة)
+                  </label>
+                  <input
+                    type="text"
+                    required={instaEnabled}
+                    placeholder="9thbatch@instapay, 01015339426"
+                    value={instaInput}
+                    onChange={(e) => setInstaInput(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+
+                {/* Display Parsed Badges */}
+                {instaInput.split(',').filter(n => n.trim()).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <span className="text-[11px] text-slate-400 font-semibold ml-1">الحسابات المعروضة للعميل:</span>
+                    {instaInput.split(',').map(n => n.trim()).filter(Boolean).map((handle, i) => (
+                      <span key={i} className="px-2.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-mono font-bold">
+                        💳 {handle}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1843,34 +1928,53 @@ export default function AdminDashboardPage() {
                 {newProdAddons.length === 0 ? (
                   <p className="text-center text-xs text-slate-500 py-2">لا توجد إضافات حتى الآن — اضغط "+ إضافة Add-on" لإضافة خيار</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {newProdAddons.map((addon) => (
-                      <div key={addon.id} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          placeholder="اسم الإضافة (مثل: تطريز اسم الطالب)"
-                          value={addon.name}
-                          onChange={(e) => updateAddon(addon.id, 'name', e.target.value)}
-                          className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-500"
-                        />
-                        <div className="relative flex items-center">
+                      <div key={addon.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                        <div className="flex items-center gap-2">
                           <input
-                            type="number"
-                            placeholder="0"
-                            min="0"
-                            value={addon.price}
-                            onChange={(e) => updateAddon(addon.id, 'price', e.target.value)}
-                            className="w-20 px-2 py-2 rounded-xl bg-slate-950 border border-slate-700 text-amber-300 text-xs font-mono focus:outline-none focus:border-amber-500 text-center"
+                            type="text"
+                            placeholder="اسم الإضافة (مثل: تطريز ذهبي خاص بالاسم)"
+                            value={addon.name}
+                            onChange={(e) => updateAddon(addon.id, 'name', e.target.value)}
+                            className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-500"
                           />
-                          <span className="absolute -left-5 text-[10px] text-slate-400 font-bold">ج.م</span>
+                          <div className="relative flex items-center">
+                            <input
+                              type="number"
+                              placeholder="0"
+                              min="0"
+                              value={addon.price}
+                              onChange={(e) => updateAddon(addon.id, 'price', e.target.value)}
+                              className="w-20 px-2 py-2 rounded-xl bg-slate-900 border border-slate-700 text-amber-300 text-xs font-mono focus:outline-none focus:border-amber-500 text-center"
+                            />
+                            <span className="text-[10px] text-slate-400 font-bold mr-1">ج.م</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeAddon(addon.id)}
+                            className="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition flex-shrink-0"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeAddon(addon.id)}
-                          className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition flex-shrink-0"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <input
+                            type="url"
+                            placeholder="رابط صورة الإضافة (اختياري) https://..."
+                            value={addon.image_url || ''}
+                            onChange={(e) => updateAddon(addon.id, 'image_url', e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500"
+                          />
+                          <input
+                            type="text"
+                            placeholder="وصف مختصر للإضافة (اختياري)"
+                            value={addon.description || ''}
+                            onChange={(e) => updateAddon(addon.id, 'description', e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>

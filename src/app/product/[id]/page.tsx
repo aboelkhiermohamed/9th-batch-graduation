@@ -1,0 +1,583 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { 
+  ShoppingBag, 
+  ChevronRight, 
+  Check, 
+  Plus, 
+  Minus, 
+  Sparkles, 
+  Ruler, 
+  Layers, 
+  Share2, 
+  CheckCircle2, 
+  Award, 
+  X, 
+  ArrowLeft,
+  RefreshCw,
+  ExternalLink,
+  ShieldCheck
+} from 'lucide-react';
+import { Product, ProductAddon, CartItem } from '@/types';
+import { DEFAULT_PRODUCTS, fetchProductsFromSupabase } from '@/lib/supabaseClient';
+
+export default function StandaloneProductPage() {
+  const router = useRouter();
+  const params = useParams();
+  const productId = params.id as string;
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Active Image Gallery Index
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  // Selected Product Options
+  const [selectedSize, setSelectedSize] = useState<string>('');
+  const [customText, setCustomText] = useState<string>('');
+  const [selectedAddons, setSelectedAddons] = useState<ProductAddon[]>([]);
+  const [quantity, setQuantity] = useState(1);
+
+  // Modals & UI Feedback
+  const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
+  const [addedToast, setAddedToast] = useState(false);
+  const [copiedLinkToast, setCopiedLinkToast] = useState(false);
+
+  // Cart State from localStorage
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  useEffect(() => {
+    try {
+      const savedCart = localStorage.getItem('graduation_store_cart');
+      if (savedCart) {
+        setCart(JSON.parse(savedCart));
+      }
+    } catch (e) {
+      console.warn('Failed to load cart', e);
+    }
+  }, []);
+
+  const saveCartToStorage = (updatedCart: CartItem[]) => {
+    setCart(updatedCart);
+    localStorage.setItem('graduation_store_cart', JSON.stringify(updatedCart));
+  };
+
+  useEffect(() => {
+    async function loadProductData() {
+      setIsLoading(true);
+      try {
+        const fetchedProds = await fetchProductsFromSupabase();
+        const fullList = fetchedProds && fetchedProds.length > 0 ? fetchedProds : DEFAULT_PRODUCTS;
+        setAllProducts(fullList);
+
+        const found = fullList.find(p => p.id === productId);
+        if (found) {
+          setProduct(found);
+          if (found.sizes && found.sizes.length > 0) {
+            setSelectedSize(found.sizes[0]);
+          }
+        } else {
+          setProduct(null);
+        }
+      } catch (err) {
+        console.error('Error fetching product details', err);
+        const fallback = DEFAULT_PRODUCTS.find(p => p.id === productId) || null;
+        setProduct(fallback);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    if (productId) {
+      loadProductData();
+    }
+  }, [productId]);
+
+  const toggleAddon = (addon: ProductAddon) => {
+    setSelectedAddons(prev => {
+      const exists = prev.some(a => a.id === addon.id);
+      if (exists) {
+        return prev.filter(a => a.id !== addon.id);
+      } else {
+        return [...prev, addon];
+      }
+    });
+  };
+
+  const handleAddToCart = (redirectAfter: boolean = false) => {
+    if (!product) return;
+
+    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+      alert('يرجى اختيار المقاس أولاً');
+      return;
+    }
+
+    const currentCart = [...cart];
+    const existingIdx = currentCart.findIndex(
+      item => item.product.id === product.id && item.selectedSize === selectedSize && item.customText === customText
+    );
+
+    if (existingIdx > -1) {
+      currentCart[existingIdx].quantity += quantity;
+      currentCart[existingIdx].selectedAddons = selectedAddons.length > 0 ? selectedAddons : currentCart[existingIdx].selectedAddons;
+    } else {
+      currentCart.push({
+        product,
+        selectedSize: selectedSize || undefined,
+        customText: customText.trim() || undefined,
+        quantity,
+        selectedAddons: selectedAddons.length > 0 ? [...selectedAddons] : undefined
+      });
+    }
+
+    saveCartToStorage(currentCart);
+
+    if (redirectAfter) {
+      router.push('/checkout');
+    } else {
+      setAddedToast(true);
+      setTimeout(() => setAddedToast(false), 3000);
+    }
+  };
+
+  const handleShareLink = () => {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText(window.location.href);
+      setCopiedLinkToast(true);
+      setTimeout(() => setCopiedLinkToast(false), 3000);
+    }
+  };
+
+  // Filter suggested products (excluding current product)
+  const suggestedProducts = allProducts.filter(p => p.id !== productId && p.is_active !== false).slice(0, 4);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <RefreshCw className="w-8 h-8 text-amber-500 animate-spin" />
+          <p className="text-sm text-slate-400">جاري تحميل تفاصيل المنتج...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-4">
+          <ShoppingBag className="w-8 h-8 text-amber-400" />
+        </div>
+        <h1 className="text-xl font-bold text-slate-100">عفواً، المنتج غير موجود</h1>
+        <p className="text-xs text-slate-400 mt-1 max-w-sm">
+          قد يكون المنتج قد تم إزالته أو أن الرابط غير صحيح
+        </p>
+        <button
+          onClick={() => router.push('/')}
+          className="mt-6 px-6 py-3 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm hover:bg-amber-600 transition"
+        >
+          العودة لتصفح المتجر
+        </button>
+      </div>
+    );
+  }
+
+  const galleryImages = product.images && product.images.length > 0 ? product.images : [product.image_url];
+  const activeImage = galleryImages[activeImageIndex] || product.image_url;
+
+  // Calculate Addons Extra Price
+  const addonsTotalPrice = selectedAddons.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+  const singleUnitPrice = product.price + addonsTotalPrice;
+  const totalPriceCalculated = singleUnitPrice * quantity;
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-amber-500 selection:text-slate-950">
+      
+      {/* --- TOP NAVBAR --- */}
+      <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
+          <button 
+            onClick={() => router.push('/')}
+            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 transition flex items-center gap-1.5 text-xs sm:text-sm font-semibold border border-slate-700/60"
+          >
+            <ChevronRight className="w-4 h-4 text-amber-400" />
+            <span>العودة للمتجر الرئيسي</span>
+          </button>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/checkout')}
+              className="relative flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-amber-500/20"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>السلة ({totalCartCount})</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* --- BREADCRUMB --- */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <button onClick={() => router.push('/')} className="hover:text-amber-400 transition">الرئيسية</button>
+          <span>/</span>
+          <span className="text-slate-500">{product.category}</span>
+          <span>/</span>
+          <span className="text-amber-400 font-semibold truncate max-w-[200px]">{product.title_ar}</span>
+        </div>
+      </div>
+
+      {/* --- MAIN PRODUCT CONTAINER --- */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        
+        {/* Success Toast */}
+        {addedToast && (
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-slate-950 font-bold text-sm px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-2 animate-bounce">
+            <CheckCircle2 className="w-5 h-5" />
+            <span>تمت إضافة المنتج والميزات إلى سلتك بنجاح! 🎉</span>
+          </div>
+        )}
+
+        {copiedLinkToast && (
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-slate-950 font-bold text-sm px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-2">
+            <Check className="w-5 h-5" />
+            <span>تم نسخ رابط المنتج إلى الحافظة! 🔗</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+          
+          {/* --- LEFT COLUMN: GALLERY --- */}
+          <div className="lg:col-span-6 space-y-4">
+            <div className="relative aspect-square rounded-3xl overflow-hidden bg-slate-900 border border-slate-800 shadow-2xl group">
+              <img 
+                src={activeImage} 
+                alt={product.title_ar} 
+                className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+              />
+              <span className="absolute top-4 right-4 px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-800 text-amber-400 text-xs font-bold">
+                {product.category}
+              </span>
+            </div>
+
+            {/* Gallery Thumbnails */}
+            {galleryImages.length > 1 && (
+              <div className="flex items-center gap-3 overflow-x-auto pb-2">
+                {galleryImages.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveImageIndex(idx)}
+                    className={`relative w-20 h-20 rounded-2xl overflow-hidden border-2 flex-shrink-0 transition ${
+                      activeImageIndex === idx
+                        ? 'border-amber-500 ring-2 ring-amber-500/30'
+                        : 'border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={img} alt={`صورة ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* --- RIGHT COLUMN: PRODUCT INFO & OPTIONS --- */}
+          <div className="lg:col-span-6 space-y-6">
+            
+            {/* Title & Stock */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
+                  ✓ متوفر الآن للطلب (دفعة التخرج 9)
+                </span>
+
+                <button
+                  onClick={handleShareLink}
+                  className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-amber-400 transition"
+                  title="مشاركة المنتج"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-100 leading-snug">
+                {product.title_ar}
+              </h1>
+              {product.title && product.title !== product.title_ar && (
+                <p className="text-xs text-slate-500 font-mono" dir="ltr">{product.title}</p>
+              )}
+            </div>
+
+            {/* Price Box */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+              <div>
+                <span className="text-xs text-slate-400 block">السعر الأساسي للقطعة</span>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-3xl font-black text-emerald-400">{product.price}</span>
+                  <span className="text-sm font-bold text-slate-400">ج.م</span>
+                </div>
+              </div>
+
+              {addonsTotalPrice > 0 && (
+                <div className="text-left border-r border-slate-800 pr-4">
+                  <span className="text-[11px] text-amber-400 block">+ الإضافات الخاطفة</span>
+                  <span className="text-sm font-bold text-slate-200">+{addonsTotalPrice} ج.م</span>
+                </div>
+              )}
+            </div>
+
+            {/* Description */}
+            {product.description_ar && (
+              <div className="text-xs sm:text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-4 rounded-2xl border border-slate-800/60">
+                {product.description_ar}
+              </div>
+            )}
+
+            {/* Size Picker */}
+            {product.sizes && product.sizes.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-200">اختر المقاس المناسب:</label>
+                  {product.size_chart_url && (
+                    <button
+                      onClick={() => setIsSizeChartOpen(true)}
+                      className="text-xs text-amber-400 hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      <Ruler className="w-3.5 h-3.5" />
+                      <span>جدول المقاسات</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2.5">
+                  {product.sizes.map((sz) => (
+                    <button
+                      key={sz}
+                      onClick={() => setSelectedSize(sz)}
+                      className={`min-w-[48px] h-12 px-4 rounded-2xl text-xs sm:text-sm font-bold border transition ${
+                        selectedSize === sz
+                          ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-md shadow-amber-500/20'
+                          : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      {sz}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Custom Embroidery Input */}
+            {product.has_customization && (
+              <div className="space-y-2 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl">
+                <label className="block text-xs font-bold text-amber-400">
+                  ✏️ {product.customization_label || 'الاسم أو الكلية للتطريز/الطباعة:'}
+                </label>
+                <input
+                  type="text"
+                  placeholder="مثال: أحمد مصطفى - كلية الهندسـة"
+                  value={customText}
+                  onChange={(e) => setCustomText(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
+                />
+              </div>
+            )}
+
+            {/* --- VISUAL ADD-ONS SECTION (الإضافات المصورة) --- */}
+            {product.addons && product.addons.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-100">
+                    إضافات وملحقات مميزة (Add-ons):
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {product.addons.map((addon) => {
+                    const isSelected = selectedAddons.some(a => a.id === addon.id);
+                    return (
+                      <div
+                        key={addon.id}
+                        onClick={() => toggleAddon(addon)}
+                        className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center gap-3 ${
+                          isSelected
+                            ? 'bg-amber-500/10 border-amber-500 text-slate-100 shadow-md shadow-amber-500/10'
+                            : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                        }`}
+                      >
+                        {/* Addon Image preview */}
+                        {addon.image_url ? (
+                          <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0">
+                            <img src={addon.image_url} alt={addon.name} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0">
+                            <Layers className="w-6 h-6" />
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <h4 className="text-xs font-bold truncate">{addon.name}</h4>
+                            <span className="text-xs font-extrabold text-emerald-400">+{addon.price} ج.م</span>
+                          </div>
+                          {addon.description && (
+                            <p className="text-[10px] text-slate-400 truncate mt-0.5">{addon.description}</p>
+                          )}
+                        </div>
+
+                        {/* Checkbox Icon */}
+                        <div className={`w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0 transition ${
+                          isSelected ? 'bg-amber-500 text-slate-950' : 'border border-slate-700 bg-slate-950'
+                        }`}>
+                          {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Quantity Controller & Totals */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300">الكمية:</span>
+                <div className="flex items-center gap-3 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 flex items-center justify-center transition"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="w-8 text-center text-sm font-bold text-slate-100">{quantity}</span>
+                  <button
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 flex items-center justify-center transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                <span className="text-xs font-bold text-slate-400">الإجمالي المحسوب:</span>
+                <span className="text-xl font-black text-emerald-400">{totalPriceCalculated} ج.م</span>
+              </div>
+            </div>
+
+            {/* Purchase Action Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <button
+                onClick={() => handleAddToCart(false)}
+                className="py-4 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 font-bold text-sm transition shadow-lg flex items-center justify-center gap-2"
+              >
+                <ShoppingBag className="w-4 h-4 text-amber-400" />
+                <span>إضافة إلى السلة</span>
+              </button>
+
+              <button
+                onClick={() => handleAddToCart(true)}
+                className="py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-sm transition shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2"
+              >
+                <span>شراء الآن والدفع 🚀</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        {/* --- SUGGESTED / RECOMMENDED PRODUCTS SECTION (منتجات مقترحة) --- */}
+        {suggestedProducts.length > 0 && (
+          <section className="mt-16 pt-10 border-t border-slate-800/80 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <h2 className="text-lg sm:text-xl font-black text-slate-100">
+                  قد يعجبك أيضاً (منتجات مقترحة 🌟)
+                </h2>
+              </div>
+
+              <button
+                onClick={() => router.push('/')}
+                className="text-xs font-bold text-amber-400 hover:underline flex items-center gap-1"
+              >
+                <span>عرض جميع المنتجات</span>
+                <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              {suggestedProducts.map((sp) => (
+                <div
+                  key={sp.id}
+                  onClick={() => router.push(`/product/${sp.id}`)}
+                  className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden cursor-pointer hover:border-amber-500/50 transition duration-300 group flex flex-col justify-between"
+                >
+                  <div className="relative aspect-square overflow-hidden bg-slate-950">
+                    <img
+                      src={sp.image_url}
+                      alt={sp.title_ar}
+                      className="w-full h-full object-cover object-center group-hover:scale-105 transition duration-500"
+                    />
+                    <span className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/80 text-[10px] font-bold text-amber-400">
+                      {sp.category}
+                    </span>
+                  </div>
+
+                  <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-100 group-hover:text-amber-400 transition line-clamp-1">
+                        {sp.title_ar}
+                      </h3>
+                      {sp.description_ar && (
+                        <p className="text-[11px] text-slate-400 line-clamp-2 mt-1">
+                          {sp.description_ar}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between">
+                      <span className="text-sm font-black text-emerald-400">{sp.price} ج.م</span>
+                      <span className="text-xs text-amber-400 font-semibold group-hover:translate-x-[-2px] transition">
+                        عرض التفاصيل ←
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+      </main>
+
+      {/* --- SIZE CHART MODAL --- */}
+      {isSizeChartOpen && product.size_chart_url && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="relative max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden p-6">
+            <button
+              onClick={() => setIsSizeChartOpen(false)}
+              className="absolute top-4 left-4 p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-slate-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-base font-bold text-slate-100 mb-4 flex items-center gap-2">
+              <Ruler className="w-5 h-5 text-amber-400" />
+              <span>جدول مقاسات - {product.title_ar}</span>
+            </h3>
+
+            <div className="rounded-2xl overflow-hidden border border-slate-800 bg-slate-950">
+              <img src={product.size_chart_url} alt="جدول المقاسات" className="w-full h-auto max-h-[70vh] object-contain" />
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

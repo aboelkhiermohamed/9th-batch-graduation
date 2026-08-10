@@ -82,7 +82,14 @@ export default function CheckoutPage() {
         const setRes = await fetch('/api/admin/settings');
         if (setRes.ok) {
           const setts = await setRes.json();
-          if (setts) setSettings(setts);
+          if (setts) {
+            setSettings(setts);
+            if (setts.vodafone_cash_enabled === false && setts.instapay_enabled !== false) {
+              setPaymentMethod('instapay');
+            } else if (setts.vodafone_cash_enabled !== false) {
+              setPaymentMethod('vodafone_cash');
+            }
+          }
         }
       } catch (e) {
         console.error('Initialization error:', e);
@@ -458,76 +465,116 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Payment Method Selector Tabs */}
-                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('vodafone_cash')}
-                    className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all ${
-                      paymentMethod === 'vodafone_cash'
-                        ? 'bg-rose-600/20 border-rose-500 text-rose-300 shadow-lg shadow-rose-600/10'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
-                    }`}
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0"></span>
-                    <span>فودافون كاش (Vodafone Cash)</span>
-                  </button>
+                {(() => {
+                  const isVodaEnabled = settings.vodafone_cash_enabled !== false;
+                  const isInstaEnabled = settings.instapay_enabled !== false;
+                  const vodaNums = settings.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0
+                    ? settings.vodafone_cash_numbers
+                    : ['01015339426'];
+                  const instaAccounts = settings.instapay_ipas && settings.instapay_ipas.length > 0
+                    ? settings.instapay_ipas
+                    : [settings.instapay_ipa || '9thbatch@instapay'];
 
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('instapay')}
-                    className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all ${
-                      paymentMethod === 'instapay'
-                        ? 'bg-purple-600/20 border-purple-500 text-purple-300 shadow-lg shadow-purple-600/10'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
-                    }`}
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 flex-shrink-0"></span>
-                    <span>إنستا باي (InstaPay)</span>
-                  </button>
-                </div>
+                  if (!isVodaEnabled && !isInstaEnabled) {
+                    return (
+                      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold text-center">
+                        ⚠️ الدفع الإلكتروني معطل حالياً بشكل مؤقت في المتجر. يرجى المتابعة مع خدمة العملاء.
+                      </div>
+                    );
+                  }
 
-                {/* Transfer Number Copy Box */}
-                {paymentMethod === 'vodafone_cash' ? (
-                  <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span>حول المبلغ على رقم فودافون كاش التالي:</span>
-                      <span className="text-rose-400 font-semibold flex-shrink-0">محفظة كاش</span>
+                  return (
+                    <div className="space-y-4">
+                      {/* Tabs */}
+                      <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3">
+                        {isVodaEnabled && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('vodafone_cash')}
+                            className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all ${
+                              paymentMethod === 'vodafone_cash'
+                                ? 'bg-rose-600/20 border-rose-500 text-rose-300 shadow-lg shadow-rose-600/10'
+                                : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
+                            }`}
+                          >
+                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0"></span>
+                            <span>فودافون كاش (Vodafone Cash)</span>
+                          </button>
+                        )}
+
+                        {isInstaEnabled && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentMethod('instapay')}
+                            className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all ${
+                              paymentMethod === 'instapay'
+                                ? 'bg-purple-600/20 border-purple-500 text-purple-300 shadow-lg shadow-purple-600/10'
+                                : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
+                            }`}
+                          >
+                            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 flex-shrink-0"></span>
+                            <span>إنستا باي (InstaPay)</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Transfer Numbers/Accounts Display Box */}
+                      {paymentMethod === 'vodafone_cash' && isVodaEnabled && (
+                        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span>حول المبلغ المطلوب على أحد أرقام فودافون كاش التالية:</span>
+                            <span className="text-rose-400 font-semibold flex-shrink-0">محفظة كاش ({vodaNums.length})</span>
+                          </div>
+
+                          <div className="space-y-2">
+                            {vodaNums.map((num, idx) => (
+                              <div key={idx} className="flex flex-wrap xs:flex-nowrap items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                <span className="text-base sm:text-lg font-mono font-extrabold text-white tracking-wider truncate dir-ltr select-all">
+                                  {num}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopy(num, `voda-${idx}`)}
+                                  className="w-full xs:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition flex-shrink-0"
+                                >
+                                  {copiedText === `voda-${idx}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                  <span>{copiedText === `voda-${idx}` ? 'تم النسخ' : 'نسخ الرقم'}</span>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {paymentMethod === 'instapay' && isInstaEnabled && (
+                        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span>حول المبلغ المطلوب على أحد حسابات InstaPay التالية:</span>
+                            <span className="text-purple-400 font-semibold flex-shrink-0">InstaPay ({instaAccounts.length})</span>
+                          </div>
+
+                          <div className="space-y-2">
+                            {instaAccounts.map((acc, idx) => (
+                              <div key={idx} className="flex flex-wrap xs:flex-nowrap items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                <span className="text-sm sm:text-base font-mono font-bold text-white truncate dir-ltr select-all">
+                                  {acc}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopy(acc, `insta-${idx}`)}
+                                  className="w-full xs:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition flex-shrink-0"
+                                >
+                                  {copiedText === `insta-${idx}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                  <span>{copiedText === `insta-${idx}` ? 'تم النسخ' : 'نسخ الحساب'}</span>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex flex-wrap xs:flex-nowrap items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
-                      <span className="text-base sm:text-xl font-mono font-extrabold text-white tracking-widest truncate dir-ltr select-all">
-                        {activeVodafoneNumber}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(activeVodafoneNumber, 'voda')}
-                        className="w-full xs:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition flex-shrink-0"
-                      >
-                        {copiedText === 'voda' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedText === 'voda' ? 'تم النسخ' : 'نسخ الرقم'}</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between text-xs text-slate-400">
-                      <span>حول المبلغ على حساب InstaPay IPA التالي:</span>
-                      <span className="text-purple-400 font-semibold flex-shrink-0">InstaPay</span>
-                    </div>
-                    <div className="flex flex-wrap xs:flex-nowrap items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
-                      <span className="text-sm sm:text-base font-mono font-bold text-white truncate dir-ltr select-all">
-                        {settings.instapay_ipa}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(settings.instapay_ipa, 'insta')}
-                        className="w-full xs:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition flex-shrink-0"
-                      >
-                        {copiedText === 'insta' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedText === 'insta' ? 'تم النسخ' : 'نسخ الحساب'}</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Form Inputs */}
                 <form onSubmit={handlePlaceOrder} className="space-y-4 pt-2">
