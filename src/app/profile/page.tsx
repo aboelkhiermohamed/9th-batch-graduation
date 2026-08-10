@@ -84,23 +84,52 @@ export default function CustomerProfilePage() {
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
 
-  // Load customer session on mount
+  // Load customer session on mount (including Supabase Google OAuth redirect)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('graduation_customer_session');
-      if (saved) {
-        const sess = JSON.parse(saved);
-        setCustomerSession(sess);
-        setFullNameInput(sess.full_name || '');
-        setEmailInput(sess.email || '');
-        setPhoneInput(sess.phone_number || '');
-        fetchCustomerOrders(sess.phone_number);
+    async function initSession() {
+      try {
+        // 1. Check local session
+        const saved = localStorage.getItem('graduation_customer_session');
+        if (saved) {
+          const sess = JSON.parse(saved);
+          setCustomerSession(sess);
+          setFullNameInput(sess.full_name || '');
+          setEmailInput(sess.email || '');
+          setPhoneInput(sess.phone_number || '');
+          fetchCustomerOrders(sess.phone_number || sess.email || '');
+          setIsSessionLoaded(true);
+          return;
+        }
+
+        // 2. Check Supabase Google OAuth session from redirect
+        if (supabase) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            const gUser = session.user;
+            const googleSess = {
+              id: gUser.id,
+              full_name: gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google',
+              email: gUser.email || '',
+              phone_number: gUser.phone || gUser.user_metadata?.phone || '',
+              created_at: gUser.created_at || new Date().toISOString()
+            };
+            setCustomerSession(googleSess);
+            localStorage.setItem('graduation_customer_session', JSON.stringify(googleSess));
+            setFullNameInput(googleSess.full_name);
+            setEmailInput(googleSess.email);
+            setPhoneInput(googleSess.phone_number);
+            if (googleSess.phone_number || googleSess.email) {
+              fetchCustomerOrders(googleSess.phone_number || googleSess.email);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error loading customer session', e);
+      } finally {
+        setIsSessionLoaded(true);
       }
-    } catch (e) {
-      console.error('Error loading customer session', e);
-    } finally {
-      setIsSessionLoaded(true);
     }
+    initSession();
   }, []);
 
   const fetchCustomerOrders = async (phone: string) => {
@@ -283,9 +312,32 @@ export default function CustomerProfilePage() {
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
+    setIsGoogleLoading(true);
     setGuestAuthError('');
-    setIsGoogleModalOpen(true);
+    try {
+      if (supabase) {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/profile` : undefined
+          }
+        });
+
+        if (error) {
+          console.warn('Supabase Google OAuth Provider Notice:', error.message);
+          setGuestAuthError(`تنبيه: يتطلب تفعيل Google OAuth في لوحة تحكم Supabase Dashboard (Authentication -> Providers -> Google).`);
+          setIsGoogleModalOpen(true);
+        }
+      } else {
+        setIsGoogleModalOpen(true);
+      }
+    } catch (err: any) {
+      setGuestAuthError('حدث خطأ أثناء الاتصال بـ Google');
+      setIsGoogleModalOpen(true);
+    } finally {
+      setIsGoogleLoading(false);
+    }
   };
 
   const handleConfirmGoogleLogin = async (e: React.FormEvent) => {
