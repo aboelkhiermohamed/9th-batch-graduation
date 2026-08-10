@@ -282,18 +282,31 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
       return getMemorySettings();
     }
 
+    let meta: any = null;
+    let rawNote = data.pickup_note || '';
+
+    const match = rawNote.match(/\[SETTINGS_META:(.*?)\]/);
+    if (match && match[1]) {
+      try {
+        meta = JSON.parse(match[1]);
+        rawNote = rawNote.replace(/\s*\[SETTINGS_META:.*?\]/g, '').trim();
+      } catch (e) {}
+    }
+
     const currentMem = getMemorySettings();
-    const defaultIpa = data.instapay_ipa || currentMem.instapay_ipa || '9thbatch@instapay';
+    const defaultIpa = meta?.instapay_ipa || data.instapay_ipa || currentMem.instapay_ipa || '9thbatch@instapay';
+    const vodaNums = meta?.vodafone_cash_numbers || parseArrayOrCommaString(data.vodafone_cash_numbers, currentMem.vodafone_cash_numbers || ['01015339426']);
+    const instaAccounts = meta?.instapay_ipas || parseArrayOrCommaString(data.instapay_ipas, currentMem.instapay_ipas || [defaultIpa]);
 
     const settings: StoreSettings = {
       id: data.id,
-      store_name: data.store_name || currentMem.store_name || '9th batch graduation',
-      vodafone_cash_enabled: data.vodafone_cash_enabled !== undefined ? Boolean(data.vodafone_cash_enabled) : (currentMem.vodafone_cash_enabled ?? true),
-      instapay_enabled: data.instapay_enabled !== undefined ? Boolean(data.instapay_enabled) : (currentMem.instapay_enabled ?? true),
-      vodafone_cash_numbers: parseArrayOrCommaString(data.vodafone_cash_numbers, currentMem.vodafone_cash_numbers || ['01015339426']),
+      store_name: meta?.store_name || data.store_name || currentMem.store_name || '9th batch graduation',
+      vodafone_cash_enabled: meta ? meta.vodafone_cash_enabled !== false : (data.vodafone_cash_enabled !== undefined ? Boolean(data.vodafone_cash_enabled) : (currentMem.vodafone_cash_enabled ?? true)),
+      instapay_enabled: meta ? meta.instapay_enabled !== false : (data.instapay_enabled !== undefined ? Boolean(data.instapay_enabled) : (currentMem.instapay_enabled ?? true)),
+      vodafone_cash_numbers: vodaNums,
       instapay_ipa: defaultIpa,
-      instapay_ipas: parseArrayOrCommaString(data.instapay_ipas, currentMem.instapay_ipas || [defaultIpa]),
-      pickup_note: data.pickup_note || currentMem.pickup_note || 'تابع جروب التليجرام',
+      instapay_ipas: instaAccounts,
+      pickup_note: rawNote || 'تابع جروب التليجرام',
       updated_at: data.updated_at || new Date().toISOString()
     };
 
@@ -309,15 +322,28 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
   setMemorySettings(settings);
 
   try {
-    const payload: any = {
-      id: 'default',
+    const metaPayload = {
       store_name: settings.store_name,
-      vodafone_cash_enabled: settings.vodafone_cash_enabled !== undefined ? settings.vodafone_cash_enabled : true,
-      instapay_enabled: settings.instapay_enabled !== undefined ? settings.instapay_enabled : true,
+      vodafone_cash_enabled: settings.vodafone_cash_enabled !== false,
+      instapay_enabled: settings.instapay_enabled !== false,
       vodafone_cash_numbers: settings.vodafone_cash_numbers,
       instapay_ipa: settings.instapay_ipa || (settings.instapay_ipas && settings.instapay_ipas[0]) || '9thbatch@instapay',
       instapay_ipas: settings.instapay_ipas || [settings.instapay_ipa],
-      pickup_note: settings.pickup_note,
+      pickup_note: settings.pickup_note
+    };
+
+    const cleanNote = (settings.pickup_note || 'تابع جروب التليجرام').replace(/\s*\[SETTINGS_META:.*?\]/g, '').trim();
+    const encodedNote = `${cleanNote} [SETTINGS_META:${JSON.stringify(metaPayload)}]`;
+
+    const payload: any = {
+      id: 'default',
+      store_name: settings.store_name,
+      vodafone_cash_enabled: settings.vodafone_cash_enabled !== false,
+      instapay_enabled: settings.instapay_enabled !== false,
+      vodafone_cash_numbers: JSON.stringify(settings.vodafone_cash_numbers),
+      instapay_ipa: settings.instapay_ipa || (settings.instapay_ipas && settings.instapay_ipas[0]) || '9thbatch@instapay',
+      instapay_ipas: JSON.stringify(settings.instapay_ipas || [settings.instapay_ipa]),
+      pickup_note: encodedNote,
       updated_at: new Date().toISOString()
     };
 
