@@ -162,6 +162,14 @@ export async function DELETE(req: NextRequest) {
     if (supabase) {
       try {
         await supabase.from('store_products').delete().eq('id', id);
+        await supabase.from('store_products').upsert({
+          id: id,
+          title: 'DELETED',
+          title_ar: 'DELETED',
+          price: 0,
+          image_url: '',
+          is_active: false
+        });
       } catch (e) {
         console.warn('Supabase product delete warning:', e);
       }

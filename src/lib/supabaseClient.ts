@@ -152,33 +152,42 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
       .order('created_at', { ascending: true });
 
     let dbProds: Product[] = [];
+    const inactiveDbIds = new Set<string>();
+
     if (!error && data && data.length > 0) {
-      dbProds = data.map((p: any) => ({
-        id: p.id,
-        title: p.title || p.title_ar,
-        title_ar: p.title_ar || p.title,
-        description: p.description || '',
-        description_ar: p.description_ar || '',
-        price: Number(p.price || 0),
-        category: p.category || 'Apparel',
-        image_url: p.image_url || '',
-        images: Array.isArray(p.images) ? p.images : (typeof p.images === 'string' ? JSON.parse(p.images) : [p.image_url]),
-        size_chart_url: p.size_chart_url || undefined,
-        has_customization: Boolean(p.has_customization),
-        customization_label: p.customization_label || undefined,
-        sizes: Array.isArray(p.sizes) ? p.sizes : (typeof p.sizes === 'string' ? JSON.parse(p.sizes) : []),
-        addons: Array.isArray(p.addons) ? p.addons : (typeof p.addons === 'string' ? JSON.parse(p.addons) : []),
-        stock: Number(p.stock || 0),
-        is_active: Boolean(p.is_active),
-        created_at: p.created_at || new Date().toISOString(),
-        updated_at: p.updated_at || new Date().toISOString()
-      }));
+      data.forEach((p: any) => {
+        if (p.is_active === false || p.title === 'DELETED' || p.title_ar === 'DELETED') {
+          inactiveDbIds.add(p.id);
+          addDeletedProductId(p.id);
+        } else {
+          dbProds.push({
+            id: p.id,
+            title: p.title || p.title_ar,
+            title_ar: p.title_ar || p.title,
+            description: p.description || '',
+            description_ar: p.description_ar || '',
+            price: Number(p.price || 0),
+            category: p.category || 'Apparel',
+            image_url: p.image_url || '',
+            images: Array.isArray(p.images) ? p.images : (typeof p.images === 'string' ? JSON.parse(p.images) : [p.image_url]),
+            size_chart_url: p.size_chart_url || undefined,
+            has_customization: Boolean(p.has_customization),
+            customization_label: p.customization_label || undefined,
+            sizes: Array.isArray(p.sizes) ? p.sizes : (typeof p.sizes === 'string' ? JSON.parse(p.sizes) : []),
+            addons: Array.isArray(p.addons) ? p.addons : (typeof p.addons === 'string' ? JSON.parse(p.addons) : []),
+            stock: Number(p.stock || 0),
+            is_active: true,
+            created_at: p.created_at || new Date().toISOString(),
+            updated_at: p.updated_at || new Date().toISOString()
+          });
+        }
+      });
     }
 
-    const deletedIds = new Set(getDeletedProductIds());
+    const deletedIds = new Set([...getDeletedProductIds(), ...inactiveDbIds]);
     const currentMemory = getMemoryProducts().filter(p => !deletedIds.has(p.id));
     const dbIds = new Set(dbProds.map(p => p.id));
-    const extraLocal = currentMemory.filter(p => !dbIds.has(p.id));
+    const extraLocal = currentMemory.filter(p => !dbIds.has(p.id) && !deletedIds.has(p.id));
     const finalProducts = [...dbProds, ...extraLocal].filter(p => !deletedIds.has(p.id));
 
     setMemoryProducts(finalProducts);
