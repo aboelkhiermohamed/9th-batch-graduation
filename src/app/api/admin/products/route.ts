@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Product } from '@/types';
-import { getMemoryProducts, setMemoryProducts, fetchProductsFromSupabase, saveProductToSupabase, addDeletedProductId, supabase } from '@/lib/supabaseClient';
+import { getMemoryProducts, setMemoryProducts, fetchProductsFromSupabase, saveProductToSupabase, addDeletedProductId, fetchSettingsFromSupabase, saveSettingsToSupabase, supabase } from '@/lib/supabaseClient';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -145,6 +145,12 @@ export async function DELETE(req: NextRequest) {
     const products = getMemoryProducts();
     const filtered = products.filter(p => p.id !== id);
     setMemoryProducts(filtered);
+
+    // Sync updated deleted product IDs list into DB store_settings metadata payload
+    try {
+      const currentSettings = await fetchSettingsFromSupabase();
+      await saveSettingsToSupabase(currentSettings);
+    } catch (e) {}
 
     if (supabase) {
       try {

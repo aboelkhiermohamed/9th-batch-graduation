@@ -119,6 +119,17 @@ export function getDeletedProductIds(): string[] {
   return memoryDeletedProductIds;
 }
 
+export function setDeletedProductIds(ids: string[]) {
+  if (Array.isArray(ids)) {
+    memoryDeletedProductIds = Array.from(new Set([...memoryDeletedProductIds, ...ids]));
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('graduation_store_deleted_products', JSON.stringify(memoryDeletedProductIds));
+      } catch (e) {}
+    }
+  }
+}
+
 export function addDeletedProductId(id: string) {
   if (!memoryDeletedProductIds.includes(id)) {
     memoryDeletedProductIds.push(id);
@@ -294,14 +305,21 @@ function parseArrayOrCommaString(val: any, fallback: string[]): string[] {
 
 export function cleanDisplayNotes(str?: string | null): string {
   if (!str) return '';
-  return str
-    .replace(/\s*\[(META|SETTINGS_META):.*?\]/gi, '')
-    .replace(/\s*\[RECEIPT_URL:.*?\]/gi, '')
-    .replace(/META:\{.*?\}/gi, '')
-    .replace(/RECEIPT_URL:https?:\/\/\S+/gi, '')
-    .replace(/\[\[".*?"\]\]/gi, '')
-    .replace(/\[".*?"\]/gi, '')
-    .trim();
+  let cleaned = String(str);
+
+  cleaned = cleaned.replace(/\[\s*(META|SETTINGS_META):[\s\S]*?\]/gi, '');
+  cleaned = cleaned.replace(/META:\s*\{[\s\S]*?\}/gi, '');
+  cleaned = cleaned.replace(/\{"v":[\s\S]*?\}/gi, '');
+  cleaned = cleaned.replace(/"(v|i|vn|ia|del)":[\s\S]*?(\}|\])/gi, '');
+  cleaned = cleaned.replace(/\[\s*RECEIPT_URL:[\s\S]*?\]/gi, '');
+  cleaned = cleaned.replace(/RECEIPT_URL:\s*https?:\/\/\S+/gi, '');
+  cleaned = cleaned.replace(/\[\[[\s\S]*?\]\]/gi, '');
+  cleaned = cleaned.replace(/\["[^"]*?@instapay[^"]*?"\]/gi, '');
+  cleaned = cleaned.replace(/\[[a-z0-9_\-\.]+\.(jpg|jpeg|png|webp|pdf)\]/gi, '');
+  cleaned = cleaned.replace(/[\{\}\[\]"']/g, '');
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  return cleaned;
 }
 
 export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
@@ -326,6 +344,10 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
         meta = JSON.parse(match[2]);
         rawNote = rawNote.replace(/\s*\[(META|SETTINGS_META):.*?\]/g, '').trim();
       } catch (e) {}
+    }
+
+    if (Array.isArray(meta?.del) && meta.del.length > 0) {
+      setDeletedProductIds(meta.del);
     }
 
     const currentMem = getMemorySettings();
@@ -369,12 +391,13 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
   setMemorySettings(memoryPayload);
 
   try {
-    // Ultra-compact metadata object (fits under 100 chars to avoid VARCHAR(255) overflow)
+    // Ultra-compact metadata object (fits under 120 chars to avoid VARCHAR(255) overflow)
     const compactMeta = {
       v: settings.vodafone_cash_enabled !== false ? 1 : 0,
       i: settings.instapay_enabled !== false ? 1 : 0,
       vn: settings.vodafone_cash_numbers,
-      ia: settings.instapay_ipas || [settings.instapay_ipa]
+      ia: settings.instapay_ipas || [settings.instapay_ipa],
+      del: getDeletedProductIds()
     };
 
     const metaTag = `[META:${JSON.stringify(compactMeta)}]`;

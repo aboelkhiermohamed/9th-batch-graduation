@@ -592,7 +592,7 @@ export default function StoreFrontPage() {
           {/* Pickup Note Alert */}
           <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-950/60 border border-indigo-500/30 text-indigo-200 text-xs sm:text-sm font-medium">
             <Info className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-            <span>مكان التسليم: <strong className="text-amber-400">{settings.pickup_note}</strong></span>
+            <span>مكان التسليم: <strong className="text-amber-400">{cleanDisplayNotes(settings.pickup_note)}</strong></span>
           </div>
         </div>
       </section>
@@ -1269,7 +1269,7 @@ export default function StoreFrontPage() {
               {/* Pickup Note Reminder */}
               <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
                 <Info className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                <span>مكان التسليم: <strong className="text-white">{settings.pickup_note}</strong></span>
+                <span>مكان التسليم: <strong className="text-white">{cleanDisplayNotes(settings.pickup_note)}</strong></span>
               </div>
 
               {/* Submit Button */}
