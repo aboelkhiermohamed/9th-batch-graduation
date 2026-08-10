@@ -1239,12 +1239,23 @@ export default function AdminDashboardPage() {
                         className="w-full h-44 rounded-2xl object-cover bg-slate-950"
                       />
                       {product.images && product.images.length > 1 && (
-                        <span className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-slate-950/80 backdrop-blur-sm text-white font-bold text-[10px] flex items-center gap-1 border border-slate-700">
+                        <span className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-slate-950/80 backdrop-blur-sm text-amber-300 font-bold text-[10px] flex items-center gap-1 border border-amber-500/30">
                           <Layers className="w-3 h-3 text-amber-400" />
-                          <span>{product.images.length} صور</span>
+                          <span>{product.images.length} صور معرض</span>
                         </span>
                       )}
                     </div>
+
+                    {/* Secondary Images Strip */}
+                    {product.images && product.images.length > 1 && (
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
+                        {product.images.map((imgUrl, imgIdx) => (
+                          <div key={imgIdx} className="w-10 h-10 rounded-lg overflow-hidden border border-slate-700/80 flex-shrink-0 bg-slate-950">
+                            <img src={imgUrl} alt={`صورة فرعية ${imgIdx + 1}`} className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between">
                       <h4 className="text-base font-bold text-white">{product.title_ar || product.title}</h4>

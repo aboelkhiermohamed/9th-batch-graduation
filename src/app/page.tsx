@@ -654,6 +654,17 @@ export default function StoreFrontPage() {
                   </div>
                 </div>
 
+                {/* Secondary Gallery Images Thumbnails */}
+                  {imagesList.length > 1 && (
+                    <div className="flex items-center gap-2 overflow-x-auto px-4 py-2 bg-slate-950/60 border-t border-b border-slate-800/80">
+                      {imagesList.map((gImg, gIdx) => (
+                        <div key={gIdx} className="w-9 h-9 rounded-lg overflow-hidden border border-slate-700/80 flex-shrink-0 bg-slate-900">
+                          <img src={gImg} alt={`معرض ${gIdx + 1}`} className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                 {/* Product Details */}
                 <div className="p-6 flex-1 flex flex-col justify-between" onClick={(e) => e.stopPropagation()}>
                   <div>

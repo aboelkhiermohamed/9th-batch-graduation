@@ -109,24 +109,28 @@ export async function PUT(req: NextRequest) {
 
     if (supabase) {
       try {
+        const payloadToSave: any = {
+          id,
+          title: title_ar || 'Product',
+          title_ar,
+          description_ar: description_ar || '',
+          price: Number(price) || 0,
+          stock: Number(stock) || 0,
+          sizes: Array.isArray(sizes) ? sizes : [],
+          image_url,
+          images: Array.isArray(images) && images.length > 0 ? images : [image_url],
+          size_chart_url,
+          has_customization: Boolean(has_customization),
+          customization_label: customization_label || undefined,
+          category: category || 'Apparel',
+          addons: Array.isArray(addons) ? addons : [],
+          is_active: is_active !== undefined ? Boolean(is_active) : true,
+          updated_at: new Date().toISOString()
+        };
+
         await supabase
           .from('store_products')
-          .update({
-            title_ar,
-            description_ar,
-            price: Number(price),
-            stock: Number(stock),
-            sizes,
-            image_url,
-            images,
-            size_chart_url,
-            has_customization,
-            customization_label,
-            category,
-            addons,
-            is_active
-          })
-          .eq('id', id);
+          .upsert(payloadToSave);
       } catch (e) {
         console.warn('Supabase product update warning:', e);
       }
