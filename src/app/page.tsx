@@ -277,13 +277,9 @@ export default function StoreFrontPage() {
     return () => clearInterval(interval);
   }, [isTrackerOpen, searchQuery, latestCreatedOrder]);
 
-  // Open product modal helper
+  // Open product page helper
   const handleOpenProductModal = (product: Product) => {
-    setActiveProductModal(product);
-    setModalActiveImageIndex(0);
-    setModalSelectedSize(product.sizes && product.sizes.length > 0 ? product.sizes[0] : '');
-    setModalCustomText('');
-    setModalSelectedAddons([]);
+    router.push(`/product/${product.id}`);
   };
 
   const handleAddToCartFromModal = () => {

@@ -385,55 +385,88 @@ export default function StandaloneProductPage() {
               </div>
             )}
 
-            {/* --- VISUAL ADD-ONS SECTION (الإضافات المصورة) --- */}
+            {/* --- VISUAL ADD-ONS SECTION (الإضافات والملحقات) --- */}
             {product.addons && product.addons.length > 0 && (
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <h3 className="text-xs sm:text-sm font-bold text-slate-100">
-                    إضافات وملحقات مميزة (Add-ons):
-                  </h3>
+              <div className="space-y-4 pt-4 border-t border-slate-800/80">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-100">
+                        خيارات وإضافات مخصصة لطلبك (Add-ons):
+                      </h3>
+                      <p className="text-xs text-slate-400">يمكنك اختيار ميزات أو ملحقات إضافية تضاف لطلبك</p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {product.addons.map((addon) => {
                     const isSelected = selectedAddons.some(a => a.id === addon.id);
                     return (
                       <div
                         key={addon.id}
                         onClick={() => toggleAddon(addon)}
-                        className={`p-3.5 rounded-2xl border cursor-pointer transition flex items-center gap-3 ${
+                        className={`p-4 rounded-3xl border-2 cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-3 relative overflow-hidden group ${
                           isSelected
-                            ? 'bg-amber-500/10 border-amber-500 text-slate-100 shadow-md shadow-amber-500/10'
-                            : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                            ? 'bg-slate-900 border-amber-500 shadow-xl shadow-amber-500/10 scale-[1.02]'
+                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
                         }`}
                       >
-                        {/* Addon Image preview */}
-                        {addon.image_url ? (
-                          <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0">
-                            <img src={addon.image_url} alt={addon.name} className="w-full h-full object-cover" />
-                          </div>
-                        ) : (
-                          <div className="w-14 h-14 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0">
-                            <Layers className="w-6 h-6" />
-                          </div>
-                        )}
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1">
-                            <h4 className="text-xs font-bold truncate">{addon.name}</h4>
-                            <span className="text-xs font-extrabold text-emerald-400">+{addon.price} ج.م</span>
-                          </div>
-                          {addon.description && (
-                            <p className="text-[10px] text-slate-400 truncate mt-0.5">{addon.description}</p>
+                        <div className="flex items-start gap-3.5">
+                          {/* Addon Image preview */}
+                          {addon.image_url ? (
+                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex-shrink-0 shadow-md">
+                              <img src={addon.image_url} alt={addon.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
+                            </div>
+                          ) : (
+                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0 shadow-md">
+                              <Layers className="w-8 h-8" />
+                            </div>
                           )}
+
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-start justify-between gap-1">
+                              <h4 className="text-sm sm:text-base font-bold text-slate-100 leading-snug">
+                                {addon.name}
+                              </h4>
+                            </div>
+                            {addon.description && (
+                              <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
+                                {addon.description}
+                              </p>
+                            )}
+                            <div className="pt-1">
+                              <span className="inline-block px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-extrabold text-xs font-mono">
+                                +{addon.price} ج.م
+                              </span>
+                            </div>
+                          </div>
                         </div>
 
-                        {/* Checkbox Icon */}
-                        <div className={`w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0 transition ${
-                          isSelected ? 'bg-amber-500 text-slate-950' : 'border border-slate-700 bg-slate-950'
-                        }`}>
-                          {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                        {/* Select Toggle Button */}
+                        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-slate-400">
+                            {isSelected ? 'تم اختيار الإضافة ✓' : 'إضافة للطلب'}
+                          </span>
+
+                          <button
+                            type="button"
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                                : 'bg-slate-800 text-slate-300 group-hover:bg-slate-700'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded-md flex items-center justify-center ${
+                              isSelected ? 'bg-slate-950 text-amber-400' : 'border border-slate-600'
+                            }`}>
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                            <span>{isSelected ? 'محددة' : 'إضافة'}</span>
+                          </button>
                         </div>
                       </div>
                     );

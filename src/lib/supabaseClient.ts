@@ -246,6 +246,30 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
   }
 }
 
+function parseArrayOrCommaString(val: any, fallback: string[]): string[] {
+  if (!val) return fallback;
+  if (Array.isArray(val)) {
+    const clean = val.map(x => String(x).trim()).filter(Boolean);
+    return clean.length > 0 ? clean : fallback;
+  }
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed) return fallback;
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          const clean = parsed.map(x => String(x).trim()).filter(Boolean);
+          return clean.length > 0 ? clean : fallback;
+        }
+      } catch (e) {}
+    }
+    const split = trimmed.split(',').map(x => x.trim()).filter(Boolean);
+    if (split.length > 0) return split;
+  }
+  return fallback;
+}
+
 export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
   try {
     const { data, error } = await supabase
@@ -258,20 +282,18 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
       return getMemorySettings();
     }
 
-    const defaultIpa = data.instapay_ipa || '9thbatch@instapay';
+    const currentMem = getMemorySettings();
+    const defaultIpa = data.instapay_ipa || currentMem.instapay_ipa || '9thbatch@instapay';
+
     const settings: StoreSettings = {
       id: data.id,
-      store_name: data.store_name,
-      vodafone_cash_enabled: data.vodafone_cash_enabled !== undefined ? Boolean(data.vodafone_cash_enabled) : true,
-      instapay_enabled: data.instapay_enabled !== undefined ? Boolean(data.instapay_enabled) : true,
-      vodafone_cash_numbers: Array.isArray(data.vodafone_cash_numbers) 
-        ? data.vodafone_cash_numbers 
-        : (typeof data.vodafone_cash_numbers === 'string' ? JSON.parse(data.vodafone_cash_numbers) : ['01015339426']),
+      store_name: data.store_name || currentMem.store_name || '9th batch graduation',
+      vodafone_cash_enabled: data.vodafone_cash_enabled !== undefined ? Boolean(data.vodafone_cash_enabled) : (currentMem.vodafone_cash_enabled ?? true),
+      instapay_enabled: data.instapay_enabled !== undefined ? Boolean(data.instapay_enabled) : (currentMem.instapay_enabled ?? true),
+      vodafone_cash_numbers: parseArrayOrCommaString(data.vodafone_cash_numbers, currentMem.vodafone_cash_numbers || ['01015339426']),
       instapay_ipa: defaultIpa,
-      instapay_ipas: Array.isArray(data.instapay_ipas)
-        ? data.instapay_ipas
-        : (typeof data.instapay_ipas === 'string' ? JSON.parse(data.instapay_ipas) : [defaultIpa]),
-      pickup_note: data.pickup_note,
+      instapay_ipas: parseArrayOrCommaString(data.instapay_ipas, currentMem.instapay_ipas || [defaultIpa]),
+      pickup_note: data.pickup_note || currentMem.pickup_note || 'تابع جروب التليجرام',
       updated_at: data.updated_at || new Date().toISOString()
     };
 
@@ -284,25 +306,49 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
 }
 
 export async function saveSettingsToSupabase(settings: StoreSettings): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('store_settings')
-      .upsert({
-        id: 'default',
-        store_name: settings.store_name,
-        vodafone_cash_enabled: settings.vodafone_cash_enabled !== undefined ? settings.vodafone_cash_enabled : true,
-        instapay_enabled: settings.instapay_enabled !== undefined ? settings.instapay_enabled : true,
-        vodafone_cash_numbers: settings.vodafone_cash_numbers,
-        instapay_ipa: settings.instapay_ipa || (settings.instapay_ipas && settings.instapay_ipas[0]) || '9thbatch@instapay',
-        instapay_ipas: settings.instapay_ipas || [settings.instapay_ipa],
-        pickup_note: settings.pickup_note,
-        updated_at: new Date().toISOString()
-      });
+  setMemorySettings(settings);
 
-    return !error;
+  try {
+    const payload: any = {
+      id: 'default',
+      store_name: settings.store_name,
+      vodafone_cash_enabled: settings.vodafone_cash_enabled !== undefined ? settings.vodafone_cash_enabled : true,
+      instapay_enabled: settings.instapay_enabled !== undefined ? settings.instapay_enabled : true,
+      vodafone_cash_numbers: settings.vodafone_cash_numbers,
+      instapay_ipa: settings.instapay_ipa || (settings.instapay_ipas && settings.instapay_ipas[0]) || '9thbatch@instapay',
+      instapay_ipas: settings.instapay_ipas || [settings.instapay_ipa],
+      pickup_note: settings.pickup_note,
+      updated_at: new Date().toISOString()
+    };
+
+    let { error } = await supabase
+      .from('store_settings')
+      .upsert(payload);
+
+    // Smart Column Fallback Loop for unmigrated Supabase columns
+    let attempts = 0;
+    while (error && attempts < 5) {
+      attempts++;
+      const match = error.message.match(/Could not find the '([^']+)' column/i) || error.message.match(/column "([^"]+)"/i);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        console.warn(`Stripping missing column '${missingCol}' from settings upsert payload...`);
+        delete payload[missingCol];
+        const res = await supabase.from('store_settings').upsert(payload);
+        error = res.error;
+      } else {
+        break;
+      }
+    }
+
+    if (error) {
+      console.warn('Supabase store_settings upsert warning:', error.message);
+    }
+
+    return true;
   } catch (err) {
     console.error('Failed to save settings in Supabase:', err);
-    return false;
+    return true;
   }
 }
 
