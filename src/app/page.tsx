@@ -31,7 +31,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Product, CartItem, Order, PaymentMethod, StoreSettings, ProductAddon } from '@/types';
-import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS } from '@/lib/supabaseClient';
+import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS, cleanDisplayNotes } from '@/lib/supabaseClient';
 
 const fireConfetti = (options?: any) => {
   if (typeof window === 'undefined') return;
@@ -1405,7 +1405,7 @@ export default function StoreFrontPage() {
 
                       {/* Pickup Info Banner */}
                       <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-indigo-300 flex items-center justify-between">
-                        <span>مكان التسليم: <strong className="text-amber-400">{settings.pickup_note}</strong></span>
+                        <span>مكان التسليم: <strong className="text-amber-400">{cleanDisplayNotes(settings.pickup_note)}</strong></span>
                         <span className="text-[11px] text-slate-400">{new Date(order.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>

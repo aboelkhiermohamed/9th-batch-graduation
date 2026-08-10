@@ -21,7 +21,7 @@ import {
   Minus
 } from 'lucide-react';
 import { CartItem, Order, PaymentMethod, StoreSettings, ProductAddon } from '@/types';
-import { DEFAULT_SETTINGS } from '@/lib/supabaseClient';
+import { DEFAULT_SETTINGS, cleanDisplayNotes } from '@/lib/supabaseClient';
 
 const fireConfetti = (options?: any) => {
   if (typeof window === 'undefined') return;
@@ -803,7 +803,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between text-xs text-slate-400">
                     <span>مكان التسليم:</span>
-                    <span className="text-amber-400 font-semibold">{settings.pickup_note}</span>
+                    <span className="text-amber-400 font-semibold">{cleanDisplayNotes(settings.pickup_note)}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm sm:text-base font-black pt-2 border-t border-slate-800">
                     <span className="text-white">المبلغ الكلي المطلوب:</span>

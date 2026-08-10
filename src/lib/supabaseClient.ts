@@ -270,6 +270,18 @@ function parseArrayOrCommaString(val: any, fallback: string[]): string[] {
   return fallback;
 }
 
+export function cleanDisplayNotes(str?: string | null): string {
+  if (!str) return '';
+  return str
+    .replace(/\s*\[(META|SETTINGS_META):.*?\]/gi, '')
+    .replace(/\s*\[RECEIPT_URL:.*?\]/gi, '')
+    .replace(/META:\{.*?\}/gi, '')
+    .replace(/RECEIPT_URL:https?:\/\/\S+/gi, '')
+    .replace(/\[\[".*?"\]\]/gi, '')
+    .replace(/\[".*?"\]/gi, '')
+    .trim();
+}
+
 export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
   try {
     const { data, error } = await supabase
@@ -307,6 +319,8 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
     const vodaNums = meta?.vn || meta?.vodafone_cash_numbers || parseArrayOrCommaString(data.vodafone_cash_numbers, currentMem.vodafone_cash_numbers || ['01015339426']);
     const instaAccounts = meta?.ia || meta?.instapay_ipas || parseArrayOrCommaString(data.instapay_ipas, currentMem.instapay_ipas || [defaultIpa]);
 
+    const cleanNote = cleanDisplayNotes(rawNote) || 'تابع جروب التليجرام';
+
     const settings: StoreSettings = {
       id: data.id,
       store_name: meta?.store_name || data.store_name || currentMem.store_name || '9th batch graduation',
@@ -315,7 +329,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
       vodafone_cash_numbers: vodaNums,
       instapay_ipa: defaultIpa,
       instapay_ipas: instaAccounts,
-      pickup_note: rawNote || 'تابع جروب التليجرام',
+      pickup_note: cleanNote,
       updated_at: data.updated_at || new Date().toISOString()
     };
 
@@ -328,7 +342,9 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
 }
 
 export async function saveSettingsToSupabase(settings: StoreSettings): Promise<boolean> {
-  setMemorySettings(settings);
+  const cleanNote = cleanDisplayNotes(settings.pickup_note || 'تابع جروب التليجرام');
+  const memoryPayload = { ...settings, pickup_note: cleanNote };
+  setMemorySettings(memoryPayload);
 
   try {
     // Ultra-compact metadata object (fits under 100 chars to avoid VARCHAR(255) overflow)
@@ -338,10 +354,6 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       vn: settings.vodafone_cash_numbers,
       ia: settings.instapay_ipas || [settings.instapay_ipa]
     };
-
-    const cleanNote = (settings.pickup_note || 'تابع جروب التليجرام')
-      .replace(/\s*\[(META|SETTINGS_META):.*?\]/g, '')
-      .trim();
 
     const metaTag = `[META:${JSON.stringify(compactMeta)}]`;
     // Ensure encodedNote fits in VARCHAR(255)

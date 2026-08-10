@@ -46,6 +46,7 @@ import {
   Ruler
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
+import { cleanDisplayNotes } from '@/lib/supabaseClient';
 
 export default function AdminDashboardPage() {
   // Auth state
@@ -931,8 +932,8 @@ export default function AdminDashboardPage() {
                                 <Package className="w-3.5 h-3.5 text-amber-400" />
                                 <span>طلب منتج تخرج ({order.total_amount} ج.م)</span>
                               </p>
-                              {order.notes && (
-                                <p className="text-[10px] text-slate-400 font-normal">ملاحظة: {order.notes}</p>
+                              {cleanDisplayNotes(order.notes) && (
+                                <p className="text-[10px] text-slate-400 font-normal">ملاحظة: {cleanDisplayNotes(order.notes)}</p>
                               )}
                             </div>
                           ) : (
@@ -1999,7 +2000,7 @@ export default function AdminDashboardPage() {
 
       {/* --- RECEIPT SCREENSHOT MODAL --- */}
       {viewingReceiptUrl && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md p-4 flex items-center justify-center">
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/95 backdrop-blur-md p-4 flex items-center justify-center">
           <div className="relative max-w-2xl w-full glass-modal rounded-3xl p-6 border border-slate-700 text-center space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -2362,9 +2363,9 @@ export default function AdminDashboardPage() {
                 )}
               </div>
 
-              {selectedOrderModal.notes && (
+              {cleanDisplayNotes(selectedOrderModal.notes) && (
                 <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
-                  <span className="font-bold text-amber-400">ملاحظات إضافية من العميل:</span> {selectedOrderModal.notes}
+                  <span className="font-bold text-amber-400">ملاحظات إضافية من العميل:</span> {cleanDisplayNotes(selectedOrderModal.notes)}
                 </div>
               )}
             </div>
