@@ -144,15 +144,6 @@ export default function CheckoutPage() {
     setReceiptPreview(previewUrl);
     setReceiptFile(file);
 
-    // Read as Base64 Data URL as primary reliable fallback
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      if (evt.target?.result) {
-        setReceiptUrl(evt.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
-
     setIsUploadingReceipt(true);
     try {
       const fd = new FormData();
@@ -165,9 +156,25 @@ export default function CheckoutPage() {
 
       if (res.ok && data.url) {
         setReceiptUrl(data.url);
+      } else {
+        // Fallback to Base64 if upload endpoint returned error
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          if (evt.target?.result) {
+            setReceiptUrl(evt.target.result as string);
+          }
+        };
+        reader.readAsDataURL(file);
       }
     } catch (err) {
       console.warn('Receipt upload fallback to Base64:', err);
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        if (evt.target?.result) {
+          setReceiptUrl(evt.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
     } finally {
       setIsUploadingReceipt(false);
     }
