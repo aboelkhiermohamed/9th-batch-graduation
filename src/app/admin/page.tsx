@@ -246,12 +246,12 @@ export default function AdminDashboardPage() {
     setIsLoading(true);
     try {
       const [ordRes, prodRes, setRes, smsRes, devRes, admRes] = await Promise.all([
-        fetch('/api/orders'),
-        fetch('/api/admin/products'),
-        fetch('/api/admin/settings'),
-        fetch('/api/sms'),
-        fetch('/api/admin/devices'),
-        fetch('/api/admin/users')
+        fetch('/api/orders', { cache: 'no-store' }),
+        fetch('/api/admin/products', { cache: 'no-store' }),
+        fetch('/api/admin/settings', { cache: 'no-store' }),
+        fetch('/api/sms', { cache: 'no-store' }),
+        fetch('/api/admin/devices', { cache: 'no-store' }),
+        fetch('/api/admin/users', { cache: 'no-store' })
       ]);
 
       if (ordRes.ok) setOrders(await ordRes.json());
@@ -1131,8 +1131,8 @@ export default function AdminDashboardPage() {
                               </div>
                             ))
                           )}
-                          {order.items && order.items.length > 0 && order.notes && (
-                            <p className="text-[11px] text-slate-400 italic">ملاحظة: {order.notes}</p>
+                          {order.items && order.items.length > 0 && cleanDisplayNotes(order.notes) && (
+                            <p className="text-[11px] text-slate-400 italic">ملاحظة: {cleanDisplayNotes(order.notes)}</p>
                           )}
                         </td>
                         <td className="p-4 font-black text-sm text-white">
@@ -2442,8 +2442,8 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
-            <div className="p-2 rounded-2xl bg-slate-950 border border-slate-800 max-h-[70vh] overflow-auto flex items-center justify-center">
-              <img src={viewingReceiptUrl} alt="Receipt Screenshot" className="max-w-full rounded-xl object-contain" />
+            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center max-h-[65vh] overflow-hidden">
+              <img src={viewingReceiptUrl} alt="Receipt Screenshot" className="max-h-[60vh] max-w-full w-auto h-auto rounded-xl object-contain shadow-lg" />
             </div>
 
             <div className="flex items-center justify-center gap-3">

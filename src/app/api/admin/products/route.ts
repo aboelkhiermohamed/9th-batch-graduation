@@ -9,9 +9,16 @@ function generateUUID() {
   return 'f' + Date.now().toString(16).padStart(11, '0') + '-4000-8000-000000000000';
 }
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const products = await fetchProductsFromSupabase();
-  return NextResponse.json(products);
+  return NextResponse.json(products, {
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'
+    }
+  });
 }
 
 export async function POST(req: NextRequest) {

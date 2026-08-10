@@ -243,8 +243,8 @@ export default function StoreFrontPage() {
     async function loadData() {
       try {
         const [prodRes, setRes] = await Promise.all([
-          fetch('/api/admin/products'),
-          fetch('/api/admin/settings')
+          fetch('/api/admin/products', { cache: 'no-store' }),
+          fetch('/api/admin/settings', { cache: 'no-store' })
         ]);
         if (prodRes.ok) {
           const prods = await prodRes.json();
