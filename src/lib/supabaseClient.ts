@@ -205,7 +205,7 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
   const current = getMemoryProducts();
   const idx = current.findIndex(p => p.id === product.id);
   if (idx >= 0) {
-    current[idx] = product;
+    current[idx] = { ...current[idx], ...product };
   } else {
     current.unshift(product);
   }
@@ -216,38 +216,40 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
   }
 
   try {
+    const rawImages = product.images && product.images.length > 0 ? product.images : [product.image_url];
+    const rawSizes = product.sizes || [];
+    const rawAddons = product.addons || [];
+
     const payload: any = {
-      title: product.title,
-      title_ar: product.title_ar,
+      title: product.title || product.title_ar || 'Product',
+      title_ar: product.title_ar || product.title || 'منتج',
       description: product.description || '',
-      description_ar: product.description_ar || '',
-      price: product.price,
-      category: product.category,
+      description_ar: product.description_ar || product.description || '',
+      price: Number(product.price) || 0,
+      category: product.category || 'Apparel',
       image_url: product.image_url,
-      images: product.images || [product.image_url],
+      images: rawImages,
       size_chart_url: product.size_chart_url || null,
-      has_customization: product.has_customization || false,
+      has_customization: Boolean(product.has_customization),
       customization_label: product.customization_label || null,
-      sizes: product.sizes,
-      stock: product.stock,
-      is_active: product.is_active
+      sizes: rawSizes,
+      addons: rawAddons,
+      stock: Number(product.stock) || 0,
+      is_active: product.is_active !== undefined ? Boolean(product.is_active) : true,
+      updated_at: new Date().toISOString()
     };
 
-    if (isUuid) {
+    if (isUuid || product.id) {
       payload.id = product.id;
-    }
-
-    if (product.addons && product.addons.length > 0) {
-      payload.addons = product.addons;
     }
 
     let { data, error } = await supabase
       .from('store_products')
-      .insert(payload)
+      .upsert(payload, { onConflict: 'id' })
       .select()
       .single();
 
-    // Smart Column Fallback Loop: Dynamically strip any column missing in Supabase DB schema
+    // Smart Column & Type Fallback Loop: Handles missing columns or text/json array column mismatches in Supabase Postgres
     let attempts = 0;
     while (error && attempts < 6) {
       attempts++;
@@ -256,13 +258,14 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
         const missingCol = match[1];
         console.warn(`Stripping unmigrated column '${missingCol}' from product payload...`);
         delete payload[missingCol];
-        const res = await supabase.from('store_products').insert(payload).select().single();
+        const res = await supabase.from('store_products').upsert(payload, { onConflict: 'id' }).select().single();
         data = res.data;
         error = res.error;
-      } else if (error.message.includes('json') || error.message.includes('array')) {
-        payload.images = typeof payload.images === 'object' ? JSON.stringify(payload.images) : payload.images;
-        payload.sizes = typeof payload.sizes === 'object' ? JSON.stringify(payload.sizes) : payload.sizes;
-        const res = await supabase.from('store_products').insert(payload).select().single();
+      } else if (error.message.includes('json') || error.message.includes('array') || error.message.includes('syntax') || error.message.includes('type')) {
+        if (typeof payload.images === 'object') payload.images = JSON.stringify(payload.images);
+        if (typeof payload.sizes === 'object') payload.sizes = JSON.stringify(payload.sizes);
+        if (typeof payload.addons === 'object') payload.addons = JSON.stringify(payload.addons);
+        const res = await supabase.from('store_products').upsert(payload, { onConflict: 'id' }).select().single();
         data = res.data;
         error = res.error;
       } else {
@@ -271,7 +274,7 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
     }
 
     if (error) {
-      console.error('Supabase product insert error:', error);
+      console.error('Supabase product upsert error:', error.message);
       return { success: false, error: error.message };
     }
 
