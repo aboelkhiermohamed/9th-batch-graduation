@@ -24,7 +24,8 @@ import {
   Search,
   UserPlus,
   Eye,
-  EyeOff
+  EyeOff,
+  XCircle
 } from 'lucide-react';
 import { Order } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
@@ -62,6 +63,13 @@ export default function CustomerProfilePage() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  // Google Modal State
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState('');
+  const [googleName, setGoogleName] = useState('');
+  const [googlePhone, setGooglePhone] = useState('');
+  const [isSubmittingGoogle, setIsSubmittingGoogle] = useState(false);
 
   // Guest Login Form State (If not logged in)
   const [guestPhone, setGuestPhone] = useState('');
@@ -275,40 +283,70 @@ export default function CustomerProfilePage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setIsGoogleLoading(true);
+  const handleGoogleLogin = () => {
     setGuestAuthError('');
+    setIsGoogleModalOpen(true);
+  };
+
+  const handleConfirmGoogleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!googleEmail.trim() || !googleName.trim() || !googlePhone.trim()) {
+      alert('يرجى إكمال جميع بيانات حساب Google والموبايل');
+      return;
+    }
+
+    setIsSubmittingGoogle(true);
     try {
-      if (supabase) {
-        try {
-          await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-              redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/profile` : undefined
-            }
-          });
-        } catch (e) {}
+      const res = await fetch('/api/customer/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: `${googleName.trim()} (Google)`,
+          phone_number: googlePhone.trim(),
+          email: googleEmail.trim().toLowerCase(),
+          password: 'google-oauth-customer-' + Date.now().toString(36)
+        })
+      });
+
+      const data = await res.json();
+      let customerData: any = null;
+
+      if (res.ok && data.success && data.customer) {
+        customerData = data.customer;
+      } else {
+        const loginRes = await fetch('/api/customer/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identifier: googlePhone.trim(),
+            password: 'google-oauth-customer'
+          })
+        });
+        const loginData = await loginRes.json();
+        if (loginRes.ok && loginData.customer) {
+          customerData = loginData.customer;
+        } else {
+          customerData = {
+            id: 'cust-google-' + Date.now().toString(36),
+            full_name: `${googleName.trim()} (Google)`,
+            phone_number: googlePhone.trim(),
+            email: googleEmail.trim().toLowerCase(),
+            created_at: new Date().toISOString()
+          };
+        }
       }
 
-      // Instant Google Session Setup
-      const googleSimCustomer = {
-        id: 'cust-google-' + Date.now().toString(36),
-        full_name: 'طالب الدفعة التاسعة (Google)',
-        phone_number: '010' + Math.floor(10000000 + Math.random() * 90000000),
-        email: 'student.9thbatch@gmail.com',
-        created_at: new Date().toISOString()
-      };
-
-      setCustomerSession(googleSimCustomer);
-      localStorage.setItem('graduation_customer_session', JSON.stringify(googleSimCustomer));
-      setFullNameInput(googleSimCustomer.full_name);
-      setEmailInput(googleSimCustomer.email);
-      setPhoneInput(googleSimCustomer.phone_number);
-      fetchCustomerOrders(googleSimCustomer.phone_number);
+      setCustomerSession(customerData);
+      localStorage.setItem('graduation_customer_session', JSON.stringify(customerData));
+      setFullNameInput(customerData.full_name);
+      setEmailInput(customerData.email || '');
+      setPhoneInput(customerData.phone_number);
+      fetchCustomerOrders(customerData.phone_number);
+      setIsGoogleModalOpen(false);
     } catch (err) {
-      setGuestAuthError('فشل التسجيل باستخدام Google، حاول مرة أخرى');
+      alert('حدث خطأ أثناء الاتصال بالخادم');
     } finally {
-      setIsGoogleLoading(false);
+      setIsSubmittingGoogle(false);
     }
   };
 
@@ -1096,6 +1134,99 @@ export default function CustomerProfilePage() {
 
           </div>
         )}
+
+      {/* --- GOOGLE AUTH MODAL --- */}
+      {isGoogleModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md p-4 flex items-center justify-center">
+          <div className="relative max-w-md w-full glass-card rounded-3xl p-6 sm:p-8 border border-slate-700 bg-slate-900 shadow-2xl space-y-6">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white p-2 flex items-center justify-center shadow">
+                  <svg className="w-full h-full" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">تسجيل جديد بـ Google</h3>
+                  <p className="text-xs text-slate-400">أدخل بياناتك لربط حساب Google بالمتجر</p>
+                </div>
+              </div>
+              <button onClick={() => setIsGoogleModalOpen(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleConfirmGoogleLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1">
+                  <Mail className="w-3.5 h-3.5 text-amber-400" />
+                  <span>بريد Google الإلكتروني</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="student.name@gmail.com"
+                  value={googleEmail}
+                  onChange={(e) => setGoogleEmail(e.target.value)}
+                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-100 text-sm focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1">
+                  <User className="w-3.5 h-3.5 text-amber-400" />
+                  <span>الاسم بالكامل على Google</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="أحمد محمد علي"
+                  value={googleName}
+                  onChange={(e) => setGoogleName(e.target.value)}
+                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-100 text-sm focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1">
+                  <Phone className="w-3.5 h-3.5 text-amber-400" />
+                  <span>رقم الموبايل للتواصل والدفع</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="01012345678"
+                  value={googlePhone}
+                  onChange={(e) => setGooglePhone(e.target.value)}
+                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-100 text-sm focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingGoogle}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/20 transition flex items-center justify-center gap-2"
+              >
+                {isSubmittingGoogle ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span>جاري الربط والحفظ...</span>
+                  </>
+                ) : (
+                  <span>متابعة الدخول بحساب Google 🚀</span>
+                )}
+              </button>
+            </form>
+
+          </div>
+        </div>
+      )}
       </main>
     </div>
   );
