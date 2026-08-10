@@ -31,7 +31,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Product, CartItem, Order, PaymentMethod, StoreSettings, ProductAddon } from '@/types';
-import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS, cleanDisplayNotes } from '@/lib/supabaseClient';
+import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS, cleanDisplayNotes, supabase } from '@/lib/supabaseClient';
 
 const fireConfetti = (options?: any) => {
   if (typeof window === 'undefined') return;
@@ -129,6 +129,50 @@ export default function StoreFrontPage() {
       setIsCartLoaded(true);
     }
   }, []);
+
+  // Listen for Supabase OAuth Redirect Callback (Google Sign In hash token)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (window.location.hash && window.location.hash.includes('access_token=')) {
+      if (supabase) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            const gUser = session.user;
+            const googleSess = {
+              id: gUser.id,
+              full_name: gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google',
+              email: gUser.email || '',
+              phone_number: gUser.phone || gUser.user_metadata?.phone || '',
+              created_at: gUser.created_at || new Date().toISOString()
+            };
+            localStorage.setItem('graduation_customer_session', JSON.stringify(googleSess));
+            router.push('/profile');
+          }
+        });
+      }
+    }
+
+    if (supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          const gUser = session.user;
+          const googleSess = {
+            id: gUser.id,
+            full_name: gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google',
+            email: gUser.email || '',
+            phone_number: gUser.phone || gUser.user_metadata?.phone || '',
+            created_at: gUser.created_at || new Date().toISOString()
+          };
+          localStorage.setItem('graduation_customer_session', JSON.stringify(googleSess));
+          router.push('/profile');
+        }
+      });
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, [router]);
 
   const fetchCustomerOrders = async (phone: string) => {
     if (!phone) return;

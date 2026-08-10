@@ -95,6 +95,40 @@ export default function CustomerProfilePage() {
   useEffect(() => {
     async function initSession() {
       try {
+        // Parse Supabase OAuth Hash Token directly if present in URL
+        if (typeof window !== 'undefined' && window.location.hash && window.location.hash.includes('access_token=')) {
+          if (supabase) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+              const gUser = session.user;
+              const googleSess = {
+                id: gUser.id,
+                full_name: gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google',
+                email: gUser.email || '',
+                phone_number: gUser.phone || gUser.user_metadata?.phone || '',
+                created_at: gUser.created_at || new Date().toISOString()
+              };
+              setCustomerSession(googleSess);
+              localStorage.setItem('graduation_customer_session', JSON.stringify(googleSess));
+              setFullNameInput(googleSess.full_name);
+              setEmailInput(googleSess.email);
+              setPhoneInput(googleSess.phone_number);
+              
+              // Clean hash from address bar nicely
+              window.history.replaceState(null, '', window.location.pathname);
+
+              if (!googleSess.phone_number || !googleSess.full_name) {
+                setCompleteFullName(googleSess.full_name);
+                setCompletePhone(googleSess.phone_number);
+                setCompleteEmail(googleSess.email);
+                setIsCompleteProfileOpen(true);
+              }
+              setIsSessionLoaded(true);
+              return;
+            }
+          }
+        }
+
         // 1. Check local session
         const saved = localStorage.getItem('graduation_customer_session');
         if (saved) {
@@ -145,6 +179,36 @@ export default function CustomerProfilePage() {
       }
     }
     initSession();
+
+    if (supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          const gUser = session.user;
+          const googleSess = {
+            id: gUser.id,
+            full_name: gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google',
+            email: gUser.email || '',
+            phone_number: gUser.phone || gUser.user_metadata?.phone || '',
+            created_at: gUser.created_at || new Date().toISOString()
+          };
+          setCustomerSession(googleSess);
+          localStorage.setItem('graduation_customer_session', JSON.stringify(googleSess));
+          setFullNameInput(googleSess.full_name);
+          setEmailInput(googleSess.email);
+          setPhoneInput(googleSess.phone_number);
+
+          if (!googleSess.phone_number || !googleSess.full_name) {
+            setCompleteFullName(googleSess.full_name);
+            setCompletePhone(googleSess.phone_number);
+            setCompleteEmail(googleSess.email);
+            setIsCompleteProfileOpen(true);
+          }
+        }
+      });
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
   }, []);
 
   const fetchCustomerOrders = async (phone: string) => {
