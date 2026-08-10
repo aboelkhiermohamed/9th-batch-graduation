@@ -28,7 +28,8 @@ import {
   Upload,
   Image as ImageIcon,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  User
 } from 'lucide-react';
 import { Product, CartItem, Order, PaymentMethod, StoreSettings, ProductAddon } from '@/types';
 import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS, cleanDisplayNotes, supabase } from '@/lib/supabaseClient';
@@ -560,11 +561,11 @@ export default function StoreFrontPage() {
               </div>
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm sm:text-xl font-bold tracking-tight gradient-gold-text truncate max-w-[130px] xs:max-w-none">
-                {settings.store_name}
+              <h1 className="text-sm sm:text-xl font-black tracking-tight gradient-gold-text truncate">
+                متجر الدفعة التاسعة
               </h1>
               <p className="text-[10px] sm:text-xs text-slate-400 hidden xs:flex items-center gap-1 truncate">
-                <span>🎓 متجر الدفعة التاسعة الرسمي</span>
+                <span>🎓 مستلزمات وحجوزات التخرج الرسمية</span>
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
               </p>
             </div>
@@ -575,19 +576,14 @@ export default function StoreFrontPage() {
             {/* Customer Account / Profile Button */}
             <button
               onClick={() => router.push('/profile')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs sm:text-sm font-bold text-amber-300 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs sm:text-sm font-bold text-amber-300 transition-all shadow-md shadow-amber-500/10"
             >
-              <ShieldCheck className="w-4 h-4 text-amber-400" />
-              <span>{customerSession ? `حسابي (${customerSession.full_name || 'البروفايل'})` : 'بروفايل العميل 👤'}</span>
-            </button>
-
-            {/* Track Order Button */}
-            <button
-              onClick={() => setIsTrackerOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700/60 text-xs sm:text-sm font-medium text-slate-200 transition-all"
-            >
-              <Search className="w-4 h-4 text-indigo-400" />
-              <span className="hidden sm:inline">متابعة حالة الطلب</span>
+              <User className="w-4 h-4 text-amber-400" />
+              <span>
+                {customerSession 
+                  ? `البروفايل (${customerSession.full_name?.split(' ')[0] || 'حسابي'})` 
+                  : 'تسجيل / دخول 🔑'}
+              </span>
             </button>
 
             {/* Cart Button */}
@@ -629,15 +625,9 @@ export default function StoreFrontPage() {
           <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white mb-4 leading-tight">
             احجز منتجات <span className="gradient-gold-text">الدفعة التاسعة</span> الآن
           </h2>
-          <p className="max-w-2xl mx-auto text-slate-400 text-sm sm:text-base mb-6 leading-relaxed">
+          <p className="max-w-2xl mx-auto text-slate-400 text-sm sm:text-base mb-2 leading-relaxed">
             تصفح صور المنتج بالكامل، اختر المقاس والتطريز المطلوب، وادفع فوراً عبر فودافون كاش أو إنستا باي مع التأكيد المباشر للطلب.
           </p>
-
-          {/* Pickup Note Alert */}
-          <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-950/60 border border-indigo-500/30 text-indigo-200 text-xs sm:text-sm font-medium">
-            <Info className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-            <span>مكان التسليم: <strong className="text-amber-400">{cleanDisplayNotes(settings.pickup_note)}</strong></span>
-          </div>
         </div>
       </section>
 
