@@ -84,6 +84,13 @@ export default function CustomerProfilePage() {
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
 
+  // Complete Profile Modal State
+  const [isCompleteProfileOpen, setIsCompleteProfileOpen] = useState(false);
+  const [completeFullName, setCompleteFullName] = useState('');
+  const [completePhone, setCompletePhone] = useState('');
+  const [completeEmail, setCompleteEmail] = useState('');
+  const [isSavingCompleteProfile, setIsSavingCompleteProfile] = useState(false);
+
   // Load customer session on mount (including Supabase Google OAuth redirect)
   useEffect(() => {
     async function initSession() {
@@ -120,6 +127,14 @@ export default function CustomerProfilePage() {
             setPhoneInput(googleSess.phone_number);
             if (googleSess.phone_number || googleSess.email) {
               fetchCustomerOrders(googleSess.phone_number || googleSess.email);
+            }
+
+            // Prompt user to complete missing fields (e.g. phone or name)
+            if (!googleSess.phone_number || !googleSess.full_name) {
+              setCompleteFullName(googleSess.full_name);
+              setCompletePhone(googleSess.phone_number);
+              setCompleteEmail(googleSess.email);
+              setIsCompleteProfileOpen(true);
             }
           }
         }
@@ -302,6 +317,12 @@ export default function CustomerProfilePage() {
         setEmailInput(data.customer.email || '');
         setPhoneInput(data.customer.phone_number || '');
         fetchCustomerOrders(data.customer.phone_number);
+
+        // Open completion modal so user can confirm and complete details
+        setCompleteFullName(data.customer.full_name || '');
+        setCompletePhone(data.customer.phone_number || '');
+        setCompleteEmail(data.customer.email || '');
+        setIsCompleteProfileOpen(true);
       } else {
         setGuestAuthError(data.error || 'فشل إنشاء الحساب، يرجى المحاولة لاحقاً');
       }
@@ -399,6 +420,51 @@ export default function CustomerProfilePage() {
       alert('حدث خطأ أثناء الاتصال بالخادم');
     } finally {
       setIsSubmittingGoogle(false);
+    }
+  };
+
+  const handleSaveCompleteProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!completeFullName.trim() || !completePhone.trim()) {
+      alert('يرجى كِتابة الاسم بالكامل ورقم الموبايل على الأقل');
+      return;
+    }
+
+    setIsSavingCompleteProfile(true);
+    try {
+      const res = await fetch('/api/customer/update-profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: customerSession?.id,
+          phone_number: customerSession?.phone_number,
+          new_phone: completePhone.trim(),
+          full_name: completeFullName.trim(),
+          email: completeEmail.trim()
+        })
+      });
+
+      const data = await res.json();
+      const updatedSess = {
+        ...customerSession,
+        id: customerSession?.id || 'cust-' + Date.now().toString(36),
+        full_name: completeFullName.trim(),
+        phone_number: completePhone.trim(),
+        email: completeEmail.trim()
+      };
+
+      setCustomerSession(updatedSess);
+      localStorage.setItem('graduation_customer_session', JSON.stringify(updatedSess));
+      setFullNameInput(updatedSess.full_name);
+      setPhoneInput(updatedSess.phone_number);
+      setEmailInput(updatedSess.email || '');
+      fetchCustomerOrders(updatedSess.phone_number);
+      setIsCompleteProfileOpen(false);
+      alert('🎉 تم استكمال وتأكيد بيانات حسابك بنجاح!');
+    } catch (err) {
+      alert('حدث خطأ أثناء حفظ البيانات');
+    } finally {
+      setIsSavingCompleteProfile(false);
     }
   };
 
@@ -1275,6 +1341,103 @@ export default function CustomerProfilePage() {
                 )}
               </button>
             </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* --- COMPLETE PROFILE / MISSING DATA MODAL --- */}
+      {isCompleteProfileOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-lg p-4 flex items-center justify-center">
+          <div className="relative max-w-lg w-full glass-card rounded-3xl p-6 sm:p-8 border border-amber-500/40 bg-slate-900 shadow-2xl space-y-6">
+            
+            {/* Header */}
+            <div className="text-center pb-2 border-b border-slate-800">
+              <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-3">
+                <Sparkles className="w-7 h-7 text-amber-400" />
+              </div>
+              <h3 className="text-xl font-extrabold text-white">✨ اكتمل التسجيل! استكمال باقي البيانات</h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                يرجى تأكيد بياناتك الشخصية لاستخدامها في التطريز وتتبع شحنة روب التخرج
+              </p>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveCompleteProfile} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-amber-400" />
+                  <span>الاسم بالكامل (سيُطرز على وشاح/روب التخرج)</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: أحمد محمد عبد الرحمن"
+                  value={completeFullName}
+                  onChange={(e) => setCompleteFullName(e.target.value)}
+                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-100 text-sm focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-amber-400" />
+                  <span>رقم الموبايل للتواصل والواتساب (مهم لتسلم الطلب)</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="01012345678"
+                  value={completePhone}
+                  onChange={(e) => setCompletePhone(e.target.value)}
+                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-100 text-sm focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-amber-400" />
+                  <span>البريد الإلكتروني (اختياري)</span>
+                </label>
+                <input
+                  type="email"
+                  placeholder="student@gmail.com"
+                  value={completeEmail}
+                  onChange={(e) => setCompleteEmail(e.target.value)}
+                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-100 text-sm focus:outline-none focus:border-amber-500 font-mono"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isSavingCompleteProfile}
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-sm sm:text-base shadow-xl shadow-amber-500/20 transition flex items-center justify-center gap-2 active:scale-[0.99]"
+                >
+                  {isSavingCompleteProfile ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      <span>جاري حفظ البيانات...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span>حفظ واستكمال الحساب ➔</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => setIsCompleteProfileOpen(false)}
+                className="text-xs text-slate-500 hover:text-slate-300 underline"
+              >
+                تخطي الآن والمتابعة للبروفايل
+              </button>
+            </div>
 
           </div>
         </div>

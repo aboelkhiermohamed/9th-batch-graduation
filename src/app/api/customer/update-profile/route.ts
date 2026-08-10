@@ -3,13 +3,9 @@ import { supabase } from '@/lib/supabaseClient';
 
 export async function PUT(req: Request) {
   try {
-    const { phone_number, full_name, email } = await req.json();
+    const { id, phone_number, full_name, email, new_phone } = await req.json();
 
-    if (!phone_number) {
-      return NextResponse.json({ error: 'رقم الموبايل مطلوب للتعرف على الحساب' }, { status: 400 });
-    }
-
-    const cleanPhone = phone_number.trim();
+    const targetPhone = (new_phone || phone_number || '').trim();
     const cleanName = full_name ? full_name.trim() : '';
     const cleanEmail = email ? email.trim().toLowerCase() : '';
 
@@ -19,15 +15,26 @@ export async function PUT(req: Request) {
 
     if (supabase) {
       try {
-        const { data, error } = await supabase
-          .from('store_customers')
-          .update({
-            full_name: cleanName,
-            email: cleanEmail || null,
-          })
-          .eq('phone_number', cleanPhone)
-          .select('id, phone_number, full_name, email, created_at')
-          .single();
+        const updatePayload: any = {
+          full_name: cleanName,
+          email: cleanEmail || null,
+        };
+        if (targetPhone) {
+          updatePayload.phone_number = targetPhone;
+        }
+
+        let query = supabase.from('store_customers').update(updatePayload);
+        if (id) {
+          query = query.eq('id', id);
+        } else if (phone_number) {
+          query = query.eq('phone_number', phone_number.trim());
+        } else if (cleanEmail) {
+          query = query.eq('email', cleanEmail);
+        } else {
+          return NextResponse.json({ error: 'تعذر التعرف على الحساب المراد تحديثه' }, { status: 400 });
+        }
+
+        const { data, error } = await query.select('id, phone_number, full_name, email, created_at').single();
 
         if (!error && data) {
           return NextResponse.json({
@@ -45,7 +52,8 @@ export async function PUT(req: Request) {
     return NextResponse.json({
       success: true,
       customer: {
-        phone_number: cleanPhone,
+        id: id || 'cust-' + Date.now().toString(36),
+        phone_number: targetPhone,
         full_name: cleanName,
         email: cleanEmail
       },
