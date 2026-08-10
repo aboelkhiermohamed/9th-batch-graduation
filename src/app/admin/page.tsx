@@ -46,7 +46,14 @@ import {
   Ruler
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
-import { cleanDisplayNotes } from '@/lib/supabaseClient';
+import { cleanDisplayNotes, addDeletedProductId } from '@/lib/supabaseClient';
+
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'f' + Date.now().toString(16).padStart(11, '0') + '-4000-8000-' + Math.random().toString(36).substring(2, 10);
+}
 
 export default function AdminDashboardPage() {
   // Auth state
@@ -111,6 +118,28 @@ export default function AdminDashboardPage() {
   const [newProdSizes, setNewProdSizes] = useState('S, M, L, XL, XXL');
   const [newProdDescAr, setNewProdDescAr] = useState('');
   const [newProdAddons, setNewProdAddons] = useState<{id: string; name: string; price: string; image_url?: string; description?: string}[]>([]);
+
+  // Edit product form modal state
+  const [isEditProductOpen, setIsEditProductOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editProdTitleAr, setEditProdTitleAr] = useState('');
+  const [editProdPrice, setEditProdPrice] = useState('');
+  const [editProdCategory, setEditProdCategory] = useState('الملابس');
+  const [editProdStock, setEditProdStock] = useState('100');
+  const [editProdImage, setEditProdImage] = useState('');
+  const [editProdImagePreview, setEditProdImagePreview] = useState('');
+  const [editProdImageUploading, setEditProdImageUploading] = useState(false);
+  const [editProdGalleryUrls, setEditProdGalleryUrls] = useState<string[]>([]);
+  const [editProdGalleryPreviews, setEditProdGalleryPreviews] = useState<string[]>([]);
+  const [editProdGalleryUploading, setEditProdGalleryUploading] = useState(false);
+  const [editProdSizeChart, setEditProdSizeChart] = useState('');
+  const [editProdSizeChartPreview, setEditProdSizeChartPreview] = useState('');
+  const [editProdSizeChartUploading, setEditProdSizeChartUploading] = useState(false);
+  const [editProdHasCustomization, setEditProdHasCustomization] = useState(true);
+  const [editProdCustomLabel, setEditProdCustomLabel] = useState('اسم الطالب أو الكلية للتطريز على القطعة');
+  const [editProdSizes, setEditProdSizes] = useState('S, M, L, XL, XXL');
+  const [editProdDescAr, setEditProdDescAr] = useState('');
+  const [editProdAddons, setEditProdAddons] = useState<{id: string; name: string; price: string; image_url?: string; description?: string}[]>([]);
 
   // Settings form state
   const [vodaEnabled, setVodaEnabled] = useState(true);
@@ -441,6 +470,48 @@ export default function AdminDashboardPage() {
   const updateAddon = (id: string, field: 'name' | 'price' | 'image_url' | 'description', value: string) =>
     setNewProdAddons(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
 
+  // Edit Addons & Edit Image Upload Helpers
+  const addEditAddon = () => setEditProdAddons(prev => [...prev, { id: generateUUID(), name: '', price: '0', image_url: '', description: '' }]);
+  const removeEditAddon = (id: string) => setEditProdAddons(prev => prev.filter(a => a.id !== id));
+  const updateEditAddon = (id: string, field: 'name' | 'price' | 'image_url' | 'description', value: string) =>
+    setEditProdAddons(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
+
+  const handleEditMainImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditProdImagePreview(URL.createObjectURL(file));
+    setEditProdImageUploading(true);
+    try {
+      const url = await uploadProductImage(file);
+      setEditProdImage(url);
+    } catch { alert('فشل رفع صورة المنتج'); }
+    finally { setEditProdImageUploading(false); }
+  };
+
+  const handleEditGalleryImagesPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setEditProdGalleryPreviews(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]);
+    setEditProdGalleryUploading(true);
+    try {
+      const urls = await Promise.all(files.map(uploadProductImage));
+      setEditProdGalleryUrls(prev => [...prev, ...urls]);
+    } catch { alert('فشل رفع إحدى صور المعرض'); }
+    finally { setEditProdGalleryUploading(false); }
+  };
+
+  const handleEditSizeChartPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditProdSizeChartPreview(URL.createObjectURL(file));
+    setEditProdSizeChartUploading(true);
+    try {
+      const url = await uploadProductImage(file);
+      setEditProdSizeChart(url);
+    } catch { alert('فشل رفع جدول المقاسات'); }
+    finally { setEditProdSizeChartUploading(false); }
+  };
+
   // Add Product
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -506,6 +577,119 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Open Edit Product Modal
+  const handleOpenEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setEditProdTitleAr(product.title_ar || product.title);
+    setEditProdPrice(String(product.price));
+    setEditProdStock(String(product.stock));
+    setEditProdCategory(product.category || 'الملابس (Apparel)');
+    setEditProdImage(product.image_url);
+    setEditProdImagePreview(product.image_url);
+    const gallery = product.images && product.images.length > 0 ? product.images.filter(img => img !== product.image_url) : [];
+    setEditProdGalleryUrls(gallery);
+    setEditProdGalleryPreviews(gallery);
+    setEditProdSizeChart(product.size_chart_url || '');
+    setEditProdSizeChartPreview(product.size_chart_url || '');
+    setEditProdHasCustomization(Boolean(product.has_customization));
+    setEditProdCustomLabel(product.customization_label || 'اسم الطالب أو الكلية للتطريز على القطعة');
+    setEditProdSizes((product.sizes || []).join(', '));
+    setEditProdDescAr(product.description_ar || product.description || '');
+    setEditProdAddons(
+      (product.addons || []).map(a => ({
+        id: a.id || generateUUID(),
+        name: a.name,
+        price: String(a.price || 0),
+        image_url: a.image_url || '',
+        description: a.description || ''
+      }))
+    );
+    setIsEditProductOpen(true);
+  };
+
+  // Save Edit Product
+  const handleSaveEditProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    if (!editProdTitleAr || !editProdPrice || !editProdImage) {
+      alert('يرجى إكمال الحقول الأساسية للمنتج (الاسم، السعر، الصورة الرئيسية)');
+      return;
+    }
+    if (editProdImageUploading || editProdGalleryUploading || editProdSizeChartUploading) {
+      alert('انتظر اكتمال رفع الصور أولاً');
+      return;
+    }
+
+    try {
+      const sizesArray = editProdSizes.split(',').map(s => s.trim()).filter(Boolean);
+      const allImages = editProdGalleryUrls.length > 0 ? [editProdImage, ...editProdGalleryUrls] : [editProdImage];
+      const addonsPayload = editProdAddons
+        .filter(a => a.name.trim())
+        .map(a => ({ 
+          id: a.id || generateUUID(), 
+          name: a.name.trim(), 
+          price: Number(a.price) || 0,
+          image_url: a.image_url ? a.image_url.trim() : undefined,
+          description: a.description ? a.description.trim() : undefined
+        }));
+
+      const res = await fetch('/api/admin/products', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingProduct.id,
+          title_ar: editProdTitleAr,
+          price: Number(editProdPrice),
+          category: editProdCategory,
+          stock: Number(editProdStock),
+          image_url: editProdImage,
+          images: allImages,
+          size_chart_url: editProdSizeChart || undefined,
+          has_customization: editProdHasCustomization,
+          customization_label: editProdCustomLabel.trim() || undefined,
+          sizes: sizesArray,
+          description_ar: editProdDescAr,
+          addons: addonsPayload,
+        })
+      });
+
+      if (res.ok) {
+        setIsEditProductOpen(false);
+        setEditingProduct(null);
+        alert('تم تعديل المنتج وحفظ التغييرات بنجاح! ✏️');
+        fetchAllData();
+      } else {
+        const err = await res.json();
+        alert('فشل تعديل المنتج: ' + (err.error || ''));
+      }
+    } catch (err) {
+      alert('حدث خطأ أثناء تعديل المنتج');
+    }
+  };
+
+  // Delete Product Permanent
+  const handleDeleteProduct = async (id: string) => {
+    if (!confirm('هل أنت تأكد من إزالة هذا المنتج نهائياً ولن يظهر مجدداً؟')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/products?id=${id}`, {
+        method: 'DELETE'
+      });
+
+      if (res.ok) {
+        addDeletedProductId(id);
+        setProducts(prev => prev.filter(p => p.id !== id));
+        alert('تم مسح المنتج بنجاح ولن يظهر مجدداً 🗑️');
+      } else {
+        alert('فشل حذف المنتج');
+      }
+    } catch (err) {
+      alert('حدث خطأ أثناء حذف المنتج');
+    }
+  };
+
   // Save Settings
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -540,19 +724,6 @@ export default function AdminDashboardPage() {
       }
     } catch (err) {
       alert('فشل حفظ الإعدادات');
-    }
-  };
-
-  // Delete Product
-  const handleDeleteProduct = async (id: string) => {
-    if (!confirm('هل أنت تأكد من حذف هذا المنتج؟')) return;
-    try {
-      const res = await fetch(`/api/admin/products?id=${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setProducts(prev => prev.filter(p => p.id !== id));
-      }
-    } catch (err) {
-      alert('فشل حذف المنتج');
     }
   };
 
@@ -1102,14 +1273,24 @@ export default function AdminDashboardPage() {
 
                   <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
                     <span className="text-xs text-slate-400">المخزون: <strong className="text-white">{product.stock} قطعة</strong></span>
-                    <button
-                      onClick={() => handleDeleteProduct(product.id)}
-                      className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs transition flex items-center gap-1"
-                      title="حذف المنتج"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>حذف</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleOpenEditProduct(product)}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-bold transition flex items-center gap-1 border border-amber-500/30"
+                        title="تعديل المنتج"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>تعديل</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold transition flex items-center gap-1 border border-rose-500/20"
+                        title="حذف المنتج"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>حذف</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1994,6 +2175,256 @@ export default function AdminDashboardPage() {
               </button>
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* --- EDIT PRODUCT MODAL --- */}
+      {isEditProductOpen && editingProduct && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 flex items-center justify-center">
+          <div className="relative w-full max-w-xl glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-500/30">
+            <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-800">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-amber-400" />
+                <span>تعديل بيانات المنتج ({editingProduct.title_ar || editingProduct.title})</span>
+              </h3>
+              <button onClick={() => { setIsEditProductOpen(false); setEditingProduct(null); }} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditProduct} className="space-y-4 text-right max-h-[75vh] overflow-y-auto pr-1">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">اسم المنتج بالعربي *</label>
+                <input
+                  type="text"
+                  required
+                  value={editProdTitleAr}
+                  onChange={(e) => setEditProdTitleAr(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">السعر (ج.م) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={editProdPrice}
+                    onChange={(e) => setEditProdPrice(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">الكمية بالمخزون</label>
+                  <input
+                    type="number"
+                    value={editProdStock}
+                    onChange={(e) => setEditProdStock(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">وصف مختصر للمنتج</label>
+                <textarea
+                  rows={2}
+                  value={editProdDescAr}
+                  onChange={(e) => setEditProdDescAr(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Main Image Upload */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">الصورة الرئيسية للمنتج *</label>
+                {editProdImagePreview ? (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-700">
+                    <img src={editProdImagePreview} alt="main preview" className="w-16 h-16 rounded-lg object-cover border border-slate-700" />
+                    <div className="flex-1">
+                      {editProdImageUploading ? (
+                        <p className="text-xs text-amber-400 font-bold animate-pulse">جاري الرفع...</p>
+                      ) : (
+                        <p className="text-xs text-emerald-400 font-bold">✅ تم اختيار الصورة</p>
+                      )}
+                    </div>
+                    <label className="px-3 py-1.5 rounded-lg bg-slate-800 text-amber-300 text-xs font-bold cursor-pointer hover:bg-slate-700">
+                      <input type="file" accept="image/*" onChange={handleEditMainImagePick} className="hidden" />
+                      تغيير الصورة
+                    </label>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 p-4 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-amber-500 cursor-pointer transition">
+                    <input type="file" accept="image/*" onChange={handleEditMainImagePick} className="hidden" />
+                    <Upload className="w-5 h-5 text-amber-400" />
+                    <span className="text-xs text-slate-300">رفع صورة جديدة للمنتج</span>
+                  </label>
+                )}
+              </div>
+
+              {/* Gallery Images Upload */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">معرض الصور الإضافية (Gallery)</label>
+                <div className="space-y-2">
+                  {editProdGalleryPreviews.length > 0 && (
+                    <div className="flex flex-wrap gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800">
+                      {editProdGalleryPreviews.map((src, idx) => (
+                        <div key={idx} className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-700">
+                          <img src={src} alt="gallery" className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-amber-500/60 cursor-pointer transition">
+                    <input type="file" accept="image/*" multiple onChange={handleEditGalleryImagesPick} className="hidden" />
+                    <ImageIcon className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs text-slate-300">{editProdGalleryPreviews.length > 0 ? `إضافة مزيد من الصور (${editProdGalleryPreviews.length} محددة)` : 'اختر صور إضافية للمعرض (اختياري)'}</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Size Chart Upload */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">صورة دليل المقاسات 📐 (Size Chart)</label>
+                {editProdSizeChartPreview ? (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-700">
+                    <img src={editProdSizeChartPreview} alt="size chart" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
+                    <div className="flex-1">
+                      {editProdSizeChartUploading ? (
+                        <p className="text-xs text-amber-400 animate-pulse">جاري الرفع...</p>
+                      ) : (
+                        <p className="text-xs text-emerald-400 font-bold">✅ تم رفع دليل المقاسات</p>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => { setEditProdSizeChart(''); setEditProdSizeChartPreview(''); }} className="text-rose-400 text-xs">حذف</button>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-slate-500 cursor-pointer transition">
+                    <input type="file" accept="image/*" onChange={handleEditSizeChartPick} className="hidden" />
+                    <Ruler className="w-4 h-4 text-slate-400" />
+                    <span className="text-xs text-slate-400">اضغط لرفع جدول المقاسات (اختياري)</span>
+                  </label>
+                )}
+              </div>
+
+              {/* Customization Toggle */}
+              <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <label className="flex items-center gap-2 text-xs font-bold text-amber-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editProdHasCustomization}
+                    onChange={(e) => setEditProdHasCustomization(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-700"
+                  />
+                  <span>تفعيل خيار التطريز / طباعة اسم الطالب للعميل ✨</span>
+                </label>
+                {editProdHasCustomization && (
+                  <input
+                    type="text"
+                    placeholder="عنوان الحقل: اسم الطالب أو الكلية للتطريز..."
+                    value={editProdCustomLabel}
+                    onChange={(e) => setEditProdCustomLabel(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none"
+                  />
+                )}
+              </div>
+
+              {/* Sizes */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">المقاسات المتاحة (مفصولة بفاصلة)</label>
+                <input
+                  type="text"
+                  placeholder="S, M, L, XL, XXL"
+                  value={editProdSizes}
+                  onChange={(e) => setEditProdSizes(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none"
+                />
+              </div>
+
+              {/* ===== EDIT ADD-ONS SECTION ===== */}
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-amber-500/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-400 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4" />
+                      إضافات اختيارية (Add-ons)
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">تعديل أو إضافة إضافات اختيارية للمنتج (مثل: توتي باج +100 ج.م)</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addEditAddon}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    إضافة Add-on
+                  </button>
+                </div>
+
+                {editProdAddons.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic text-center py-2">لا توجد إضافات مخصصة لهذا المنتج حالياً</p>
+                ) : (
+                  <div className="space-y-3">
+                    {editProdAddons.map((addon, index) => (
+                      <div key={addon.id} className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-amber-300">إضافة #{index + 1}</span>
+                          <button type="button" onClick={() => removeEditAddon(addon.id)} className="text-rose-400 hover:text-rose-300 text-xs flex items-center gap-1">
+                            <Trash2 className="w-3.5 h-3.5" />
+                            حذف
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            placeholder="اسم الإضافة (مثال: توتي باج مطرز)"
+                            value={addon.name}
+                            onChange={(e) => updateEditAddon(addon.id, 'name', e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-amber-500"
+                          />
+                          <input
+                            type="number"
+                            placeholder="السعر إضافي (مثال: 100)"
+                            value={addon.price}
+                            onChange={(e) => updateEditAddon(addon.id, 'price', e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-xs focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <input
+                            type="url"
+                            placeholder="رابط صورة الإضافة (اختياري)"
+                            value={addon.image_url || ''}
+                            onChange={(e) => updateEditAddon(addon.id, 'image_url', e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500"
+                          />
+                          <input
+                            type="text"
+                            placeholder="وصف مختصر للإضافة (اختياري)"
+                            value={addon.description || ''}
+                            onChange={(e) => updateEditAddon(addon.id, 'description', e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={editProdImageUploading || editProdGalleryUploading || editProdSizeChartUploading || !editProdImage}
+                className="w-full py-3.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-sm shadow-xl shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {(editProdImageUploading || editProdGalleryUploading || editProdSizeChartUploading)
+                  ? 'جاري رفع الصور... ⏳'
+                  : 'حفظ والتعديل فوراً 💾'
+                }
+              </button>
+            </form>
           </div>
         </div>
       )}

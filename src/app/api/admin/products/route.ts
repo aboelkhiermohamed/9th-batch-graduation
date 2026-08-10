@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Product } from '@/types';
-import { getMemoryProducts, setMemoryProducts, fetchProductsFromSupabase, saveProductToSupabase, supabase } from '@/lib/supabaseClient';
+import { getMemoryProducts, setMemoryProducts, fetchProductsFromSupabase, saveProductToSupabase, addDeletedProductId, supabase } from '@/lib/supabaseClient';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, title_ar, price, stock, sizes, image_url, images, size_chart_url, has_customization, customization_label, is_active, category, addons } = body;
+    const { id, title_ar, price, stock, sizes, image_url, images, size_chart_url, has_customization, customization_label, is_active, category, addons, description_ar } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'معرف المنتج مطلوب' }, { status: 400 });
@@ -80,6 +80,7 @@ export async function PUT(req: NextRequest) {
           ...p,
           title: title_ar || p.title,
           title_ar: title_ar || p.title_ar,
+          description_ar: description_ar !== undefined ? description_ar : p.description_ar,
           price: price !== undefined ? Number(price) : p.price,
           stock: stock !== undefined ? Number(stock) : p.stock,
           sizes: Array.isArray(sizes) ? sizes : p.sizes,
@@ -105,6 +106,7 @@ export async function PUT(req: NextRequest) {
           .from('store_products')
           .update({
             title_ar,
+            description_ar,
             price: Number(price),
             stock: Number(stock),
             sizes,
@@ -137,6 +139,8 @@ export async function DELETE(req: NextRequest) {
     if (!id) {
       return NextResponse.json({ error: 'معرف المنتج مطلوب' }, { status: 400 });
     }
+
+    addDeletedProductId(id);
 
     const products = getMemoryProducts();
     const filtered = products.filter(p => p.id !== id);

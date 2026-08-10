@@ -107,6 +107,30 @@ let memorySettings: StoreSettings = { ...DEFAULT_SETTINGS };
 let memoryTransactions: IncomingTransaction[] = [];
 let memoryDevices: GatewayDevice[] = [...DEFAULT_DEVICES];
 
+let memoryDeletedProductIds: string[] = [];
+
+export function getDeletedProductIds(): string[] {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('graduation_store_deleted_products');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+  }
+  return memoryDeletedProductIds;
+}
+
+export function addDeletedProductId(id: string) {
+  if (!memoryDeletedProductIds.includes(id)) {
+    memoryDeletedProductIds.push(id);
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('graduation_store_deleted_products', JSON.stringify(memoryDeletedProductIds));
+    } catch (e) {}
+  }
+  memoryProducts = memoryProducts.filter(p => p.id !== id);
+}
+
 // --- SUPABASE DATABASE PERSISTENCE HELPERS ---
 
 export async function fetchProductsFromSupabase(): Promise<Product[]> {
@@ -140,20 +164,18 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
       }));
     }
 
-    const currentMemory = getMemoryProducts();
+    const deletedIds = new Set(getDeletedProductIds());
+    const currentMemory = getMemoryProducts().filter(p => !deletedIds.has(p.id));
     const dbIds = new Set(dbProds.map(p => p.id));
     const extraLocal = currentMemory.filter(p => !dbIds.has(p.id));
-    const finalProducts = [...dbProds, ...extraLocal];
+    const finalProducts = [...dbProds, ...extraLocal].filter(p => !deletedIds.has(p.id));
 
-    if (finalProducts.length > 0) {
-      setMemoryProducts(finalProducts);
-      return finalProducts;
-    }
-
-    return getMemoryProducts();
+    setMemoryProducts(finalProducts);
+    return finalProducts;
   } catch (err) {
     console.warn('Error reading products from Supabase:', err);
-    return getMemoryProducts();
+    const deletedIds = new Set(getDeletedProductIds());
+    return getMemoryProducts().filter(p => !deletedIds.has(p.id));
   }
 }
 
