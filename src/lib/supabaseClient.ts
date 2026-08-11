@@ -376,7 +376,13 @@ export function cleanProductDescription(str?: string | null): string {
   cleaned = cleaned.replace(/id":.*$/gi, '');
   cleaned = cleaned.replace(/name":.*$/gi, '');
   cleaned = cleaned.replace(/\["https?:\/\/\S+/gi, '');
+  cleaned = cleaned.replace(/[\{\}\[\]"':]/g, '');
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  // If no letters or numbers remain, return empty string
+  if (!/[\p{L}\p{N}]/u.test(cleaned)) {
+    return '';
+  }
   return cleaned;
 }
 
