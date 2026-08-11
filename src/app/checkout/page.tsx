@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import AuthModal from '@/components/AuthModal';
 import { 
   ShoppingBag, 
   Copy, 
@@ -45,6 +46,7 @@ export default function CheckoutPage() {
 
   // Form State
   const [customerSession, setCustomerSession] = useState<{ phone_number: string; full_name: string } | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('vodafone_cash');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -427,11 +429,21 @@ export default function CheckoutPage() {
               </p>
             </div>
             <button
-              onClick={() => router.push('/?login=true')}
-              className="w-full py-4 px-6 rounded-2xl gradient-purple-btn text-white font-extrabold text-sm shadow-xl shadow-indigo-600/30 transition"
+              onClick={() => setIsAuthModalOpen(true)}
+              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-600 hover:opacity-95 text-white font-extrabold text-sm shadow-xl shadow-indigo-600/30 transition-all"
             >
               تسجيل الدخول / إنشاء حساب جديد الان 👤
             </button>
+
+            <AuthModal
+              isOpen={isAuthModalOpen}
+              onClose={() => setIsAuthModalOpen(false)}
+              onSuccess={(cust) => {
+                setCustomerSession(cust);
+                if (cust.full_name) setCustomerName(cust.full_name);
+                if (cust.phone_number) setCustomerPhone(cust.phone_number);
+              }}
+            />
           </div>
         ) : cart.length === 0 ? (
           <div className="max-w-md mx-auto text-center py-16 space-y-4">

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import AuthModal from '@/components/AuthModal';
 import { 
   ShoppingBag, 
   Copy, 
@@ -50,7 +51,7 @@ export default function StoreFrontPage() {
   const router = useRouter();
 
   // Products & Settings State
-  const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
@@ -94,19 +95,6 @@ export default function StoreFrontPage() {
   const [customerSession, setCustomerSession] = useState<{ phone_number: string; full_name: string; email?: string } | null>(null);
   const [isCustomerAuthOpen, setIsCustomerAuthOpen] = useState(false);
   const [isCustomerOrdersOpen, setIsCustomerOrdersOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authErrorMessage, setAuthErrorMessage] = useState('');
-  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
-
-  // Login Form Inputs
-  const [loginIdentifier, setLoginIdentifier] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-
-  // Register Form Inputs
-  const [registerFullName, setRegisterFullName] = useState('');
-  const [registerPhone, setRegisterPhone] = useState('');
-  const [registerEmail, setRegisterEmail] = useState('');
-  const [registerPassword, setRegisterPassword] = useState('');
 
   const [customerOrdersList, setCustomerOrdersList] = useState<Order[]>([]);
   const [isCustomerOrdersLoading, setIsCustomerOrdersLoading] = useState(false);
@@ -191,72 +179,6 @@ export default function StoreFrontPage() {
     }
   };
 
-  const handleCustomerLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthErrorMessage('');
-    setIsAuthSubmitting(true);
-
-    try {
-      const res = await fetch('/api/customer/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identifier: loginIdentifier.trim(),
-          password: loginPassword.trim()
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success && data.customer) {
-        setCustomerSession(data.customer);
-        localStorage.setItem('graduation_customer_session', JSON.stringify(data.customer));
-        setIsCustomerAuthOpen(false);
-        setIsCustomerOrdersOpen(true);
-        fetchCustomerOrders(data.customer.phone_number);
-      } else {
-        setAuthErrorMessage(data.error || 'اسم المستخدم أو كلمة المرور غير صحيحة');
-      }
-    } catch (err: any) {
-      setAuthErrorMessage('حدث خطأ في الاتصال، يرجى إعادة المحاولة');
-    } finally {
-      setIsAuthSubmitting(false);
-    }
-  };
-
-  const handleCustomerRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthErrorMessage('');
-    setIsAuthSubmitting(true);
-
-    try {
-      const res = await fetch('/api/customer/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          full_name: registerFullName.trim(),
-          phone_number: registerPhone.trim(),
-          email: registerEmail.trim() || undefined,
-          password: registerPassword.trim()
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success && data.customer) {
-        setCustomerSession(data.customer);
-        localStorage.setItem('graduation_customer_session', JSON.stringify(data.customer));
-        setIsCustomerAuthOpen(false);
-        setIsCustomerOrdersOpen(true);
-        fetchCustomerOrders(data.customer.phone_number);
-      } else {
-        setAuthErrorMessage(data.error || 'فشل إنشاء الحساب');
-      }
-    } catch (err: any) {
-      setAuthErrorMessage('حدث خطأ في الاتصال أثناء إنشاء الحساب');
-    } finally {
-      setIsAuthSubmitting(false);
-    }
-  };
-
   // Save cart to localStorage on change
   useEffect(() => {
     if (isCartLoaded) {
@@ -278,7 +200,6 @@ export default function StoreFrontPage() {
       }
       if (params.get('login') === 'true') {
         setIsCustomerAuthOpen(true);
-        setAuthErrorMessage('يرجى تسجيل الدخول أو إنشاء حساب جديد لإتمام الشراء والطلب 🎓');
       }
     }
   }, []);
@@ -293,7 +214,13 @@ export default function StoreFrontPage() {
         ]);
         if (prodRes.ok) {
           const prods = await prodRes.json();
-          if (prods && prods.length > 0) setProducts(prods);
+          if (prods && prods.length > 0) {
+            setProducts(prods);
+          } else {
+            setProducts(DEFAULT_PRODUCTS);
+          }
+        } else {
+          setProducts(DEFAULT_PRODUCTS);
         }
         if (setRes.ok) {
           const setts = await setRes.json();
@@ -301,6 +228,7 @@ export default function StoreFrontPage() {
         }
       } catch (err) {
         console.warn('Using default fallback data', err);
+        setProducts(DEFAULT_PRODUCTS);
       } finally {
         setIsLoadingProducts(false);
       }
@@ -632,7 +560,7 @@ export default function StoreFrontPage() {
       </section>
 
       {/* --- PRODUCTS CATALOG SECTION --- */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-24 md:pb-12 w-full">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h3 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -646,132 +574,159 @@ export default function StoreFrontPage() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {products.map((product) => {
-            const hasSizes = product.sizes && product.sizes.length > 0;
-            const currentSize = selectedSizes[product.id] || (hasSizes ? product.sizes[0] : '');
-            const imagesList = product.images && product.images.length > 0 ? product.images : [product.image_url];
-
-            return (
+        {isLoadingProducts ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3].map((idx) => (
               <div
-                key={product.id}
-                className="group rounded-3xl glass-card overflow-hidden border border-slate-800 hover:border-indigo-500/50 transition-all duration-300 flex flex-col hover:shadow-2xl hover:shadow-indigo-500/10 cursor-pointer"
-                onClick={() => handleOpenProductModal(product)}
+                key={idx}
+                className="rounded-3xl glass-card overflow-hidden border border-slate-800 animate-pulse flex flex-col h-[480px]"
               >
-                {/* Product Image */}
-                <div className="relative aspect-[4/3] bg-slate-900 overflow-hidden">
-                  <img
-                    src={product.image_url}
-                    alt={product.title_ar || product.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                  <div className="absolute top-3 right-3">
-                    <span className="px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md text-amber-400 font-bold text-sm border border-amber-500/30">
-                      {product.price} ج.م
-                    </span>
-                  </div>
-                  
-                  {imagesList.length > 1 && (
-                    <div className="absolute top-3 left-3">
-                      <span className="px-2 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md text-slate-300 text-[11px] font-bold border border-slate-700 flex items-center gap-1">
-                        <Layers className="w-3 h-3 text-amber-400" />
-                        <span>{imagesList.length} صور</span>
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span className="px-4 py-2 rounded-xl bg-slate-900/90 text-white font-bold text-xs flex items-center gap-1.5 shadow-xl border border-slate-700">
-                      <Eye className="w-4 h-4 text-indigo-400" />
-                      <span>معاينة التفاصيل والتطريز</span>
-                    </span>
-                  </div>
+                <div className="aspect-[4/3] bg-slate-900/80 w-full relative">
+                  <div className="absolute top-3 right-3 w-16 h-6 bg-slate-800/80 rounded-full"></div>
                 </div>
-
-                {/* Secondary Gallery Images Thumbnails */}
-                  {imagesList.length > 1 && (
-                    <div className="flex items-center gap-2 overflow-x-auto px-4 py-2 bg-slate-950/60 border-t border-b border-slate-800/80">
-                      {imagesList.map((gImg, gIdx) => (
-                        <div key={gIdx} className="w-9 h-9 rounded-lg overflow-hidden border border-slate-700/80 flex-shrink-0 bg-slate-900">
-                          <img src={gImg} alt={`معرض ${gIdx + 1}`} className="w-full h-full object-cover" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                {/* Product Details */}
-                <div className="p-6 flex-1 flex flex-col justify-between" onClick={(e) => e.stopPropagation()}>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 
-                        onClick={() => handleOpenProductModal(product)} 
-                        className="text-lg font-bold text-white group-hover:text-amber-400 transition hover:underline"
-                      >
-                        {product.title_ar || product.title}
-                      </h4>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed mb-4 line-clamp-2">
-                      {product.description_ar || product.description}
-                    </p>
-
-                    {/* Customization badge if available */}
-                    {product.has_customization && (
-                      <div className="mb-3 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-semibold flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                        <span className="truncate">{product.customization_label || 'يدعم طباعة والتطريز حسب الطلب'}</span>
-                      </div>
-                    )}
-
-                    {/* Size Selector */}
-                    {hasSizes && (
-                      <div className="mb-5">
-                        <label className="block text-xs font-semibold text-slate-300 mb-2">
-                          اختر المقاس (Size):
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          {product.sizes.map((size) => (
-                            <button
-                              key={size}
-                              type="button"
-                              onClick={() => setSelectedSizes(prev => ({ ...prev, [product.id]: size }))}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                                currentSize === size
-                                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 scale-105'
-                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
-                              }`}
-                            >
-                              {size}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                  <div className="space-y-3">
+                    <div className="h-6 bg-slate-800/80 rounded-xl w-3/4"></div>
+                    <div className="h-4 bg-slate-800/50 rounded-xl w-full"></div>
+                    <div className="h-4 bg-slate-800/30 rounded-xl w-4/5"></div>
+                    <div className="h-7 bg-amber-500/10 rounded-xl w-1/2 mt-2"></div>
                   </div>
-
-                  {/* Add to Cart Action */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleAddToCartDirect(product)}
-                      className="flex-1 py-3 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-95"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>إضافة للسلة</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/product/${product.id}`)}
-                      className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 transition border border-slate-700 flex items-center gap-1 text-xs font-semibold"
-                      title="فتح في صفحة كاملة"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </button>
+                  <div className="flex items-center gap-2 pt-4">
+                    <div className="h-12 bg-indigo-600/30 rounded-xl flex-1"></div>
+                    <div className="h-12 w-12 bg-slate-800/70 rounded-xl"></div>
                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {products.map((product) => {
+              const hasSizes = product.sizes && product.sizes.length > 0;
+              const currentSize = selectedSizes[product.id] || (hasSizes ? product.sizes[0] : '');
+              const imagesList = product.images && product.images.length > 0 ? product.images : [product.image_url];
+
+              return (
+                <div
+                  key={product.id}
+                  className="group rounded-3xl glass-card overflow-hidden border border-slate-800 hover:border-indigo-500/50 transition-all duration-300 flex flex-col hover:shadow-2xl hover:shadow-indigo-500/10 cursor-pointer"
+                  onClick={() => handleOpenProductModal(product)}
+                >
+                  {/* Product Image */}
+                  <div className="relative aspect-[4/3] bg-slate-900 overflow-hidden">
+                    <img
+                      src={product.image_url}
+                      alt={product.title_ar || product.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute top-3 right-3">
+                      <span className="px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md text-amber-400 font-bold text-sm border border-amber-500/30">
+                        {product.price} ج.م
+                      </span>
+                    </div>
+                    
+                    {imagesList.length > 1 && (
+                      <div className="absolute top-3 left-3">
+                        <span className="px-2 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md text-slate-300 text-[11px] font-bold border border-slate-700 flex items-center gap-1">
+                          <Layers className="w-3 h-3 text-amber-400" />
+                          <span>{imagesList.length} صور</span>
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="px-4 py-2 rounded-xl bg-slate-900/90 text-white font-bold text-xs flex items-center gap-1.5 shadow-xl border border-slate-700">
+                        <Eye className="w-4 h-4 text-indigo-400" />
+                        <span>معاينة التفاصيل والتطريز</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Secondary Gallery Images Thumbnails */}
+                    {imagesList.length > 1 && (
+                      <div className="flex items-center gap-2 overflow-x-auto px-4 py-2 bg-slate-950/60 border-t border-b border-slate-800/80">
+                        {imagesList.map((gImg, gIdx) => (
+                          <div key={gIdx} className="w-9 h-9 rounded-lg overflow-hidden border border-slate-700/80 flex-shrink-0 bg-slate-900">
+                            <img src={gImg} alt={`معرض ${gIdx + 1}`} className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                  {/* Product Details */}
+                  <div className="p-6 flex-1 flex flex-col justify-between" onClick={(e) => e.stopPropagation()}>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 
+                          onClick={() => handleOpenProductModal(product)} 
+                          className="text-lg font-bold text-white group-hover:text-amber-400 transition hover:underline"
+                        >
+                          {product.title_ar || product.title}
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed mb-4 line-clamp-2">
+                        {product.description_ar || product.description}
+                      </p>
+
+                      {/* Customization badge if available */}
+                      {product.has_customization && (
+                        <div className="mb-3 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-semibold flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                          <span className="truncate">{product.customization_label || 'يدعم طباعة والتطريز حسب الطلب'}</span>
+                        </div>
+                      )}
+
+                      {/* Size Selector */}
+                      {hasSizes && (
+                        <div className="mb-5">
+                          <label className="block text-xs font-semibold text-slate-300 mb-2">
+                            اختر المقاس (Size):
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {product.sizes.map((size) => (
+                              <button
+                                key={size}
+                                type="button"
+                                onClick={() => setSelectedSizes(prev => ({ ...prev, [product.id]: size }))}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                  currentSize === size
+                                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 scale-105'
+                                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                                }`}
+                              >
+                                {size}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Add to Cart Action */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleAddToCartDirect(product)}
+                        className="flex-1 py-3 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-95"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>إضافة للسلة</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/product/${product.id}`)}
+                        className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 transition border border-slate-700 flex items-center gap-1 text-xs font-semibold"
+                        title="فتح في صفحة كاملة"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </main>
 
       {/* --- RICH INTERACTIVE PRODUCT DETAIL MODAL --- */}
@@ -1091,7 +1046,7 @@ export default function StoreFrontPage() {
 
             {/* Drawer Footer */}
             {cart.length > 0 && (
-              <div className="p-6 border-t border-slate-800 bg-slate-900/90 space-y-4">
+              <div className="p-6 pb-24 sm:pb-6 border-t border-slate-800 bg-slate-900/90 space-y-4">
                 <div className="flex items-center justify-between text-base">
                   <span className="text-slate-400 font-medium">الإجمالي الكلي:</span>
                   <span className="text-2xl font-black gradient-gold-text">{cartTotal} ج.م</span>
@@ -1101,7 +1056,6 @@ export default function StoreFrontPage() {
                   onClick={() => {
                     setIsCartOpen(false);
                     if (!customerSession) {
-                      setAuthErrorMessage('يرجى تسجيل الدخول أو إنشاء حساب جديد أولاً لإتمام الشراء والطلب 🎓');
                       setIsCustomerAuthOpen(true);
                     } else {
                       router.push('/checkout');
@@ -1462,169 +1416,16 @@ export default function StoreFrontPage() {
         </div>
       )}
 
-      {/* --- CUSTOMER AUTHENTICATION MODAL (LOGIN & SIGN UP) --- */}
-      {isCustomerAuthOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 flex items-center justify-center">
-          <div className="relative w-full max-w-md glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700/80 space-y-6">
-            
-            {/* Header & Close */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">حساب العملاء 🎓</h3>
-                  <p className="text-xs text-slate-400">سجل دخولك أو أنشئ حساباً لمتابعة طلباتك</p>
-                </div>
-              </div>
-              <button onClick={() => setIsCustomerAuthOpen(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Auth Mode Tabs (Login vs Register) */}
-            <div className="grid grid-cols-2 p-1 bg-slate-900 rounded-2xl border border-slate-800">
-              <button
-                type="button"
-                onClick={() => { setAuthMode('login'); setAuthErrorMessage(''); }}
-                className={`py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all ${
-                  authMode === 'login'
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                تسجيل الدخول (Sign In)
-              </button>
-              <button
-                type="button"
-                onClick={() => { setAuthMode('register'); setAuthErrorMessage(''); }}
-                className={`py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all ${
-                  authMode === 'register'
-                    ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                إنشاء حساب جديد ✨
-              </button>
-            </div>
-
-            {authErrorMessage && (
-              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold text-center">
-                {authErrorMessage}
-              </div>
-            )}
-
-            {/* LOGIN FORM */}
-            {authMode === 'login' ? (
-              <form onSubmit={handleCustomerLoginSubmit} className="space-y-4 text-right">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    رقم الموبايل أو البريد الإلكتروني *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="أدخل رقم الموبايل أو الإيميل"
-                    value={loginIdentifier}
-                    onChange={(e) => setLoginIdentifier(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    كلمة المرور *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="أدخل كلمة السر"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isAuthSubmitting}
-                  className="w-full py-3.5 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30 disabled:opacity-50 transition"
-                >
-                  {isAuthSubmitting ? 'جاري التحقق...' : 'تسجيل الدخول 🚀'}
-                </button>
-              </form>
-            ) : (
-              /* REGISTER FORM */
-              <form onSubmit={handleCustomerRegisterSubmit} className="space-y-4 text-right">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    الاسم الثلاثي بالكامل *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="أدخل اسمك الثلاثي"
-                    value={registerFullName}
-                    onChange={(e) => setRegisterFullName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    رقم الموبايل (مهم لمتابعة واستلام الطلب) *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="010XXXXXXXX"
-                    value={registerPhone}
-                    onChange={(e) => setRegisterPhone(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm font-mono focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    البريد الإلكتروني (اختياري)
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="name@example.com"
-                    value={registerEmail}
-                    onChange={(e) => setRegisterEmail(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500 dir-ltr text-right"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    كلمة المرور للحساب *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="أكثر من 4 أرقام أو حروف"
-                    value={registerPassword}
-                    onChange={(e) => setRegisterPassword(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isAuthSubmitting}
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/20 disabled:opacity-50 transition"
-                >
-                  {isAuthSubmitting ? 'جاري إنشاء الحساب...' : 'إنشاء حساب جديد الآن ✨'}
-                </button>
-              </form>
-            )}
-
-          </div>
-        </div>
-      )}
+      {/* --- UNIFIED STITCH AUTHENTICATION MODAL --- */}
+      <AuthModal
+        isOpen={isCustomerAuthOpen}
+        onClose={() => setIsCustomerAuthOpen(false)}
+        onSuccess={(customer) => {
+          setCustomerSession(customer);
+          setIsCustomerOrdersOpen(true);
+          fetchCustomerOrders(customer.phone_number);
+        }}
+      />
 
       {/* --- CUSTOMER MY ORDERS MODAL (حسابي وطلباتي) --- */}
       {isCustomerOrdersOpen && customerSession && (
@@ -1743,12 +1544,67 @@ export default function StoreFrontPage() {
       )}
 
       {/* --- FOOTER --- */}
-      <footer className="mt-auto border-t border-slate-800/80 bg-slate-950 py-8">
+      <footer className="mt-auto border-t border-slate-800/80 bg-slate-950 py-8 pb-24 md:pb-8">
         <div className="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 space-y-2">
           <p>© 2026 {settings.store_name} - جميع الحقوق محفوظة للدفعة التاسعة.</p>
           <p className="text-[11px] text-slate-600">نظام الدفع الفوري التلقائي المربوط ببوابة SMS & InstaPay</p>
         </div>
       </footer>
+
+      {/* --- STICKY MOBILE BOTTOM NAVIGATION DOCK --- */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 backdrop-blur-2xl border-t border-slate-800/90 px-3 py-2 shadow-2xl flex items-center justify-around text-slate-400">
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-slate-400 hover:text-amber-400 transition-colors active:scale-95"
+        >
+          <Award className="w-5 h-5 text-amber-400" />
+          <span className="text-[10px] font-bold">الرئيسية</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsCartOpen(true)}
+          className="relative flex flex-col items-center gap-1 p-1.5 rounded-xl text-slate-400 hover:text-indigo-400 transition-colors active:scale-95"
+        >
+          <div className="relative">
+            <ShoppingBag className="w-5 h-5 text-indigo-400" />
+            {totalCartCount > 0 && (
+              <span className="absolute -top-2 -right-2.5 w-4 h-4 rounded-full bg-amber-500 text-slate-950 font-extrabold text-[9px] flex items-center justify-center border border-slate-950">
+                {totalCartCount}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] font-bold text-slate-200">السلة ({totalCartCount})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (customerSession) {
+              fetchCustomerOrders(customerSession.phone_number);
+              setIsCustomerOrdersOpen(true);
+            } else {
+              setIsCustomerAuthOpen(true);
+            }
+          }}
+          className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-slate-400 hover:text-emerald-400 transition-colors active:scale-95"
+        >
+          <Package className="w-5 h-5 text-emerald-400" />
+          <span className="text-[10px] font-bold">طلباتي</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => router.push('/profile')}
+          className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-slate-400 hover:text-amber-400 transition-colors active:scale-95"
+        >
+          <User className="w-5 h-5 text-amber-400" />
+          <span className="text-[10px] font-bold truncate max-w-[70px]">
+            {customerSession ? customerSession.full_name?.split(' ')[0] || 'حسابي' : 'دخول'}
+          </span>
+        </button>
+      </nav>
     </div>
   );
 }
