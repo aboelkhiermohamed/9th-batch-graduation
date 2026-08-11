@@ -161,13 +161,16 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
           addDeletedProductId(p.id);
         } else {
           let prodMeta: any = null;
-          let cleanDescAr = p.description_ar || p.description || '';
-          const metaMatch = cleanDescAr.match(/\[PROD_META:(.*?)\]/);
-          if (metaMatch && metaMatch[1]) {
-            try {
-              prodMeta = JSON.parse(metaMatch[1]);
-              cleanDescAr = cleanDescAr.replace(/\s*\[PROD_META:.*?\]/g, '').trim();
-            } catch (e) {}
+          let cleanDescAr = cleanProductDescription(p.description_ar || p.description || '');
+
+          const b64Match = (p.description_ar || '').match(/\[PROD_META_B64:([A-Za-z0-9+/=]+)\]/);
+          if (b64Match && b64Match[1]) {
+            prodMeta = decodeProdMeta(b64Match[1]);
+          } else {
+            const legacyMatch = (p.description_ar || '').match(/\[PROD_META:([\s\S]*?)\]/);
+            if (legacyMatch && legacyMatch[1]) {
+              try { prodMeta = JSON.parse(legacyMatch[1]); } catch (e) {}
+            }
           }
 
           const resolvedImages = prodMeta?.imgs && Array.isArray(prodMeta.imgs) && prodMeta.imgs.length > 0
@@ -239,13 +242,14 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
     const rawSizes = product.sizes || [];
     const rawAddons = product.addons || [];
 
-    const cleanDesc = (product.description_ar || product.description || '').replace(/\s*\[PROD_META:.*?\]/g, '').trim();
+    const cleanDesc = cleanProductDescription(product.description_ar || product.description || '');
     const prodMeta = {
       imgs: rawImages,
       chart: product.size_chart_url || undefined,
       addons: rawAddons
     };
-    const encodedDesc = `${cleanDesc} [PROD_META:${JSON.stringify(prodMeta)}]`;
+    const b64Meta = encodeProdMeta(prodMeta);
+    const encodedDesc = b64Meta ? `${cleanDesc} [PROD_META_B64:${b64Meta}]` : cleanDesc;
 
     const payload: any = {
       title: product.title || product.title_ar || 'Product',
@@ -359,6 +363,46 @@ export function cleanDisplayNotes(str?: string | null): string {
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
   return cleaned;
+}
+
+export function cleanProductDescription(str?: string | null): string {
+  if (!str) return '';
+  let cleaned = String(str);
+  cleaned = cleaned.replace(/\[PROD_META_B64:[A-Za-z0-9+/=]+\]/g, '');
+  cleaned = cleaned.replace(/\[PROD_META:[\s\S]*?\]/g, '');
+  cleaned = cleaned.replace(/imgs":.*$/gi, '');
+  cleaned = cleaned.replace(/chart":.*$/gi, '');
+  cleaned = cleaned.replace(/addons":.*$/gi, '');
+  cleaned = cleaned.replace(/id":.*$/gi, '');
+  cleaned = cleaned.replace(/name":.*$/gi, '');
+  cleaned = cleaned.replace(/\["https?:\/\/\S+/gi, '');
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  return cleaned;
+}
+
+export function encodeProdMeta(meta: any): string {
+  try {
+    const json = JSON.stringify(meta);
+    if (typeof Buffer !== 'undefined') {
+      return Buffer.from(json, 'utf-8').toString('base64');
+    } else if (typeof btoa !== 'undefined') {
+      return btoa(unescape(encodeURIComponent(json)));
+    }
+  } catch (e) {}
+  return '';
+}
+
+export function decodeProdMeta(b64Str: string): any {
+  try {
+    let json = '';
+    if (typeof Buffer !== 'undefined') {
+      json = Buffer.from(b64Str, 'base64').toString('utf-8');
+    } else if (typeof atob !== 'undefined') {
+      json = decodeURIComponent(escape(atob(b64Str)));
+    }
+    if (json) return JSON.parse(json);
+  } catch (e) {}
+  return null;
 }
 
 export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {

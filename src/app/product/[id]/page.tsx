@@ -21,7 +21,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { Product, ProductAddon, CartItem } from '@/types';
-import { DEFAULT_PRODUCTS, fetchProductsFromSupabase } from '@/lib/supabaseClient';
+import { DEFAULT_PRODUCTS, fetchProductsFromSupabase, cleanProductDescription } from '@/lib/supabaseClient';
 
 export default function StandaloneProductPage() {
   const router = useRouter();
@@ -341,9 +341,9 @@ export default function StandaloneProductPage() {
             </div>
 
             {/* Description */}
-            {product.description_ar && (
+            {cleanProductDescription(product.description_ar) && (
               <div className="text-xs sm:text-sm text-slate-300 leading-relaxed bg-slate-900/50 p-4 rounded-2xl border border-slate-800/60">
-                {product.description_ar}
+                {cleanProductDescription(product.description_ar)}
               </div>
             )}
 
