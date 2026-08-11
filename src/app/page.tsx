@@ -540,6 +540,38 @@ export default function StoreFrontPage() {
         </div>
       </header>
 
+      {/* --- MAINTENANCE MODE GUARD --- */}
+      {settings.maintenance_mode ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-12 space-y-6 max-w-2xl mx-auto my-12 dir-rtl">
+          <div className="w-24 h-24 rounded-3xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-2xl animate-pulse">
+            <Award className="w-12 h-12" />
+          </div>
+          <div className="space-y-3">
+            <span className="inline-block px-4 py-1.5 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30">
+              🚧 المتجر في وضع التحديث والصيانة حالياً
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-black text-white leading-tight">
+              نعمل على تحديث وحصر طلبات الدفعة التاسعة 🎓
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-lg mx-auto">
+              نقوم حالياً بإجراء صيانة مجدولة وتحديثات للم المتجر وإضافة المنتجات الجديدة. سنعود للعمل بكامل طاقتنا قريباً جداً!
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-300 w-full space-y-2">
+            <p className="font-bold text-amber-400">للمتابعة أو الاستفسارات العاجلة:</p>
+            <p>📌 {settings.pickup_note}</p>
+          </div>
+
+          <a
+            href="/admin"
+            className="text-xs text-slate-500 hover:text-slate-300 transition underline"
+          >
+            🔒 دخول إدارة المتجر
+          </a>
+        </div>
+      ) : (
+        <>
       {/* --- HERO SECTION --- */}
       <section className="relative overflow-hidden border-b border-slate-800/60 bg-gradient-to-b from-indigo-950/40 via-slate-950 to-slate-950 py-12 sm:py-16">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent_50%)]"></div>
@@ -728,6 +760,8 @@ export default function StoreFrontPage() {
           </div>
         )}
       </main>
+      </>
+      )}
 
       {/* --- RICH INTERACTIVE PRODUCT DETAIL MODAL --- */}
       {activeProductModal && (

@@ -463,6 +463,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
       instapay_ipa: defaultIpa,
       instapay_ipas: instaAccounts,
       pickup_note: cleanNote,
+      maintenance_mode: meta?.m === 1 || Boolean(currentMem.maintenance_mode),
       updated_at: data.updated_at || new Date().toISOString()
     };
 
@@ -484,6 +485,7 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
     const compactMeta = {
       v: settings.vodafone_cash_enabled !== false ? 1 : 0,
       i: settings.instapay_enabled !== false ? 1 : 0,
+      m: settings.maintenance_mode ? 1 : 0,
       vn: settings.vodafone_cash_numbers,
       ia: settings.instapay_ipas || [settings.instapay_ipa],
       del: getDeletedProductIds()

@@ -42,11 +42,17 @@ import {
   FileCheck,
   AlertCircle,
   Upload,
+  BarChart3,
+  PieChart,
+  Wrench,
+  Database,
+  RotateCcw,
+  ShieldAlert,
   Image as ImageIcon,
   Ruler
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
-import { cleanDisplayNotes, addDeletedProductId } from '@/lib/supabaseClient';
+import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase } from '@/lib/supabaseClient';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -63,8 +69,8 @@ export default function AdminDashboardPage() {
   const [authError, setAuthError] = useState('');
   const [currentAdmin, setCurrentAdmin] = useState<{ id: string; username: string; display_name: string; role: string } | null>(null);
 
-  // Active Tab: 'orders' | 'products' | 'admins' | 'settings' | 'sms' | 'gateway'
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'admins' | 'settings' | 'sms' | 'gateway'>('orders');
+  // Active Tab
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'admins' | 'settings' | 'sms' | 'gateway' | 'analytics' | 'maintenance'>('orders');
 
   // Data state
   const [orders, setOrders] = useState<Order[]>([]);
@@ -89,8 +95,15 @@ export default function AdminDashboardPage() {
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminRole, setNewAdminRole] = useState<'superadmin' | 'admin'>('admin');
 
-  // PDF Export Modal State
+  // PDF Export Modal State & Customizable Toggles
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [pdfShowPhone, setPdfShowPhone] = useState(true);
+  const [pdfShowCode, setPdfShowCode] = useState(true);
+  const [pdfShowRef, setPdfShowRef] = useState(true);
+  const [pdfShowCustomization, setPdfShowCustomization] = useState(true);
+
+  // Backup & Restore State
+  const [isRestoringBackup, setIsRestoringBackup] = useState(false);
 
   // Receipt Image Preview Modal State
   const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
@@ -525,6 +538,102 @@ export default function AdminDashboardPage() {
       setEditProdSizeChart(url);
     } catch { alert('فشل رفع جدول المقاسات'); }
     finally { setEditProdSizeChartUploading(false); }
+  };
+
+  // Backup & Maintenance Handlers
+  const handleExportBackup = () => {
+    try {
+      const backupData = {
+        app_name: 'GraduationStore',
+        version: '1.0.0',
+        exported_at: new Date().toISOString(),
+        store_name: settings.store_name,
+        settings,
+        products,
+        orders,
+        adminsList,
+        devices
+      };
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `graduation_store_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert('فشل تصدير النسخة الاحتياطية: ' + e.message);
+    }
+  };
+
+  const handleRestoreBackupFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsRestoringBackup(true);
+
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+      if (!backup || (!backup.products && !backup.settings)) {
+        alert('ملف النسخة الاحتياطية غير صالح أو تالف');
+        return;
+      }
+
+      if (Array.isArray(backup.products) && backup.products.length > 0) {
+        for (const p of backup.products) {
+          await fetch('/api/admin/products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(p)
+          });
+        }
+      }
+
+      if (backup.settings) {
+        await saveSettingsToSupabase(backup.settings);
+        setSettings(backup.settings);
+      }
+
+      alert('تمت استعادة النسخة الاحتياطية وحفظ كافة المنتجات والإعدادات بنجاح! 🎉');
+      fetchAllData();
+    } catch (err: any) {
+      alert('حدث خطأ أثناء قراءة ملف النسخة الاحتياطية: ' + err.message);
+    } finally {
+      setIsRestoringBackup(false);
+    }
+  };
+
+  const handleToggleMaintenanceMode = async (enabled: boolean) => {
+    try {
+      const updated = { ...settings, maintenance_mode: enabled };
+      await saveSettingsToSupabase(updated);
+      setSettings(updated);
+      if (enabled) {
+        alert('تم تفعيل وضع الصيانة 🚧 المتجر الآن مغلق مؤقتاً للزوار.');
+      } else {
+        alert('تم إلغاء وضع الصيانة ✅ المتجر الآن يعمل ومستعد لاستقبال الطلبات.');
+      }
+    } catch (e: any) {
+      alert('فشل تغيير حالة وضع الصيانة');
+    }
+  };
+
+  const handlePurgeOrdersData = async () => {
+    if (!window.confirm('⚠️ تحذير عاجل: هل أنت متأكد من تصفير ومسح الطلبات والاختبارات الحالية؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+    const confirmName = window.prompt('اكتب كلمة "CONFIRM" لتأكيد تصفير البيانات:');
+    if (confirmName !== 'CONFIRM') {
+      alert('تم إلغاء العملية');
+      return;
+    }
+
+    try {
+      setOrders([]);
+      alert('تم تصفير وحذف الطلبات بنجاح 🧹');
+    } catch (e: any) {
+      alert('حدث خطأ أثناء مسح البيانات');
+    }
   };
 
   // Add Product
@@ -992,8 +1101,10 @@ export default function AdminDashboardPage() {
           {[
             { id: 'orders', label: `إدارة الطلبات (${orders.length})`, icon: ShoppingBag },
             { id: 'products', label: `المنتجات والمعرض (${products.length})`, icon: Package },
+            { id: 'analytics', label: 'إحصائيات ومبيعات 📊', icon: BarChart3 },
             { id: 'gateway', label: `بوابة SMS والأجهزة (${devices.filter(d => d.status === 'online').length} أونلاين)`, icon: Smartphone },
             { id: 'settings', label: 'إعدادات الدفع والمحفظة', icon: Settings },
+            { id: 'maintenance', label: 'الصيانة والباك أب ⚙️', icon: Wrench },
             { id: 'sms', label: `سجل الـ SMS (${transactions.length})`, icon: MessageSquare }
           ].map(tab => {
             const Icon = tab.icon;
@@ -1145,9 +1256,6 @@ export default function AdminDashboardPage() {
                                 )}
                               </div>
                             ))
-                          )}
-                          {order.items && order.items.length > 0 && cleanDisplayNotes(order.notes) && (
-                            <p className="text-[11px] text-slate-400 italic">ملاحظة: {cleanDisplayNotes(order.notes)}</p>
                           )}
                         </td>
                         <td className="p-4 font-black text-sm text-white">
@@ -1868,6 +1976,253 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
+        {/* --- ANALYTICS & CHARTS TAB --- */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-6">
+            
+            {/* Header / Overview Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-5 rounded-3xl glass-card border border-emerald-500/30 bg-slate-900/90 space-y-2">
+                <div className="flex items-center justify-between text-emerald-400">
+                  <span className="text-xs font-bold text-slate-400">إجمالي المبيعات الإجمالية</span>
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <p className="text-3xl font-black text-white">{totalGrossRevenue} <span className="text-sm font-bold text-emerald-400">ج.م</span></p>
+                <p className="text-[11px] text-slate-400">من إجمالي {orders.length} طلب بالمتجر</p>
+              </div>
+
+              <div className="p-5 rounded-3xl glass-card border border-amber-500/30 bg-slate-900/90 space-y-2">
+                <div className="flex items-center justify-between text-amber-400">
+                  <span className="text-xs font-bold text-slate-400">الطلبات المؤكدة والجاهزة</span>
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <p className="text-3xl font-black text-amber-400">{totalVerifiedOrders} <span className="text-sm font-bold text-slate-400">طلب</span></p>
+                <p className="text-[11px] text-slate-400">مؤكد تلقائياً عبر بوابة الموبايل أو يدوياً</p>
+              </div>
+
+              <div className="p-5 rounded-3xl glass-card border border-indigo-500/30 bg-slate-900/90 space-y-2">
+                <div className="flex items-center justify-between text-indigo-400">
+                  <span className="text-xs font-bold text-slate-400">متوسط قيمة الطلب (AOV)</span>
+                  <BarChart3 className="w-5 h-5" />
+                </div>
+                <p className="text-3xl font-black text-indigo-300">
+                  {orders.length > 0 ? Math.round(totalGrossRevenue / orders.length) : 0} <span className="text-sm font-bold text-slate-400">ج.م</span>
+                </p>
+                <p className="text-[11px] text-slate-400">متوسط سلة العميل الواحدة</p>
+              </div>
+
+              <div className="p-5 rounded-3xl glass-card border border-purple-500/30 bg-slate-900/90 space-y-2">
+                <div className="flex items-center justify-between text-purple-400">
+                  <span className="text-xs font-bold text-slate-400">أصناف الكتالوج الحالية</span>
+                  <Package className="w-5 h-5" />
+                </div>
+                <p className="text-3xl font-black text-purple-300">{products.length} <span className="text-sm font-bold text-slate-400">منتجات</span></p>
+                <p className="text-[11px] text-slate-400">منتجات نشطة بالمتجر</p>
+              </div>
+            </div>
+
+            {/* Charts Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* Size Distribution Breakdown Chart */}
+              <div className="p-6 rounded-3xl glass-card border border-slate-800 bg-slate-900 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h4 className="text-base font-bold text-white flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-amber-400" />
+                    <span>توزيع المقاسات الأكثر طلباً (Size Demand)</span>
+                  </h4>
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  {['S', 'M', 'L', 'XL', 'XXL'].map(size => {
+                    const totalUnitsAll = productSizeStats.reduce((s, p) => s + p.totalUnits, 0) || 1;
+                    const sizeUnits = productSizeStats.reduce((s, p) => s + (p.sizeCounts[size] || 0), 0);
+                    const percentage = Math.round((sizeUnits / totalUnitsAll) * 100);
+
+                    return (
+                      <div key={size} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs font-bold">
+                          <span className="text-amber-300 font-mono">مقاس {size}</span>
+                          <span className="text-slate-300 font-mono">{sizeUnits} قطعة ({percentage}%)</span>
+                        </div>
+                        <div className="w-full h-3 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-500"
+                            style={{ width: `${Math.max(percentage, sizeUnits > 0 ? 5 : 0)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Payment Methods Ratio Chart */}
+              <div className="p-6 rounded-3xl glass-card border border-slate-800 bg-slate-900 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h4 className="text-base font-bold text-white flex items-center gap-2">
+                    <PieChart className="w-5 h-5 text-indigo-400" />
+                    <span>نسبة طرق الدفع المستخدمة</span>
+                  </h4>
+                </div>
+
+                {(() => {
+                  const vodaCount = orders.filter(o => o.payment_method === 'vodafone_cash').length;
+                  const instaCount = orders.filter(o => o.payment_method === 'instapay').length;
+                  const total = orders.length || 1;
+                  const vodaPct = Math.round((vodaCount / total) * 100);
+                  const instaPct = Math.round((instaCount / total) * 100);
+
+                  return (
+                    <div className="space-y-6 pt-2">
+                      <div className="flex h-6 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-1">
+                        <div className="bg-rose-500 h-full rounded-xl transition-all duration-500" style={{ width: `${vodaPct}%` }}></div>
+                        <div className="bg-purple-500 h-full rounded-xl transition-all duration-500" style={{ width: `${instaPct}%` }}></div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-center space-y-1">
+                          <p className="text-xs font-bold text-rose-300">🔴 فودافون كاش</p>
+                          <p className="text-2xl font-black text-white">{vodaCount} <span className="text-xs text-slate-400">طلب</span></p>
+                          <p className="text-xs font-mono font-bold text-rose-400">{vodaPct}% من الإجمالي</p>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 text-center space-y-1">
+                          <p className="text-xs font-bold text-purple-300">🟣 InstaPay</p>
+                          <p className="text-2xl font-black text-white">{instaCount} <span className="text-xs text-slate-400">طلب</span></p>
+                          <p className="text-xs font-mono font-bold text-purple-400">{instaPct}% من الإجمالي</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* --- MAINTENANCE & BACKUP TAB --- */}
+        {activeTab === 'maintenance' && (
+          <div className="max-w-3xl mx-auto space-y-6">
+            
+            {/* Maintenance Mode Toggle Box */}
+            <div className="p-6 rounded-3xl glass-card border border-amber-500/30 bg-slate-900/90 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+                    <Wrench className="w-6 h-6 animate-spin" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">وضع الصيانة والتحديث المجدول (Maintenance Mode)</h3>
+                    <p className="text-xs text-slate-400">تفعيل هذا الخيار يعرض شاشة صيانة عصرية للزوار ويمنع إضافة طلبات جديدة مؤقتاً</p>
+                  </div>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(settings.maintenance_mode)}
+                    onChange={(e) => handleToggleMaintenanceMode(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-14 h-7 bg-slate-950 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 flex items-center justify-between">
+                <span>الحالة الحالية للمتجر:</span>
+                {settings.maintenance_mode ? (
+                  <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                    <span>🚧 وضع الصيانة مفعّل (المتجر مغلق للزوار)</span>
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>✅ المتجر يعمل ومستعد لاستقبال الطلبات</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Backup & Restore Box */}
+            <div className="p-6 rounded-3xl glass-card border border-indigo-500/30 bg-slate-900/90 space-y-6">
+              <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center">
+                  <Database className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">النسخ الاحتياطي والاستعادة الشاملة (Backup & Restore)</h3>
+                  <p className="text-xs text-slate-400">حفظ كافة بيانات المنتجات، الإعدادات، والطلبات كملف JSON واستعادتها في أي وقت</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Export Backup Button */}
+                <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 text-right">
+                  <p className="text-xs font-bold text-amber-400">1. تصدير أخذ نسخة احتياطية (Export Backup)</p>
+                  <p className="text-[11px] text-slate-400">تحميل ملف JSON كامل يحتوي على كل المنتجات والطلبات والإعدادات الحالية.</p>
+                  <button
+                    type="button"
+                    onClick={handleExportBackup}
+                    className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition active:scale-[0.98]"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>تحميل نسخة احتياطية JSON 💾</span>
+                  </button>
+                </div>
+
+                {/* Restore Backup File Upload */}
+                <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 text-right">
+                  <p className="text-xs font-bold text-indigo-400">2. استعادة نسخة احتياطية (Restore Backup)</p>
+                  <p className="text-[11px] text-slate-400">رفع ملف JSON تم تحميلة سابقاً لاستعادة البيانات وإرجاع المنتجات والإعدادات.</p>
+                  <label className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 cursor-pointer transition active:scale-[0.98]">
+                    <Upload className="w-4 h-4" />
+                    <span>{isRestoringBackup ? 'جاري الاستعادة...' : 'رفع واستعادة ملف JSON 📥'}</span>
+                    <input
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={handleRestoreBackupFile}
+                      disabled={isRestoringBackup}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Safe Purge / Reset Box */}
+            <div className="p-6 rounded-3xl glass-card border border-rose-500/30 bg-slate-900/90 space-y-4">
+              <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+                <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center">
+                  <ShieldAlert className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">منطقة الإجراءات الحساسة (Danger Zone)</h3>
+                  <p className="text-xs text-slate-400">تصفير الطلبات وحذف البيانات المؤقتة بأمان للاختبارات</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-950 border border-rose-500/20">
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-rose-300">مسح وتصفير سجل الطلبات الحالية</p>
+                  <p className="text-[11px] text-slate-400">يستخدم لتنظيف سجل الطلبات التجريبية قبل إطلاق المتجر الفعلي.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handlePurgeOrdersData}
+                  className="px-4 py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 text-xs font-bold flex items-center gap-1.5 transition active:scale-95 flex-shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>تصفير الطلبات 🧹</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        )}
+
         {/* --- SMS AUDIT TAB --- */}
         {activeTab === 'sms' && (
           <div className="space-y-6">
@@ -2522,23 +2877,48 @@ export default function AdminDashboardPage() {
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md p-4 sm:p-8 flex items-center justify-center">
           <div className="relative w-full max-w-4xl bg-white text-slate-900 rounded-3xl p-6 sm:p-10 shadow-2xl border border-slate-300 space-y-6 max-h-[90vh] overflow-y-auto">
             
-            {/* Modal Top Actions */}
-            <div className="flex items-center justify-between border-b pb-4 print:hidden">
-              <div className="flex items-center gap-2">
-                <FileText className="w-6 h-6 text-amber-600" />
-                <h3 className="text-lg font-extrabold text-slate-900">تقرير المبيعات وحصر المقاسات الشامل</h3>
+            {/* Modal Top Actions & Field Toggles */}
+            <div className="space-y-4 border-b pb-4 print:hidden">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-6 h-6 text-amber-600" />
+                  <h3 className="text-lg font-extrabold text-slate-900">تقرير المبيعات وحصر المقاسات الشامل</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg transition"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>طباعة / حفظ كـ PDF 🖨️</span>
+                  </button>
+                  <button onClick={() => setIsPdfModalOpen(false)} className="p-2 rounded-xl bg-slate-100 text-slate-600">
+                    <XCircle className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg transition"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>طباعة / حفظ كـ PDF 🖨️</span>
-                </button>
-                <button onClick={() => setIsPdfModalOpen(false)} className="p-2 rounded-xl bg-slate-100 text-slate-600">
-                  <XCircle className="w-5 h-5" />
-                </button>
+
+              {/* PDF Column Toggles */}
+              <div className="p-4 rounded-2xl bg-slate-100 border border-slate-300 space-y-2 text-right dir-rtl">
+                <p className="text-xs font-extrabold text-slate-800">⚙️ تخصيص ومفتاح التحكم بالأعمدة قبل التصدير والطباعة:</p>
+                <div className="flex flex-wrap gap-4 text-xs font-bold text-slate-700">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={pdfShowCode} onChange={e => setPdfShowCode(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
+                    <span>كود الطلب (#OrderCode)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={pdfShowPhone} onChange={e => setPdfShowPhone(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
+                    <span>رقم موبايل العميل</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={pdfShowRef} onChange={e => setPdfShowRef(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
+                    <span>الرقم المرجعي (Ref#)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={pdfShowCustomization} onChange={e => setPdfShowCustomization(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
+                    <span>تفاصيل التطريز والإضافات</span>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -2623,9 +3003,10 @@ export default function AdminDashboardPage() {
                   <table className="w-full text-right text-[11px]">
                     <thead className="bg-slate-100 text-slate-800 font-extrabold border-b border-slate-300">
                       <tr>
-                        <th className="p-2.5">الكود</th>
+                        {pdfShowCode && <th className="p-2.5">الكود</th>}
                         <th className="p-2.5">العميل</th>
-                        <th className="p-2.5">الموبايل</th>
+                        {pdfShowPhone && <th className="p-2.5">الموبايل</th>}
+                        {pdfShowRef && <th className="p-2.5">الرقم المرجعي</th>}
                         <th className="p-2.5">طريقة الدفع</th>
                         <th className="p-2.5">الأصناف والتطريز</th>
                         <th className="p-2.5">الإجمالي</th>
@@ -2635,15 +3016,17 @@ export default function AdminDashboardPage() {
                     <tbody className="divide-y divide-slate-200">
                       {orders.map((o) => (
                         <tr key={o.id} className="hover:bg-slate-50">
-                          <td className="p-2.5 font-mono font-bold text-amber-800">#{o.order_code}</td>
+                          {pdfShowCode && <td className="p-2.5 font-mono font-bold text-amber-800">#{o.order_code}</td>}
                           <td className="p-2.5 font-bold text-slate-900">{o.customer_name}</td>
-                          <td className="p-2.5 font-mono">{o.customer_phone}</td>
+                          {pdfShowPhone && <td className="p-2.5 font-mono">{o.customer_phone}</td>}
+                          {pdfShowRef && <td className="p-2.5 font-mono font-bold text-emerald-800">{o.transaction_ref || '—'}</td>}
                           <td className="p-2.5 font-medium">{o.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}</td>
                           <td className="p-2.5">
                             {getOrderEffectiveItems(o).map((it, i) => (
                               <div key={i}>
                                 • {it.product_title} {it.selected_size ? `[${it.selected_size}]` : ''} × {it.quantity}
-                                {it.custom_text && <span className="text-amber-800 font-bold block"> (تطريز: {it.custom_text})</span>}
+                                {pdfShowCustomization && it.custom_text && <span className="text-amber-800 font-bold block"> (تطريز: {it.custom_text})</span>}
+                                {pdfShowCustomization && it.customization_option && <span className="text-emerald-800 font-bold block"> (إضافات: {it.customization_option})</span>}
                               </div>
                             ))}
                           </td>
