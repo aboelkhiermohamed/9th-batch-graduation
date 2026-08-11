@@ -281,6 +281,18 @@ export default function StandaloneProductPage() {
                 ))}
               </div>
             )}
+
+            {/* Size Chart Banner Button */}
+            {product.size_chart_url && (
+              <button
+                type="button"
+                onClick={() => setIsSizeChartOpen(true)}
+                className="w-full py-3 px-4 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-amber-500/5 active:scale-[0.98]"
+              >
+                <Ruler className="w-4 h-4 text-amber-400" />
+                <span>عرض دليل وجدول المقاسات الرسمي 📐</span>
+              </button>
+            )}
           </div>
 
           {/* --- RIGHT COLUMN: PRODUCT INFO & OPTIONS --- */}

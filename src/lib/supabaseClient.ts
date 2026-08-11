@@ -160,21 +160,40 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
           inactiveDbIds.add(p.id);
           addDeletedProductId(p.id);
         } else {
+          let prodMeta: any = null;
+          let cleanDescAr = p.description_ar || p.description || '';
+          const metaMatch = cleanDescAr.match(/\[PROD_META:(.*?)\]/);
+          if (metaMatch && metaMatch[1]) {
+            try {
+              prodMeta = JSON.parse(metaMatch[1]);
+              cleanDescAr = cleanDescAr.replace(/\s*\[PROD_META:.*?\]/g, '').trim();
+            } catch (e) {}
+          }
+
+          const resolvedImages = prodMeta?.imgs && Array.isArray(prodMeta.imgs) && prodMeta.imgs.length > 0
+            ? prodMeta.imgs
+            : (Array.isArray(p.images) ? p.images : (typeof p.images === 'string' ? JSON.parse(p.images) : [p.image_url]));
+
+          const resolvedSizeChart = prodMeta?.chart || p.size_chart_url || undefined;
+          const resolvedAddons = prodMeta?.addons && Array.isArray(prodMeta.addons) && prodMeta.addons.length > 0
+            ? prodMeta.addons
+            : (Array.isArray(p.addons) ? p.addons : (typeof p.addons === 'string' ? JSON.parse(p.addons) : []));
+
           dbProds.push({
             id: p.id,
             title: p.title || p.title_ar,
             title_ar: p.title_ar || p.title,
-            description: p.description || '',
-            description_ar: p.description_ar || '',
+            description: cleanDescAr,
+            description_ar: cleanDescAr,
             price: Number(p.price || 0),
             category: p.category || 'Apparel',
             image_url: p.image_url || '',
-            images: Array.isArray(p.images) ? p.images : (typeof p.images === 'string' ? JSON.parse(p.images) : [p.image_url]),
-            size_chart_url: p.size_chart_url || undefined,
+            images: resolvedImages,
+            size_chart_url: resolvedSizeChart,
             has_customization: Boolean(p.has_customization),
             customization_label: p.customization_label || undefined,
             sizes: Array.isArray(p.sizes) ? p.sizes : (typeof p.sizes === 'string' ? JSON.parse(p.sizes) : []),
-            addons: Array.isArray(p.addons) ? p.addons : (typeof p.addons === 'string' ? JSON.parse(p.addons) : []),
+            addons: resolvedAddons,
             stock: Number(p.stock || 0),
             is_active: true,
             created_at: p.created_at || new Date().toISOString(),
@@ -220,11 +239,19 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
     const rawSizes = product.sizes || [];
     const rawAddons = product.addons || [];
 
+    const cleanDesc = (product.description_ar || product.description || '').replace(/\s*\[PROD_META:.*?\]/g, '').trim();
+    const prodMeta = {
+      imgs: rawImages,
+      chart: product.size_chart_url || undefined,
+      addons: rawAddons
+    };
+    const encodedDesc = `${cleanDesc} [PROD_META:${JSON.stringify(prodMeta)}]`;
+
     const payload: any = {
       title: product.title || product.title_ar || 'Product',
       title_ar: product.title_ar || product.title || 'منتج',
-      description: product.description || '',
-      description_ar: product.description_ar || product.description || '',
+      description: cleanDesc,
+      description_ar: encodedDesc,
       price: Number(product.price) || 0,
       category: product.category || 'Apparel',
       image_url: product.image_url,
