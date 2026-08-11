@@ -608,8 +608,19 @@ export default function AdminDashboardPage() {
   const handleToggleMaintenanceMode = async (enabled: boolean) => {
     try {
       const updated = { ...settings, maintenance_mode: enabled };
-      await saveSettingsToSupabase(updated);
       setSettings(updated);
+
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('graduation_store_maintenance', enabled ? 'true' : 'false');
+      }
+
+      await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+      await saveSettingsToSupabase(updated);
+
       if (enabled) {
         alert('تم تفعيل وضع الصيانة 🚧 المتجر الآن مغلق مؤقتاً للزوار.');
       } else {

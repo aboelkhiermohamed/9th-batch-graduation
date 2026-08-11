@@ -19,6 +19,7 @@ export async function PUT(req: NextRequest) {
     const { 
       vodafone_cash_enabled, 
       instapay_enabled, 
+      maintenance_mode,
       vodafone_cash_numbers, 
       instapay_ipa, 
       instapay_ipas, 
@@ -33,6 +34,7 @@ export async function PUT(req: NextRequest) {
       store_name: store_name || current.store_name,
       vodafone_cash_enabled: vodafone_cash_enabled !== undefined ? Boolean(vodafone_cash_enabled) : (current.vodafone_cash_enabled ?? true),
       instapay_enabled: instapay_enabled !== undefined ? Boolean(instapay_enabled) : (current.instapay_enabled ?? true),
+      maintenance_mode: maintenance_mode !== undefined ? Boolean(maintenance_mode) : Boolean(current.maintenance_mode),
       vodafone_cash_numbers: Array.isArray(vodafone_cash_numbers) 
         ? vodafone_cash_numbers 
         : current.vodafone_cash_numbers,
