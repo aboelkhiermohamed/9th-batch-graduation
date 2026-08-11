@@ -452,6 +452,15 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
     const vodaNums = meta?.vn || meta?.vodafone_cash_numbers || parseArrayOrCommaString(data.vodafone_cash_numbers, currentMem.vodafone_cash_numbers || ['01015339426']);
     const instaAccounts = meta?.ia || meta?.instapay_ipas || parseArrayOrCommaString(data.instapay_ipas, currentMem.instapay_ipas || [defaultIpa]);
 
+    let isMaintenance = false;
+    if (meta && meta.m !== undefined) {
+      isMaintenance = meta.m === 1;
+    } else if (typeof window !== 'undefined' && window.localStorage) {
+      isMaintenance = localStorage.getItem('graduation_store_maintenance') === 'true';
+    } else {
+      isMaintenance = Boolean(currentMem.maintenance_mode);
+    }
+
     const cleanNote = cleanDisplayNotes(rawNote) || 'تابع جروب التليجرام';
 
     const settings: StoreSettings = {
@@ -463,7 +472,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
       instapay_ipa: defaultIpa,
       instapay_ipas: instaAccounts,
       pickup_note: cleanNote,
-      maintenance_mode: meta?.m === 1 || Boolean(currentMem.maintenance_mode),
+      maintenance_mode: isMaintenance,
       updated_at: data.updated_at || new Date().toISOString()
     };
 
@@ -476,6 +485,9 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
 }
 
 export async function saveSettingsToSupabase(settings: StoreSettings): Promise<boolean> {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    localStorage.setItem('graduation_store_maintenance', settings.maintenance_mode ? 'true' : 'false');
+  }
   const cleanNote = cleanDisplayNotes(settings.pickup_note || 'تابع جروب التليجرام');
   const memoryPayload = { ...settings, pickup_note: cleanNote };
   setMemorySettings(memoryPayload);
