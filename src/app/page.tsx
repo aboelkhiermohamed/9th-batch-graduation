@@ -213,22 +213,16 @@ export default function StoreFrontPage() {
           fetch('/api/admin/settings', { cache: 'no-store' })
         ]);
         if (prodRes.ok) {
-          const prods = await prodRes.json();
-          if (prods && prods.length > 0) {
-            setProducts(prods);
-          } else {
-            setProducts(DEFAULT_PRODUCTS);
-          }
-        } else {
-          setProducts(DEFAULT_PRODUCTS);
+          const prodData = prodRes.ok ? await prodRes.json() : [];
+          setProducts(prodData);
         }
         if (setRes.ok) {
-          const setts = await setRes.json();
-          if (setts) setSettings(setts);
+          const setData = await setRes.json();
+          const isMaintCached = typeof window !== 'undefined' && localStorage.getItem('graduation_store_maintenance') === 'true';
+          setSettings({ ...setData, maintenance_mode: Boolean(setData.maintenance_mode || isMaintCached) });
         }
       } catch (err) {
-        console.warn('Using default fallback data', err);
-        setProducts(DEFAULT_PRODUCTS);
+        console.error('Failed to load store data:', err);
       } finally {
         setIsLoadingProducts(false);
       }

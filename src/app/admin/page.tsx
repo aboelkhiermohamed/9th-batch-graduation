@@ -848,7 +848,8 @@ export default function AdminDashboardPage() {
           vodafone_cash_numbers: vodaArray.length > 0 ? vodaArray : ['01015339426'],
           instapay_ipa: instaArray[0] || '9thbatch@instapay',
           instapay_ipas: instaArray.length > 0 ? instaArray : ['9thbatch@instapay'],
-          pickup_note: pickupInput.trim()
+          pickup_note: pickupInput.trim(),
+          maintenance_mode: Boolean(settings.maintenance_mode)
         })
       });
 
@@ -1003,6 +1004,264 @@ export default function AdminDashboardPage() {
     });
 
     return Object.values(stats);
+  };
+
+  const printStandalonePdfReport = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('يرجى السماح للنوافذ المنبثقة (Popups) في المتصفح لتصغير وتوليد تقرير الـ PDF');
+      return;
+    }
+
+    const reportDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+    const reportTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    const totalUnitsCount = productSizeStats.reduce((acc, p) => acc + p.totalUnits, 0);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="utf-8">
+        <title>تقرير حصر الدفعة التاسعة - ${settings.store_name}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+            background: #ffffff;
+            color: #0f172a;
+            padding: 30px;
+            font-size: 11px;
+            line-height: 1.5;
+          }
+          .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #d97706;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+          }
+          .brand-title { font-size: 22px; font-weight: 900; color: #1e1b4b; }
+          .brand-subtitle { font-size: 11px; color: #475569; font-weight: 700; }
+          .meta-box { text-align: left; font-size: 10px; color: #334155; font-family: monospace; }
+          .meta-box strong { color: #d97706; }
+          
+          .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+          }
+          .kpi-card {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+          }
+          .kpi-title { font-size: 10px; font-weight: 700; color: #64748b; margin-bottom: 4px; }
+          .kpi-value { font-size: 18px; font-weight: 900; color: #0f172a; }
+          .kpi-unit { font-size: 10px; font-weight: 700; color: #d97706; }
+          
+          .section-header {
+            font-size: 13px;
+            font-weight: 800;
+            color: #1e1b4b;
+            border-right: 4px solid #d97706;
+            padding-right: 8px;
+            margin-top: 25px;
+            margin-bottom: 12px;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 11px;
+          }
+          th {
+            background: #1e293b;
+            color: #ffffff;
+            font-weight: 700;
+            padding: 8px 10px;
+            text-align: right;
+            border: 1px solid #334155;
+          }
+          td {
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            color: #1e293b;
+          }
+          tr:nth-child(even) { background: #f8fafc; }
+          .font-mono { font-family: monospace; font-weight: 700; }
+          .text-center { text-align: center; }
+          .text-amber { color: #b45309; font-weight: 800; }
+
+          .footer-signatures {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-top: 1px solid #cbd5e1;
+            padding-top: 30px;
+          }
+          .sig-box { text-align: center; width: 200px; font-weight: 700; }
+          .sig-line { border-bottom: 2px dashed #94a3b8; margin-top: 40px; }
+          .stamp-box {
+            width: 120px;
+            height: 120px;
+            border: 2.5px dashed #d97706;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #d97706;
+            font-size: 10px;
+            font-weight: 900;
+            transform: rotate(-10deg);
+            margin: 0 auto;
+            background: #fffbe6;
+          }
+
+          @media print {
+            body { padding: 0; }
+            @page { size: A4 portrait; margin: 1.2cm; }
+            tr { page-break-inside: avoid; }
+          }
+        </style>
+      </head>
+      <body>
+        <!-- Header -->
+        <div class="header-container">
+          <div>
+            <div class="brand-title">🎓 ${settings.store_name}</div>
+            <div class="brand-subtitle">تقرير حصر الكميات والمقاسات والكشوفات التكليفية الرسمية</div>
+          </div>
+          <div class="meta-box">
+            <div>التاريخ: <strong>${reportDate}</strong></div>
+            <div>الوقت: <strong>${reportTime}</strong></div>
+            <div>رقم التقرير: <strong>#REP-${Math.floor(100000 + Math.random() * 900000)}</strong></div>
+          </div>
+        </div>
+
+        <!-- KPI Summary Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-title">إجمالي المبيعات الإجمالية</div>
+            <div class="kpi-value">${totalGrossRevenue} <span class="kpi-unit">ج.م</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">عدد الطلبات المؤكدة</div>
+            <div class="kpi-value">${totalVerifiedOrders} <span class="kpi-unit">طلب</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">إجمالي القطع للتصنيع</div>
+            <div class="kpi-value">${totalUnitsCount} <span class="kpi-unit">قطعة</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">عدد الأصناف المطلوبة</div>
+            <div class="kpi-value">${products.length} <span class="kpi-unit">منتج</span></div>
+          </div>
+        </div>
+
+        <!-- Section 1: Product Size Matrix -->
+        <div class="section-header">1. بيان حصر القطع والمقاسات (الموجه للمصانع والمطبعة)</div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 35%;">اسم المنتج</th>
+              <th class="text-center">S</th>
+              <th class="text-center">M</th>
+              <th class="text-center">L</th>
+              <th class="text-center">XL</th>
+              <th class="text-center">XXL</th>
+              <th class="text-center">بدون مقاس</th>
+              <th class="text-center">إجمالي القطع</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${productSizeStats.map(stat => `
+              <tr>
+                <td><strong>${stat.productTitle}</strong></td>
+                <td class="text-center font-mono">${stat.sizeCounts['S'] || 0}</td>
+                <td class="text-center font-mono">${stat.sizeCounts['M'] || 0}</td>
+                <td class="text-center font-mono">${stat.sizeCounts['L'] || 0}</td>
+                <td class="text-center font-mono">${stat.sizeCounts['XL'] || 0}</td>
+                <td class="text-center font-mono">${stat.sizeCounts['XXL'] || 0}</td>
+                <td class="text-center font-mono">${stat.sizeCounts['بدون مقاس'] || 0}</td>
+                <td class="text-center font-mono text-amber"><strong>${stat.totalUnits} قطعة</strong></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <!-- Section 2: Detailed Orders Breakdown -->
+        <div class="section-header">2. كشوفات تسليم طلبات العملاء وتفاصيل التطريز</div>
+        <table>
+          <thead>
+            <tr>
+              ${pdfShowCode ? '<th style="width: 12%;">كود الطلب</th>' : ''}
+              <th style="width: 22%;">اسم العميل</th>
+              ${pdfShowPhone ? '<th style="width: 15%;">رقم الموبايل</th>' : ''}
+              ${pdfShowRef ? '<th style="width: 16%;">الرقم المرجعي</th>' : ''}
+              <th style="width: 12%;">طريقة الدفع</th>
+              <th>الأصناف المحددة والتطريز</th>
+              <th style="width: 12%;">الإجمالي</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${orders.map(o => `
+              <tr>
+                ${pdfShowCode ? `<td class="font-mono text-amber">#${o.order_code}</td>` : ''}
+                <td><strong>${o.customer_name}</strong></td>
+                ${pdfShowPhone ? `<td class="font-mono">${o.customer_phone}</td>` : ''}
+                ${pdfShowRef ? `<td class="font-mono">${o.transaction_ref || '—'}</td>` : ''}
+                <td>${o.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}</td>
+                <td>
+                  ${getOrderEffectiveItems(o).map(it => `
+                    <div>• ${it.product_title} ${it.selected_size ? `[${it.selected_size}]` : ''} × ${it.quantity}
+                    ${pdfShowCustomization && it.custom_text ? `<br><small style="color: #b45309;">(تطريز: ${it.custom_text})</small>` : ''}
+                    ${pdfShowCustomization && it.customization_option ? `<br><small style="color: #047857;">(إضافة: ${it.customization_option})</small>` : ''}
+                    </div>
+                  `).join('')}
+                </td>
+                <td class="font-mono"><strong>${o.total_amount} ج.م</strong></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <!-- Signatures & Stamp -->
+        <div class="footer-signatures">
+          <div class="sig-box">
+            <div>توقيع مسؤول حصر المقاسات</div>
+            <div class="sig-line"></div>
+          </div>
+          <div class="stamp-box">
+            اعتماد المتجر الرسمي<br>الدفعة التاسعة 🎓
+          </div>
+          <div class="sig-box">
+            <div>توقيع المسؤول المالي</div>
+            <div class="sig-line"></div>
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 300);
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   if (!isAuthenticated) {
@@ -2965,7 +3224,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => window.print()}
+                    onClick={() => printStandalonePdfReport()}
                     className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg transition"
                   >
                     <Printer className="w-4 h-4" />
