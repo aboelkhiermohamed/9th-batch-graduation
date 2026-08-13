@@ -242,8 +242,13 @@ export default function AdminDashboardPage() {
 
   const fetchDevices = async () => {
     try {
-      const res = await fetch('/api/admin/devices');
-      if (res.ok) setDevices(await res.json());
+      const res = await fetch('/api/admin/devices', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setDevices(data);
+        }
+      }
     } catch (err) {
       console.warn('Failed to fetch devices', err);
     }
@@ -288,7 +293,12 @@ export default function AdminDashboardPage() {
         }
       }
       if (smsRes.ok) setTransactions(await smsRes.json());
-      if (devRes.ok) setDevices(await devRes.json());
+      if (devRes.ok) {
+        const d = await devRes.json();
+        if (Array.isArray(d) && d.length > 0) {
+          setDevices(d);
+        }
+      }
       if (admRes.ok) setAdminsList(await admRes.json());
     } catch (err) {
       console.error('Failed to load admin data:', err);
