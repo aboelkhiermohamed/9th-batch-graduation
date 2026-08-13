@@ -196,14 +196,14 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
-  // Periodic poll for devices when gateway tab is active
+  // Periodic poll for devices when gateway tab is active (Every 10 seconds)
   useEffect(() => {
     let interval: any;
     if (isAuthenticated && activeTab === 'gateway') {
       fetchDevices();
       interval = setInterval(() => {
         fetchDevices();
-      }, 3000);
+      }, 10000);
     }
     return () => clearInterval(interval);
   }, [isAuthenticated, activeTab]);

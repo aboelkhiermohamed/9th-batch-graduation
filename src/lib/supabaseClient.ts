@@ -100,19 +100,7 @@ export const DEFAULT_PRODUCTS: Product[] = [
   }
 ];
 
-export const DEFAULT_DEVICES: GatewayDevice[] = [
-  {
-    id: 'dev-44f26a85aa395afd',
-    device_name: 'Android Gateway (44f26a85)',
-    phone_number: '01015339426',
-    battery_level: 100,
-    status: 'online',
-    last_ping: new Date().toISOString(),
-    total_sms_processed: 0,
-    app_version: 'v2.5.0-android',
-    created_at: new Date().toISOString()
-  }
-];
+export const DEFAULT_DEVICES: GatewayDevice[] = [];
 
 // Memory/LocalStorage cache state for seamless offline & fallback execution
 let memoryProducts: Product[] = [...DEFAULT_PRODUCTS];
@@ -961,26 +949,26 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
 
     const map = new Map<string, GatewayDevice>();
 
-    // 1. Add DEFAULT & memory devices first
+    // 1. Add memory devices
     const memDevices = getMemoryDevices();
-    [...DEFAULT_DEVICES, ...memDevices].forEach(d => {
+    memDevices.forEach(d => {
       if (d.id) map.set(d.id, d);
     });
 
-    const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
-    // 2. Override with DB devices if present
+    // 2. Override/merge DB devices if present
     if (data && Array.isArray(data) && data.length > 0) {
       data.forEach((d: any) => {
         if (!d.id) return;
         const ping = d.last_ping || new Date().toISOString();
-        const devStatus: 'online' | 'offline' = (ping >= tenMinsAgo) ? 'online' : 'offline';
+        const devStatus: 'online' | 'offline' = (ping >= fifteenMinsAgo) ? 'online' : 'offline';
 
         const existing = map.get(d.id);
         map.set(d.id, {
           id: d.id,
-          device_name: d.device_name || existing?.device_name || 'Android Gateway Phone',
-          phone_number: d.phone_number || existing?.phone_number || '01015339426',
+          device_name: existing?.device_name || d.device_name || `Android Phone (${d.id.slice(0, 8)})`,
+          phone_number: d.phone_number || existing?.phone_number || undefined,
           battery_level: d.battery_level !== undefined ? Number(d.battery_level) : (existing?.battery_level || 100),
           status: devStatus,
           last_ping: ping,
@@ -1001,21 +989,21 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
 }
 
 export async function upsertDevicePingInSupabase(device: Partial<GatewayDevice>): Promise<GatewayDevice> {
-  const devId = device.id || 'dev-' + (device.device_name || 'android').toLowerCase().replace(/[^a-z0-9]/g, '-');
+  const devId = device.id || (device.phone_number ? `dev-${device.phone_number.replace(/[^0-9]/g, '')}` : ('dev-' + (device.device_name || 'android').toLowerCase().replace(/[^a-z0-9]/g, '-')));
   const now = new Date().toISOString();
   
   const existing = getMemoryDevices();
   const found = existing.find(d => d.id === devId);
 
   // Preserve custom name set by admin if default generic name is passed
-  const isGenericName = !device.device_name || device.device_name.startsWith('Android Phone') || device.device_name.startsWith('Android Device') || device.device_name.startsWith('Android Gateway');
-  const finalName = (!isGenericName && device.device_name) ? device.device_name : (found?.device_name || device.device_name || 'Android Gateway Phone');
+  const isGenericName = !device.device_name || device.device_name.startsWith('Android Phone') || device.device_name.startsWith('Android Device');
+  const finalName = (!isGenericName && device.device_name) ? device.device_name : (found?.device_name || device.device_name || `Android Gateway (${devId.slice(0, 8)})`);
 
   const updatedDevice: GatewayDevice = {
     id: devId,
     device_name: finalName,
-    phone_number: device.phone_number || found?.phone_number || '01015339426',
-    battery_level: device.battery_level !== undefined ? device.battery_level : (found?.battery_level || 90),
+    phone_number: device.phone_number || found?.phone_number || undefined,
+    battery_level: device.battery_level !== undefined ? device.battery_level : (found?.battery_level || 100),
     status: 'online',
     last_ping: now,
     total_sms_processed: (found?.total_sms_processed || 0) + (device.total_sms_processed || 0),
