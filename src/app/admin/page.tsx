@@ -388,17 +388,25 @@ export default function AdminDashboardPage() {
   // Update order status
   const handleUpdateOrderStatus = async (orderId: string, status: string, matchedTxId?: string) => {
     try {
+      const adminName = currentAdmin?.display_name || currentAdmin?.username || 'أدمن المتجر';
       const res = await fetch('/api/orders', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, status, matchedTransactionId: matchedTxId })
+        body: JSON.stringify({ 
+          orderId, 
+          status, 
+          matchedTransactionId: matchedTxId,
+          verifiedBy: adminName,
+          verified_by: adminName
+        })
       });
       if (res.ok) {
         setOrders(prev => prev.map(o => o.id === orderId ? { 
           ...o, 
           status: status as any,
           matched_transaction_id: matchedTxId || o.matched_transaction_id,
-          verified_at: (status === 'manual_verified' || status === 'auto_verified') ? (o.verified_at || new Date().toISOString()) : o.verified_at
+          verified_at: (status === 'manual_verified' || status === 'auto_verified') ? (o.verified_at || new Date().toISOString()) : o.verified_at,
+          verified_by: adminName
         } : o));
         
         if (selectedOrderModal && selectedOrderModal.id === orderId) {
@@ -406,7 +414,8 @@ export default function AdminDashboardPage() {
             ...prev,
             status: status as any,
             matched_transaction_id: matchedTxId || prev.matched_transaction_id,
-            verified_at: (status === 'manual_verified' || status === 'auto_verified') ? (prev.verified_at || new Date().toISOString()) : prev.verified_at
+            verified_at: (status === 'manual_verified' || status === 'auto_verified') ? (prev.verified_at || new Date().toISOString()) : prev.verified_at,
+            verified_by: adminName
           } : null);
         }
       }
@@ -1714,7 +1723,9 @@ export default function AdminDashboardPage() {
                                 <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
                                 <span>👤 مؤكد يدوي (الإدارة)</span>
                               </span>
-                              <p className="text-[10px] text-slate-400 font-mono">بواسطة أدمن المتجر</p>
+                              <p className="text-[10px] text-cyan-300/80 font-mono font-bold">
+                                بواسطة {order.verified_by || currentAdmin?.display_name || currentAdmin?.username || 'أدمن المتجر'}
+                              </p>
                             </div>
                           )}
                           {order.status === 'pending' && (
@@ -4011,7 +4022,7 @@ export default function AdminDashboardPage() {
                     <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 space-y-2">
                       <div className="flex items-center gap-2 text-cyan-300 text-xs font-bold">
                         <UserCheck className="w-4 h-4 text-cyan-400" />
-                        <span>تم تأكيد هذا الطلب يدوياً بواسطة الإدارة (بدون مطابقة SMS تلقائية).</span>
+                        <span>تم تأكيد هذا الطلب يدوياً بواسطة: <strong className="text-white underline">{selectedOrderModal.verified_by || currentAdmin?.display_name || currentAdmin?.username || 'أدمن المتجر'}</strong></span>
                       </div>
 
                       {/* Option to manually associate an unmatched transaction */}

@@ -360,6 +360,7 @@ export function cleanDisplayNotes(str?: string | null): string {
   cleaned = cleaned.replace(/\bsp:\s*\d+/gi, '');
   cleaned = cleaned.replace(/\[\s*RECEIPT_URL:[\s\S]*?\]/gi, '');
   cleaned = cleaned.replace(/RECEIPT_URL:\s*https?:\/\/\S+/gi, '');
+  cleaned = cleaned.replace(/\[VERIFIED_BY:.*?\]/gi, '');
   cleaned = cleaned.replace(/\[\[[\s\S]*?\]\]/gi, '');
   cleaned = cleaned.replace(/\["[^"]*?@instapay[^"]*?"\]/gi, '');
   cleaned = cleaned.replace(/\[[a-z0-9_\-\.]+\.(jpg|jpeg|png|webp|pdf)\]/gi, '');
@@ -710,12 +711,21 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
     const fetchedOrders: Order[] = dbOrders.map((o: any) => {
       let rawNotes = o.notes || '';
       let extractedReceiptUrl = o.receipt_url || undefined;
+      let verifiedBy = o.verified_by || undefined;
 
       if (!extractedReceiptUrl && rawNotes.includes('[RECEIPT_URL:')) {
         const match = rawNotes.match(/\[RECEIPT_URL:(.*?)\]/);
         if (match && match[1]) {
           extractedReceiptUrl = match[1];
           rawNotes = rawNotes.replace(/\[RECEIPT_URL:.*?\]/, '').trim();
+        }
+      }
+
+      if (!verifiedBy && rawNotes.includes('[VERIFIED_BY:')) {
+        const match = rawNotes.match(/\[VERIFIED_BY:(.*?)\]/);
+        if (match && match[1]) {
+          verifiedBy = match[1];
+          rawNotes = rawNotes.replace(/\[VERIFIED_BY:.*?\]/, '').trim();
         }
       }
 
@@ -776,6 +786,7 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         notes: rawNotes,
         matched_transaction_id: o.matched_transaction_id || undefined,
         verified_at: o.verified_at || undefined,
+        verified_by: verifiedBy,
         created_at: o.created_at || new Date().toISOString(),
         updated_at: o.updated_at || new Date().toISOString(),
         items
@@ -826,7 +837,7 @@ export async function updateTransactionStatusInSupabase(txId: string, status: st
   }
 }
 
-export async function updateOrderStatusInSupabase(orderId: string, status: string, matchedTxId?: string): Promise<boolean> {
+export async function updateOrderStatusInSupabase(orderId: string, status: string, matchedTxId?: string, verifiedBy?: string): Promise<boolean> {
   try {
     const payload: any = {
       status,
@@ -834,15 +845,22 @@ export async function updateOrderStatusInSupabase(orderId: string, status: strin
     };
     if (status === 'auto_verified' || status === 'manual_verified') {
       payload.verified_at = new Date().toISOString();
+      if (verifiedBy) payload.verified_by = verifiedBy;
     }
     if (matchedTxId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matchedTxId)) {
       payload.matched_transaction_id = matchedTxId;
     }
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from('store_orders')
       .update(payload)
       .eq('id', orderId);
+
+    if (error && verifiedBy && (error.message.includes('verified_by') || error.message.includes('column'))) {
+      delete payload.verified_by;
+      const res = await supabase.from('store_orders').update(payload).eq('id', orderId);
+      error = res.error;
+    }
 
     if (matchedTxId) {
       await updateTransactionStatusInSupabase(matchedTxId, 'matched', orderId);

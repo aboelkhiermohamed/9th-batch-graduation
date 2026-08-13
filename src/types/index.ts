@@ -69,6 +69,7 @@ export interface Order {
   notes?: string;
   matched_transaction_id?: string;
   verified_at?: string;
+  verified_by?: string;
   created_at: string;
   updated_at: string;
   items?: OrderItem[];

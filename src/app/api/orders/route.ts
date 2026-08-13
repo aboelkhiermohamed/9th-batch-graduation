@@ -141,8 +141,9 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { orderId, status, matchedTransactionId, matched_transaction_id } = body;
+    const { orderId, status, matchedTransactionId, matched_transaction_id, verifiedBy, verified_by } = body;
     const txId = matchedTransactionId || matched_transaction_id;
+    const vBy = verifiedBy || verified_by;
 
     if (!orderId || !status) {
       return NextResponse.json({ error: 'Missing orderId or status' }, { status: 400 });
@@ -156,6 +157,7 @@ export async function PUT(req: NextRequest) {
           status,
           matched_transaction_id: txId || o.matched_transaction_id,
           verified_at: (status === 'manual_verified' || status === 'auto_verified') ? (o.verified_at || new Date().toISOString()) : o.verified_at,
+          verified_by: vBy || o.verified_by,
           updated_at: new Date().toISOString()
         };
       }
@@ -165,7 +167,7 @@ export async function PUT(req: NextRequest) {
     setMemoryOrders(updated);
 
     // Update in Supabase
-    await updateOrderStatusInSupabase(orderId, status, txId);
+    await updateOrderStatusInSupabase(orderId, status, txId, vBy);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
