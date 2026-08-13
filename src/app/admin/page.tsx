@@ -1333,11 +1333,13 @@ export default function AdminDashboardPage() {
   const totalVerifiedOrders = orders.filter(o => o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered').length;
   const totalGrossRevenue = orders.reduce((sum, o) => o.status !== 'cancelled' ? sum + Number(o.total_amount) : sum, 0);
 
+  const isSuperAdmin = currentAdmin?.role === 'superadmin';
+
   const navTabs = [
     { id: 'orders', label: 'إدارة الطلبات', badge: `${orders.length}`, icon: ShoppingBag },
     { id: 'products', label: 'المنتجات والمعرض', badge: `${products.length}`, icon: Package },
     { id: 'analytics', label: 'إحصائيات ومبيعات 📊', badge: null, icon: BarChart3 },
-    { id: 'admins', label: 'إدارة الأدمنز والمشرفين 🔑', badge: `${adminsList.length}`, icon: ShieldCheck },
+    ...(isSuperAdmin ? [{ id: 'admins', label: 'إدارة الأدمنز والمشرفين 🔑', badge: `${adminsList.length}`, icon: ShieldCheck }] : []),
     { id: 'gateway', label: 'بوابة SMS والأجهزة', badge: `${devices.filter(d => d.status === 'online').length} أونلاين`, icon: Smartphone },
     { id: 'settings', label: 'إعدادات الدفع والمحفظة', badge: null, icon: Settings },
     { id: 'maintenance', label: 'الصيانة والباك أب ⚙️', badge: settings.maintenance_mode ? '🚧 مفعّل' : null, icon: Wrench },
@@ -2590,126 +2592,138 @@ export default function AdminDashboardPage() {
 
         {/* --- ADMINS MANAGEMENT TAB --- */}
         {activeTab === 'admins' && (
-          <div className="max-w-5xl mx-auto space-y-6">
-            
-            {/* Header banner */}
-            <div className="p-6 rounded-3xl glass-card border border-indigo-500/30 bg-slate-900/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-700 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center flex-shrink-0">
-                  <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-                    <ShieldCheck className="w-6 h-6 text-amber-400" />
+          !isSuperAdmin ? (
+            <div className="max-w-xl mx-auto p-8 rounded-3xl bg-slate-900 border border-rose-500/30 text-center space-y-4 shadow-xl">
+              <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto">
+                <ShieldAlert className="w-8 h-8 text-rose-500" />
+              </div>
+              <h3 className="text-lg font-bold text-white">عذراً، هذا القسم مخصص للمدير العام فقط (Super Admin)</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                إدارة المشرفين وإنشاء الحسابات الجديدة متاح حكراً للمدير العام للحفاظ على أمان وصلاحيات لوحة التحكم.
+              </p>
+            </div>
+          ) : (
+            <div className="max-w-5xl mx-auto space-y-6">
+              
+              {/* Header banner */}
+              <div className="p-6 rounded-3xl glass-card border border-indigo-500/30 bg-slate-900/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-700 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+                      <ShieldCheck className="w-6 h-6 text-amber-400" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>نظام إدارة حسابات الأدمنز والمشرفين</span>
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
+                        {adminsList.length} حساب مسجل
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      إضافة وإنشاء حسابات جديدة للمشرفين، تحديد الرتب والصلاحيات، وإدارة مفاتيح الدخول للوحة التحكم
+                    </p>
                   </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <span>نظام إدارة حسابات الأدمنز والمشرفين</span>
-                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
-                      {adminsList.length} حساب مسجل
-                    </span>
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    إضافة وإنشاء حسابات جديدة للمشرفين، تحديد الرتب والصلاحيات، وإدارة مفاتيح الدخول للوحة التحكم
-                  </p>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAddAdminOpen(true)}
+                  className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition active:scale-95 flex-shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>إضافة مشرف/أدمن جديد 🔑</span>
+                </button>
+              </div>
+
+              {/* Admin accounts grid / table */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                  <User className="w-4 h-4 text-amber-400" />
+                  <span>قائمة حسابات الأدمنز المعتمدة في المتجر</span>
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {adminsList.map((adm) => {
+                    const isSuper = adm.role === 'superadmin';
+                    const isSelf = currentAdmin?.username === adm.username || currentAdmin?.id === adm.id;
+                    const isDefaultAdmin = adm.username === 'admin';
+
+                    return (
+                      <div
+                        key={adm.id || adm.username}
+                        className="p-5 rounded-3xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition space-y-4 shadow-xl"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-12 h-12 rounded-2xl p-0.5 flex items-center justify-center ${
+                              isSuper ? 'bg-gradient-to-tr from-amber-500 to-amber-700' : 'bg-gradient-to-tr from-indigo-500 to-purple-600'
+                            }`}>
+                              <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+                                <ShieldCheck className={`w-6 h-6 ${isSuper ? 'text-amber-400' : 'text-indigo-400'}`} />
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h5 className="text-base font-bold text-white">{adm.display_name}</h5>
+                                {isSelf && (
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                                    حسابك الحالي
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-amber-400 font-mono mt-0.5">@{adm.username}</p>
+                            </div>
+                          </div>
+
+                          <span className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold border ${
+                            isSuper 
+                              ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' 
+                              : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                          }`}>
+                            {isSuper ? '👑 مدير عام (Super Admin)' : '🛡️ مشرف (Admin)'}
+                          </span>
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                          <span className="flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>حساب نشط ومعتمد</span>
+                          </span>
+
+                          {!isDefaultAdmin && !isSelf && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAdminSubmit(adm.id)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>حذف الحساب</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsAddAdminOpen(true)}
-                className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition active:scale-95 flex-shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                <span>إضافة مشرف/أدمن جديد 🔑</span>
-              </button>
-            </div>
-
-            {/* Admin accounts grid / table */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                <User className="w-4 h-4 text-amber-400" />
-                <span>قائمة حسابات الأدمنز المعتمدة في المتجر</span>
-              </h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {adminsList.map((adm) => {
-                  const isSuper = adm.role === 'superadmin';
-                  const isSelf = currentAdmin?.username === adm.username || currentAdmin?.id === adm.id;
-                  const isDefaultAdmin = adm.username === 'admin';
-
-                  return (
-                    <div
-                      key={adm.id || adm.username}
-                      className="p-5 rounded-3xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition space-y-4 shadow-xl"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-12 h-12 rounded-2xl p-0.5 flex items-center justify-center ${
-                            isSuper ? 'bg-gradient-to-tr from-amber-500 to-amber-700' : 'bg-gradient-to-tr from-indigo-500 to-purple-600'
-                          }`}>
-                            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-                              <ShieldCheck className={`w-6 h-6 ${isSuper ? 'text-amber-400' : 'text-indigo-400'}`} />
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h5 className="text-base font-bold text-white">{adm.display_name}</h5>
-                              {isSelf && (
-                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
-                                  حسابك الحالي
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-amber-400 font-mono mt-0.5">@{adm.username}</p>
-                          </div>
-                        </div>
-
-                        <span className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold border ${
-                          isSuper 
-                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' 
-                            : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
-                        }`}>
-                          {isSuper ? '👑 مدير عام (Super Admin)' : '🛡️ مشرف (Admin)'}
-                        </span>
-                      </div>
-
-                      <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                        <span className="flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>حساب نشط ومعتمد</span>
-                        </span>
-
-                        {!isDefaultAdmin && !isSelf && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteAdminSubmit(adm.id)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>حذف الحساب</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              {/* Instruction box */}
+              <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 space-y-2">
+                <h5 className="font-bold text-amber-400 flex items-center gap-2">
+                  <Info className="w-4 h-4" />
+                  <span>كيف يعمل نظام الأدمن المتعدد (Multi-Admin Accounts System)؟</span>
+                </h5>
+                <ul className="list-disc list-inside space-y-1 text-slate-400 leading-relaxed">
+                  <li>كل أدمن يمتلك اسم مستخدم (`username`) وكلمة مرور خاصة به للولوج إلى لوحة التحكم.</li>
+                  <li>المشرف العادي يمتلك صلاحيات إدارة الطلبات والمنتجات دون التعديل على الحسابات.</li>
+                  <li>يتم حفظ الجلسة وتسجيل الدخول لكل أدمن بشكل مستقل بأمان عبر السيرفر وقاعدة بيانات Supabase.</li>
+                </ul>
               </div>
-            </div>
 
-            {/* Instruction box */}
-            <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 space-y-2">
-              <h5 className="font-bold text-amber-400 flex items-center gap-2">
-                <Info className="w-4 h-4" />
-                <span>كيف يعمل نظام الأدمن المتعدد (Multi-Admin Accounts System)؟</span>
-              </h5>
-              <ul className="list-disc list-inside space-y-1 text-slate-400 leading-relaxed">
-                <li>كل أدمن يمتلك اسم مستخدم (`username`) وكلمة مرور خاصة به للولوج إلى لوحة التحكم.</li>
-                <li>حساب المدير العام الرئيسي (`admin`) متاح دائماً كحساب احتياطي أساسي للنظام.</li>
-                <li>يتم حفظ الجلسة وتسجيل الدخول لكل أدمن بشكل مستقل بأمان عبر السيرفر وقاعدة بيانات Supabase.</li>
-              </ul>
             </div>
-
-          </div>
+          )
         )}
 
         {/* --- SMS AUDIT TAB --- */}
@@ -3362,7 +3376,7 @@ export default function AdminDashboardPage() {
       )}
 
       {/* --- ADD NEW ADMIN MODAL --- */}
-      {isAddAdminOpen && (
+      {isAddAdminOpen && isSuperAdmin && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 flex items-center justify-center">
           <div className="relative w-full max-w-md glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-500/30 space-y-6 text-right">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
