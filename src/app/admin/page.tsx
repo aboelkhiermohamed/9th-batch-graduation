@@ -101,6 +101,7 @@ export default function AdminDashboardPage() {
   const [pdfShowCode, setPdfShowCode] = useState(true);
   const [pdfShowRef, setPdfShowRef] = useState(true);
   const [pdfShowCustomization, setPdfShowCustomization] = useState(true);
+  const [pdfShowStatus, setPdfShowStatus] = useState(true);
 
   // Backup & Restore State
   const [isRestoringBackup, setIsRestoringBackup] = useState(false);
@@ -976,12 +977,13 @@ export default function AdminDashboardPage() {
     return matchSearch && matchStatus;
   });
 
-  // Calculate statistics for PDF export & breakdown
+  // Calculate statistics for PDF export & breakdown (Confirmed Orders Only for Factory Manufacturing)
   const calculateProductSizeStats = () => {
     const stats: Record<string, { productTitle: string; sizeCounts: Record<string, number>; totalUnits: number; totalRevenue: number }> = {};
 
     orders.forEach(order => {
-      if (order.status === 'cancelled') return;
+      const isConfirmed = order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered';
+      if (!isConfirmed) return;
       const items = getOrderEffectiveItems(order);
       items.forEach(item => {
         const title = item.product_title || 'منتج غير معرف';
@@ -1202,13 +1204,14 @@ export default function AdminDashboardPage() {
         <table>
           <thead>
             <tr>
-              ${pdfShowCode ? '<th style="width: 12%;">كود الطلب</th>' : ''}
-              <th style="width: 22%;">اسم العميل</th>
-              ${pdfShowPhone ? '<th style="width: 15%;">رقم الموبايل</th>' : ''}
-              ${pdfShowRef ? '<th style="width: 16%;">الرقم المرجعي</th>' : ''}
-              <th style="width: 12%;">طريقة الدفع</th>
+              ${pdfShowCode ? '<th style="width: 11%;">كود الطلب</th>' : ''}
+              <th style="width: 18%;">اسم العميل</th>
+              ${pdfShowPhone ? '<th style="width: 13%;">رقم الموبايل</th>' : ''}
+              ${pdfShowRef ? '<th style="width: 14%;">الرقم المرجعي</th>' : ''}
+              <th style="width: 11%;">طريقة الدفع</th>
+              ${pdfShowStatus ? '<th style="width: 12%;">حالة الطلب</th>' : ''}
               <th>الأصناف المحددة والتطريز</th>
-              <th style="width: 12%;">الإجمالي</th>
+              <th style="width: 11%;">الإجمالي</th>
             </tr>
           </thead>
           <tbody>
@@ -1219,6 +1222,13 @@ export default function AdminDashboardPage() {
                 ${pdfShowPhone ? `<td class="font-mono">${o.customer_phone}</td>` : ''}
                 ${pdfShowRef ? `<td class="font-mono">${o.transaction_ref || '—'}</td>` : ''}
                 <td>${o.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}</td>
+                ${pdfShowStatus ? `<td>
+                  ${o.status === 'auto_verified' || o.status === 'manual_verified' ? '<span style="color: #047857; font-weight: bold;">مؤكد ✓</span>' :
+                    o.status === 'ready_for_pickup' ? '<span style="color: #6d28d9; font-weight: bold;">جاهز للاستلام 🎓</span>' :
+                    o.status === 'delivered' ? '<span style="color: #1d4ed8; font-weight: bold;">تم التسليم 📦</span>' :
+                    o.status === 'cancelled' ? '<span style="color: #b91c1c; font-weight: bold;">ملغي ❌</span>' :
+                    '<span style="color: #b45309; font-weight: bold;">قيد الانتظار ⏳</span>'}
+                </td>` : ''}
                 <td>
                   ${getOrderEffectiveItems(o).map(it => `
                     <div>• ${it.product_title} ${it.selected_size ? `[${it.selected_size}]` : ''} × ${it.quantity}
@@ -1327,6 +1337,7 @@ export default function AdminDashboardPage() {
     { id: 'orders', label: 'إدارة الطلبات', badge: `${orders.length}`, icon: ShoppingBag },
     { id: 'products', label: 'المنتجات والمعرض', badge: `${products.length}`, icon: Package },
     { id: 'analytics', label: 'إحصائيات ومبيعات 📊', badge: null, icon: BarChart3 },
+    { id: 'admins', label: 'إدارة الأدمنز والمشرفين 🔑', badge: `${adminsList.length}`, icon: ShieldCheck },
     { id: 'gateway', label: 'بوابة SMS والأجهزة', badge: `${devices.filter(d => d.status === 'online').length} أونلاين`, icon: Smartphone },
     { id: 'settings', label: 'إعدادات الدفع والمحفظة', badge: null, icon: Settings },
     { id: 'maintenance', label: 'الصيانة والباك أب ⚙️', badge: settings.maintenance_mode ? '🚧 مفعّل' : null, icon: Wrench },
@@ -1392,6 +1403,20 @@ export default function AdminDashboardPage() {
 
         {/* Footer Admin Info & Actions */}
         <div className="pt-4 border-t border-slate-800 space-y-3">
+          {currentAdmin && (
+            <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-white truncate">{currentAdmin.display_name || currentAdmin.username}</p>
+                  <p className="text-[10px] text-amber-400 font-mono">@{currentAdmin.username} • {currentAdmin.role === 'superadmin' ? 'مدير عام' : 'مشرف'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <button
               onClick={fetchAllData}
@@ -1399,13 +1424,15 @@ export default function AdminDashboardPage() {
               title="تحديث البيانات"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>تحديث البيانات</span>
+              <span>تحديث</span>
             </button>
 
             <button
               onClick={() => {
                 sessionStorage.removeItem('admin_authenticated');
+                sessionStorage.removeItem('admin_profile');
                 setIsAuthenticated(false);
+                setCurrentAdmin(null);
               }}
               className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition border border-rose-500/20 mr-2"
               title="تسجيل الخروج"
@@ -2561,6 +2588,130 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
+        {/* --- ADMINS MANAGEMENT TAB --- */}
+        {activeTab === 'admins' && (
+          <div className="max-w-5xl mx-auto space-y-6">
+            
+            {/* Header banner */}
+            <div className="p-6 rounded-3xl glass-card border border-indigo-500/30 bg-slate-900/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-700 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+                    <ShieldCheck className="w-6 h-6 text-amber-400" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <span>نظام إدارة حسابات الأدمنز والمشرفين</span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-bold">
+                      {adminsList.length} حساب مسجل
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    إضافة وإنشاء حسابات جديدة للمشرفين، تحديد الرتب والصلاحيات، وإدارة مفاتيح الدخول للوحة التحكم
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddAdminOpen(true)}
+                className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition active:scale-95 flex-shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إضافة مشرف/أدمن جديد 🔑</span>
+              </button>
+            </div>
+
+            {/* Admin accounts grid / table */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                <User className="w-4 h-4 text-amber-400" />
+                <span>قائمة حسابات الأدمنز المعتمدة في المتجر</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {adminsList.map((adm) => {
+                  const isSuper = adm.role === 'superadmin';
+                  const isSelf = currentAdmin?.username === adm.username || currentAdmin?.id === adm.id;
+                  const isDefaultAdmin = adm.username === 'admin';
+
+                  return (
+                    <div
+                      key={adm.id || adm.username}
+                      className="p-5 rounded-3xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition space-y-4 shadow-xl"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-12 h-12 rounded-2xl p-0.5 flex items-center justify-center ${
+                            isSuper ? 'bg-gradient-to-tr from-amber-500 to-amber-700' : 'bg-gradient-to-tr from-indigo-500 to-purple-600'
+                          }`}>
+                            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+                              <ShieldCheck className={`w-6 h-6 ${isSuper ? 'text-amber-400' : 'text-indigo-400'}`} />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h5 className="text-base font-bold text-white">{adm.display_name}</h5>
+                              {isSelf && (
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                                  حسابك الحالي
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-amber-400 font-mono mt-0.5">@{adm.username}</p>
+                          </div>
+                        </div>
+
+                        <span className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold border ${
+                          isSuper 
+                            ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' 
+                            : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/30'
+                        }`}>
+                          {isSuper ? '👑 مدير عام (Super Admin)' : '🛡️ مشرف (Admin)'}
+                        </span>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>حساب نشط ومعتمد</span>
+                        </span>
+
+                        {!isDefaultAdmin && !isSelf && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAdminSubmit(adm.id)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>حذف الحساب</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Instruction box */}
+            <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 space-y-2">
+              <h5 className="font-bold text-amber-400 flex items-center gap-2">
+                <Info className="w-4 h-4" />
+                <span>كيف يعمل نظام الأدمن المتعدد (Multi-Admin Accounts System)؟</span>
+              </h5>
+              <ul className="list-disc list-inside space-y-1 text-slate-400 leading-relaxed">
+                <li>كل أدمن يمتلك اسم مستخدم (`username`) وكلمة مرور خاصة به للولوج إلى لوحة التحكم.</li>
+                <li>حساب المدير العام الرئيسي (`admin`) متاح دائماً كحساب احتياطي أساسي للنظام.</li>
+                <li>يتم حفظ الجلسة وتسجيل الدخول لكل أدمن بشكل مستقل بأمان عبر السيرفر وقاعدة بيانات Supabase.</li>
+              </ul>
+            </div>
+
+          </div>
+        )}
+
         {/* --- SMS AUDIT TAB --- */}
         {activeTab === 'sms' && (
           <div className="space-y-6">
@@ -3210,6 +3361,106 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {/* --- ADD NEW ADMIN MODAL --- */}
+      {isAddAdminOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 flex items-center justify-center">
+          <div className="relative w-full max-w-md glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-amber-500/30 space-y-6 text-right">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center font-bold">
+                  <ShieldCheck className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">إضافة حساب أدمن / مشرف جديد</h3>
+                  <p className="text-xs text-slate-400">إنشاء بيانات الدخول والصلاحيات للمشرف</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddAdminOpen(false)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddAdminSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-200 mb-1">
+                  الاسم بالكامل / الاسم الظاهر <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: أحمد علي (مدير المبيعات)"
+                  value={newAdminName}
+                  onChange={(e) => setNewAdminName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-200 mb-1">
+                  اسم المستخدم (Username) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: ahmed_admin"
+                  value={newAdminUsername}
+                  onChange={(e) => setNewAdminUsername(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-200 mb-1">
+                  كلمة المرور (Password) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="أدخل كلمة مرور قوية"
+                  value={newAdminPassword}
+                  onChange={(e) => setNewAdminPassword(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-200 mb-1">
+                  الرتبة والصلاحية (Role)
+                </label>
+                <select
+                  value={newAdminRole}
+                  onChange={(e) => setNewAdminRole(e.target.value as any)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs sm:text-sm focus:outline-none focus:border-amber-500"
+                >
+                  <option value="admin">مشرف عادي (Admin) — إدارة الطلبات والمنتجات</option>
+                  <option value="superadmin">مدير عام (Super Admin) — كافة الصلاحيات والإعدادات</option>
+                </select>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddAdminOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-500/20 transition"
+                >
+                  إضافة المشرف فوراً 💾
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* --- PRINTABLE PDF REPORT MODAL --- */}
       {isPdfModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md p-4 sm:p-8 flex items-center justify-center">
@@ -3251,6 +3502,10 @@ export default function AdminDashboardPage() {
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={pdfShowRef} onChange={e => setPdfShowRef(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
                     <span>الرقم المرجعي (Ref#)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={pdfShowStatus} onChange={e => setPdfShowStatus(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
+                    <span>حالة الطلب</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={pdfShowCustomization} onChange={e => setPdfShowCustomization(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
@@ -3725,28 +3980,40 @@ export default function AdminDashboardPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-slate-400 font-bold">تغيير الحالة:</span>
                 <button
-                  onClick={() => handleUpdateOrderStatus(selectedOrderModal.id, 'manual_verified')}
+                  onClick={() => {
+                    handleUpdateOrderStatus(selectedOrderModal.id, 'manual_verified');
+                    setSelectedOrderModal(null);
+                  }}
                   className="px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white font-bold text-xs border border-emerald-500/30 transition"
                 >
                   تأكيد يدوي 👤
                 </button>
 
                 <button
-                  onClick={() => handleUpdateOrderStatus(selectedOrderModal.id, 'ready_for_pickup')}
+                  onClick={() => {
+                    handleUpdateOrderStatus(selectedOrderModal.id, 'ready_for_pickup');
+                    setSelectedOrderModal(null);
+                  }}
                   className="px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white font-bold text-xs border border-indigo-500/30 transition"
                 >
                   جاهز للاستلام 📦
                 </button>
 
                 <button
-                  onClick={() => handleUpdateOrderStatus(selectedOrderModal.id, 'delivered')}
+                  onClick={() => {
+                    handleUpdateOrderStatus(selectedOrderModal.id, 'delivered');
+                    setSelectedOrderModal(null);
+                  }}
                   className="px-3 py-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white font-bold text-xs border border-blue-500/30 transition"
                 >
                   تم التسليم 🎉
                 </button>
 
                 <button
-                  onClick={() => handleUpdateOrderStatus(selectedOrderModal.id, 'cancelled')}
+                  onClick={() => {
+                    handleUpdateOrderStatus(selectedOrderModal.id, 'cancelled');
+                    setSelectedOrderModal(null);
+                  }}
                   className="px-3 py-1.5 rounded-xl bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white font-bold text-xs border border-rose-500/30 transition"
                 >
                   إلغاء الطلب ❌

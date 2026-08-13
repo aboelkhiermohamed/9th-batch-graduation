@@ -16,24 +16,41 @@ export async function POST(req: Request) {
       const { data, error } = await supabase
         .from('store_admins')
         .select('*')
-        .eq('username', cleanUsername)
-        .eq('is_active', true)
-        .single();
+        .or(`username.eq.${cleanUsername},username.eq.${cleanUsername.split('@')[0]}`)
+        .eq('is_active', true);
 
-      if (data && data.password_hash === cleanPassword) {
-        return NextResponse.json({
-          success: true,
-          admin: {
-            id: data.id,
-            username: data.username,
-            display_name: data.display_name,
-            role: data.role
-          }
-        });
+      if (data && data.length > 0) {
+        const found = data.find(a => a.password_hash === cleanPassword);
+        if (found) {
+          return NextResponse.json({
+            success: true,
+            admin: {
+              id: found.id,
+              username: found.username,
+              display_name: found.display_name,
+              role: found.role
+            }
+          });
+        }
       }
     }
 
-    // Fallback default superadmin login
+    // Default Super Admin logins (Fallbacks)
+    if (
+      (cleanUsername === 'mohamedahmed077m@gmail.com' || cleanUsername === 'mohamedahmed077m') &&
+      cleanPassword === '19312@Mo'
+    ) {
+      return NextResponse.json({
+        success: true,
+        admin: {
+          id: 'super-admin-mohamed',
+          username: 'mohamedahmed077m@gmail.com',
+          display_name: 'محمد ابو الخير (Super Admin)',
+          role: 'superadmin'
+        }
+      });
+    }
+
     if (cleanUsername === 'admin' && cleanPassword === 'admin123') {
       return NextResponse.json({
         success: true,

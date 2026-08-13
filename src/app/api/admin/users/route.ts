@@ -3,6 +3,14 @@ import { supabase } from '@/lib/supabaseClient';
 
 let MEMORY_ADMINS = [
   {
+    id: 'super-admin-mohamed',
+    username: 'mohamedahmed077m@gmail.com',
+    display_name: 'محمد ابو الخير (Super Admin)',
+    role: 'superadmin',
+    is_active: true,
+    created_at: new Date().toISOString()
+  },
+  {
     id: 'default-admin',
     username: 'admin',
     display_name: 'المدير العام (Super Admin)',

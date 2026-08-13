@@ -19,7 +19,8 @@ import {
   Send,
   Trash2,
   Plus,
-  Minus
+  Minus,
+  Lock
 } from 'lucide-react';
 import { CartItem, Order, PaymentMethod, StoreSettings, ProductAddon } from '@/types';
 import { DEFAULT_SETTINGS, cleanDisplayNotes } from '@/lib/supabaseClient';
@@ -190,7 +191,9 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!customerName.trim() || !customerPhone.trim() || !transactionRef.trim()) {
+    const finalPhone = (customerSession?.phone_number || customerPhone).trim();
+
+    if (!customerName.trim() || !finalPhone || !transactionRef.trim()) {
       alert('يرجى إدخال اسم العميل ورقم الموبايل والرقم المرجعي للعملية');
       return;
     }
@@ -222,8 +225,8 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
-          senderPhone: senderPhone.trim() || customerPhone.trim(),
+          customerPhone: finalPhone,
+          senderPhone: senderPhone.trim() || finalPhone,
           transactionRef: transactionRef.trim(),
           paymentMethod,
           receiptUrl: receiptUrl || undefined,
