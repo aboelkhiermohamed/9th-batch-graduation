@@ -352,10 +352,12 @@ export function cleanDisplayNotes(str?: string | null): string {
   if (!str) return '';
   let cleaned = String(str);
 
-  cleaned = cleaned.replace(/\[\s*(META|SETTINGS_META):[\s\S]*?\]/gi, '');
-  cleaned = cleaned.replace(/META:\s*\{[\s\S]*?\}/gi, '');
-  cleaned = cleaned.replace(/\{"v":[\s\S]*?\}/gi, '');
-  cleaned = cleaned.replace(/"(v|i|vn|ia|del)":[\s\S]*?(\}|\])/gi, '');
+  // Strip META tags even if truncated at the end
+  cleaned = cleaned.replace(/\[\s*(META|SETTINGS_META):[\s\S]*/gi, '');
+  cleaned = cleaned.replace(/META:\s*\{[\s\S]*/gi, '');
+  cleaned = cleaned.replace(/\{"v":[\s\S]*/gi, '');
+  cleaned = cleaned.replace(/"(v|i|vf|m|vn|ia|sp|del)":[\s\S]*/gi, '');
+  cleaned = cleaned.replace(/\bsp:\s*\d+/gi, '');
   cleaned = cleaned.replace(/\[\s*RECEIPT_URL:[\s\S]*?\]/gi, '');
   cleaned = cleaned.replace(/RECEIPT_URL:\s*https?:\/\/\S+/gi, '');
   cleaned = cleaned.replace(/\[\[[\s\S]*?\]\]/gi, '');
@@ -517,11 +519,10 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
     };
 
     const metaTag = `[META:${JSON.stringify(compactMeta)}]`;
-    // Ensure encodedNote fits in VARCHAR(255)
-    let encodedNote = `${cleanNote} ${metaTag}`;
-    if (encodedNote.length > 240) {
-      encodedNote = encodedNote.slice(0, 240);
-    }
+    let maxNoteLen = 235 - metaTag.length;
+    if (maxNoteLen < 10) maxNoteLen = 10;
+    const safeNote = cleanNote.slice(0, maxNoteLen);
+    const encodedNote = `${safeNote} ${metaTag}`;
 
     const payload: any = {
       id: 'default',
