@@ -1579,15 +1579,6 @@ export default function AdminDashboardPage() {
                           <p className="font-mono font-bold text-emerald-400 text-xs">
                             {order.transaction_ref ? `Ref# ${order.transaction_ref}` : '—'}
                           </p>
-                          {order.receipt_url && (
-                            <button
-                              onClick={() => setViewingReceiptUrl(order.receipt_url!)}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-bold text-[11px] border border-indigo-500/30 transition"
-                            >
-                              <Eye className="w-3 h-3" />
-                              <span>صورة الإيصال 📸</span>
-                            </button>
-                          )}
                         </td>
                         <td className="p-4 space-y-1.5">
                           {(!order.items || order.items.length === 0) ? (
@@ -1925,66 +1916,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Live Gateway Controls & Realtime Simulator */}
-            <div className="p-6 rounded-3xl glass-card border border-amber-500/30 bg-slate-900/90 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-amber-400 animate-pulse" />
-                  <div>
-                    <h3 className="text-base font-bold text-white">أداة محاكاة واختبار الأجهزة المباشرة (Realtime Testing Simulator)</h3>
-                    <p className="text-xs text-slate-400">استخدم هذه الأداة لاختبار وصول إشارات المزامنة الحية واستجابة النظام في الوقت الفعلي</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] border border-emerald-500/30 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                    <span>مزامنة حية (كل 3 ثوانٍ) 🔄</span>
-                  </span>
-                  {devices.length > 0 && (
-                    <button
-                      onClick={handleClearAllDevices}
-                      className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold transition border border-rose-500/20"
-                    >
-                      مسح الأجهزة 🧹
-                    </button>
-                  )}
-                </div>
-              </div>
 
-              {/* Preset Devices Quick Test Buttons */}
-              <div className="space-y-2">
-                <p className="text-xs font-bold text-slate-300">اختبار سريع بضغطة واحدة (Quick Preset Pings):</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSendCustomPing('Xiaomi Redmi Note 13', '01015339426', 96)}
-                    className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-indigo-600/30 text-indigo-300 border border-slate-800 text-xs font-bold flex items-center gap-1.5 transition"
-                  >
-                    <Smartphone className="w-3.5 h-3.5 text-amber-400" />
-                    <span>تجربة Xiaomi Redmi (96%) ⚡</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSendCustomPing('Samsung Galaxy S24 Ultra', '01098765432', 88)}
-                    className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-indigo-600/30 text-indigo-300 border border-slate-800 text-xs font-bold flex items-center gap-1.5 transition"
-                  >
-                    <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>تجربة Samsung S24 (88%) ⚡</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSendCustomPing('Google Pixel 8 Pro', '01122334455', 99)}
-                    className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-indigo-600/30 text-indigo-300 border border-slate-800 text-xs font-bold flex items-center gap-1.5 transition"
-                  >
-                    <Smartphone className="w-3.5 h-3.5 text-blue-400" />
-                    <span>تجربة Google Pixel (99%) ⚡</span>
-                  </button>
-                </div>
-              </div>
-            </div>
 
             {/* Mobile Devices Grid */}
             <div className="space-y-4">
