@@ -240,17 +240,64 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Persistent Devices localStorage helpers to prevent any card unmounting
+  const getPersistentDevices = (): GatewayDevice[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const s = localStorage.getItem('grad_store_admin_devices');
+      return s ? JSON.parse(s) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const savePersistentDevices = (devs: GatewayDevice[]) => {
+    if (typeof window === 'undefined' || !Array.isArray(devs) || devs.length === 0) return;
+    try {
+      const existing = getPersistentDevices();
+      const map = new Map<string, GatewayDevice>();
+      existing.forEach(d => map.set(d.id, d));
+      devs.forEach(d => {
+        const prev = map.get(d.id);
+        const isPrevGeneric = !prev?.device_name || prev.device_name.startsWith('Android Gateway (') || prev.device_name.startsWith('Android Phone');
+        const name = (!isPrevGeneric && prev?.device_name) ? prev.device_name : d.device_name;
+        map.set(d.id, { ...prev, ...d, device_name: name });
+      });
+      localStorage.setItem('grad_store_admin_devices', JSON.stringify(Array.from(map.values())));
+    } catch (e) {}
+  };
+
+  const updateDevicesSafely = (incoming: GatewayDevice[]) => {
+    const local = getPersistentDevices();
+    const map = new Map<string, GatewayDevice>();
+
+    local.forEach(d => map.set(d.id, d));
+    if (Array.isArray(incoming)) {
+      incoming.forEach(d => {
+        const prev = map.get(d.id);
+        const isPrevGeneric = !prev?.device_name || prev.device_name.startsWith('Android Gateway (') || prev.device_name.startsWith('Android Phone');
+        const name = (!isPrevGeneric && prev?.device_name) ? prev.device_name : d.device_name;
+        map.set(d.id, { ...prev, ...d, device_name: name });
+      });
+    }
+
+    const merged = Array.from(map.values());
+    if (merged.length > 0) {
+      setDevices(merged);
+      savePersistentDevices(merged);
+    }
+  };
+
   const fetchDevices = async () => {
     try {
       const res = await fetch('/api/admin/devices', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setDevices(data);
-        }
+        updateDevicesSafely(data);
       }
     } catch (err) {
       console.warn('Failed to fetch devices', err);
+      updateDevicesSafely([]);
     }
   };
 
@@ -925,10 +972,12 @@ export default function AdminDashboardPage() {
 
   const handleDeleteDevice = async (id: string) => {
     try {
-      const res = await fetch(`/api/admin/devices?id=${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setDevices(prev => prev.filter(d => d.id !== id));
+      if (typeof window !== 'undefined') {
+        const local = getPersistentDevices().filter(d => d.id !== id);
+        localStorage.setItem('grad_store_admin_devices', JSON.stringify(local));
       }
+      setDevices(prev => prev.filter(d => d.id !== id));
+      await fetch(`/api/admin/devices?id=${id}`, { method: 'DELETE' });
     } catch (e) {
       console.warn(e);
     }
@@ -941,7 +990,11 @@ export default function AdminDashboardPage() {
     if (!cleanName) return;
 
     try {
-      const res = await fetch('/api/admin/devices', {
+      const updatedList = devices.map(d => d.id === device.id ? { ...d, device_name: cleanName } : d);
+      setDevices(updatedList);
+      savePersistentDevices(updatedList);
+
+      await fetch('/api/admin/devices', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -950,10 +1003,7 @@ export default function AdminDashboardPage() {
           phone_number: device.phone_number
         })
       });
-      if (res.ok) {
-        setDevices(prev => prev.map(d => d.id === device.id ? { ...d, device_name: cleanName } : d));
-        alert('تم تعديل وحفظ اسم الموبايل بنجاح! 📱');
-      }
+      alert('تم تعديل وحفظ اسم الموبايل بنجاح! 📱');
     } catch (e) {
       alert('فشل تعديل اسم الموبايل');
     }
