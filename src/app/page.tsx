@@ -107,11 +107,11 @@ export default function StoreFrontPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowDuaaToast(true);
-    }, 1200);
+    }, 800);
 
     const autoDismiss = setTimeout(() => {
       setShowDuaaToast(false);
-    }, 10000);
+    }, 5800);
 
     return () => {
       clearTimeout(timer);
@@ -498,19 +498,19 @@ export default function StoreFrontPage() {
       
       {/* --- DUAA TOAST NOTIFICATION FOR FATHER --- */}
       {showDuaaToast && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-xl transition-all duration-500">
-          <div className="relative p-3.5 sm:p-4.5 rounded-2xl bg-slate-950/95 backdrop-blur-2xl border border-amber-500/40 shadow-2xl shadow-amber-500/15 flex items-center justify-between gap-3 text-right">
+        <div className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 w-[calc(100%-24px)] sm:w-auto max-w-md transition-all duration-500">
+          <div className="relative p-3.5 rounded-2xl bg-slate-950/95 backdrop-blur-2xl border border-amber-500/40 shadow-2xl shadow-amber-500/20 flex items-center justify-between gap-3 text-right">
             
-            <div className="flex items-center gap-3.5 min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex-shrink-0 shadow-inner">
-                <Heart className="w-5 h-5 fill-amber-400/30 stroke-[2.2]" />
+                <Heart className="w-4 h-4 sm:w-5 sm:h-5 fill-amber-400/30 stroke-[2.2]" />
               </div>
 
               <div className="space-y-0.5 min-w-0">
                 <p className="text-xs font-extrabold text-amber-300 flex items-center gap-1.5">
-                  <span>نسألكم الدعاء لوالدنا بالرحمة والمغفرة 🤲</span>
+                  <span>نسألكم الدعاء لوالدي بالرحمة والمغفرة 🤲</span>
                 </p>
-                <p className="text-[11px] sm:text-xs text-slate-200 font-semibold leading-relaxed">
+                <p className="text-[11px] text-slate-200 font-semibold leading-relaxed">
                   &quot;اللَّهُمَّ اغْفِرْ لَهُ وَارْحَمْهُ، وَعَافِهِ وَاعْفُ عَنْهُ، وَأَكْرِمْ نُزُلَهُ وَوَسِّعْ مُدْخَلَهُ&quot;
                 </p>
               </div>
@@ -521,7 +521,7 @@ export default function StoreFrontPage() {
               className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition border border-slate-800 flex-shrink-0"
               title="إغلاق"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
