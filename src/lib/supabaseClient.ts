@@ -949,7 +949,7 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
 
     const map = new Map<string, GatewayDevice>();
 
-    // 1. Add memory devices
+    // 1. Load memory devices first
     const memDevices = getMemoryDevices();
     memDevices.forEach(d => {
       if (d.id) map.set(d.id, d);
@@ -957,7 +957,7 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
 
     const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
-    // 2. Override/merge DB devices if present
+    // 2. Merge DB devices
     if (data && Array.isArray(data) && data.length > 0) {
       data.forEach((d: any) => {
         if (!d.id) return;
@@ -967,7 +967,7 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
         const existing = map.get(d.id);
         map.set(d.id, {
           id: d.id,
-          device_name: existing?.device_name || d.device_name || `Android Phone (${d.id.slice(0, 8)})`,
+          device_name: existing?.device_name || d.device_name || `Android Gateway (${d.id.slice(0, 8)})`,
           phone_number: d.phone_number || existing?.phone_number || undefined,
           battery_level: d.battery_level !== undefined ? Number(d.battery_level) : (existing?.battery_level || 100),
           status: devStatus,
@@ -989,18 +989,33 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
 }
 
 export async function upsertDevicePingInSupabase(device: Partial<GatewayDevice>): Promise<GatewayDevice> {
-  const devId = device.id || (device.phone_number ? `dev-${device.phone_number.replace(/[^0-9]/g, '')}` : ('dev-' + (device.device_name || 'android').toLowerCase().replace(/[^a-z0-9]/g, '-')));
+  const rawId = device.id || (device.phone_number ? `dev-${device.phone_number.replace(/[^0-9]/g, '')}` : ('dev-' + (device.device_name || 'android').toLowerCase().replace(/[^a-z0-9]/g, '-')));
+  const cleanPhone = device.phone_number ? device.phone_number.replace(/[^0-9]/g, '') : undefined;
   const now = new Date().toISOString();
   
   const existing = getMemoryDevices();
-  const found = existing.find(d => d.id === devId);
+  // Smart match: find existing device by ID or by matching phone number
+  const found = existing.find(d => {
+    if (d.id === rawId) return true;
+    if (cleanPhone && d.phone_number) {
+      const dPhone = d.phone_number.replace(/[^0-9]/g, '');
+      if (dPhone.length >= 7 && cleanPhone.length >= 7 && (dPhone.endsWith(cleanPhone.slice(-7)) || cleanPhone.endsWith(dPhone.slice(-7)))) {
+        return true;
+      }
+    }
+    return false;
+  });
 
-  // Preserve custom name set by admin if default generic name is passed
+  const targetId = found?.id || rawId;
   const isGenericName = !device.device_name || device.device_name.startsWith('Android Phone') || device.device_name.startsWith('Android Device');
-  const finalName = (!isGenericName && device.device_name) ? device.device_name : (found?.device_name || device.device_name || `Android Gateway (${devId.slice(0, 8)})`);
+  
+  // ALWAYS keep custom name set by admin
+  const finalName = found?.device_name
+    ? found.device_name
+    : (!isGenericName && device.device_name ? device.device_name : `Android Gateway (${targetId.slice(0, 8)})`);
 
   const updatedDevice: GatewayDevice = {
-    id: devId,
+    id: targetId,
     device_name: finalName,
     phone_number: device.phone_number || found?.phone_number || undefined,
     battery_level: device.battery_level !== undefined ? device.battery_level : (found?.battery_level || 100),
@@ -1011,7 +1026,7 @@ export async function upsertDevicePingInSupabase(device: Partial<GatewayDevice>)
     created_at: found?.created_at || now
   };
 
-  const filtered = existing.filter(d => d.id !== devId);
+  const filtered = existing.filter(d => d.id !== targetId);
   setMemoryDevices([updatedDevice, ...filtered]);
 
   try {
