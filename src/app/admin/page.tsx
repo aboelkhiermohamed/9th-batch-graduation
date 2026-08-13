@@ -986,7 +986,15 @@ export default function AdminDashboardPage() {
       if (!isConfirmed) return;
       const items = getOrderEffectiveItems(order);
       items.forEach(item => {
-        const title = item.product_title || 'منتج غير معرف';
+        let rawTitle = item.product_title || 'منتج غير معرف';
+        // Clean title from add-ons or embroidery details bracket tags for unified factory grouping
+        let title = rawTitle
+          .replace(/\s*\.?\s*\[الإضافات:.*?\]/gi, '')
+          .replace(/\s*\.?\s*\[التطريز:.*?\]/gi, '')
+          .replace(/\s*\.?\s*\[Addons:.*?\]/gi, '')
+          .trim();
+        if (!title) title = rawTitle;
+
         if (!stats[title]) {
           stats[title] = {
             productTitle: title,

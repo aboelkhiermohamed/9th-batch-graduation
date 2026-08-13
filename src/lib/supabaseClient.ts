@@ -628,12 +628,10 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
         const customTextStr = item.custom_text || (item as any).customText || '';
 
         let titleWithDetails = item.product_title || item.product?.title_ar || item.product?.title || 'منتج التخرج';
-        if (customOptStr && !titleWithDetails.includes('[الإضافات:')) {
-          titleWithDetails += ` [الإضافات: ${customOptStr}]`;
-        }
-        if (customTextStr && !titleWithDetails.includes('[التطريز:')) {
-          titleWithDetails += ` [التطريز: ${customTextStr}]`;
-        }
+        titleWithDetails = titleWithDetails
+          .replace(/\s*\.?\s*\[الإضافات:.*?\]/gi, '')
+          .replace(/\s*\.?\s*\[التطريز:.*?\]/gi, '')
+          .trim();
 
         return {
           id: itemId,
