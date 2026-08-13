@@ -10,6 +10,7 @@ import {
   fetchOrdersFromSupabase,
   fetchTransactionsFromSupabase,
   updateOrderStatusInSupabase,
+  updateTransactionStatusInSupabase,
   supabase
 } from './supabaseClient';
 
@@ -111,6 +112,7 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
 
     setMemoryOrders(updatedOrders);
     await updateOrderStatusInSupabase(matchedOrder.id, 'auto_verified', tx.id);
+    await updateTransactionStatusInSupabase(tx.id, 'matched', matchedOrder.id);
 
     // Update transaction status
     tx.matched_order_id = matchedOrder.id;
@@ -228,6 +230,8 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
       const currentTxs = getMemoryTransactions();
       const updatedTxs = currentTxs.map(t => t.id === matchedTx!.id ? { ...t, status: 'matched' as const, matched_order_id: newOrder.id } : t);
       setMemoryTransactions(updatedTxs);
+
+      await updateTransactionStatusInSupabase(matchedTx.id, 'matched', newOrder.id);
 
       return { matched: true, matchedTx };
     }

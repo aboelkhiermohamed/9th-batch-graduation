@@ -2784,36 +2784,65 @@ export default function AdminDashboardPage() {
                       </td>
                     </tr>
                   ) : (
-                    transactions.map(tx => (
-                      <tr key={tx.id} className="hover:bg-slate-800/40">
-                        <td className="p-4 text-slate-400">
-                          {new Date(tx.received_at).toLocaleString('ar-EG')}
-                        </td>
-                        <td className="p-4 font-sans font-bold text-white">
-                          {tx.payment_method}
-                        </td>
-                        <td className="p-4 text-amber-400 font-bold text-sm">
-                          {tx.amount} EGP
-                        </td>
-                        <td className="p-4 text-slate-300">
-                          {tx.sender_phone || 'غير محدد'}
-                        </td>
-                        <td className="p-4 text-[11px] text-slate-400 max-w-xs truncate font-sans">
-                          {tx.raw_sms}
-                        </td>
-                        <td className="p-4 font-sans">
-                          {tx.status === 'matched' ? (
-                            <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px]">
-                              مطابق لطلب
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 font-semibold text-[11px]">
-                              غير مطابق
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
+                    transactions.map(tx => {
+                      const cleanTxRef = tx.transaction_ref ? tx.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                      const cleanTxPhone = tx.sender_phone ? tx.sender_phone.replace(/[^0-9]/g, '') : '';
+
+                      // Dynamic cross-check against registered orders
+                      const matchedOrder = orders.find(o => {
+                        if (o.matched_transaction_id === tx.id || (tx.matched_order_id && o.id === tx.matched_order_id)) return true;
+                        if (cleanTxRef && o.transaction_ref) {
+                          const oRef = o.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+                          if (oRef && (oRef === cleanTxRef || oRef.includes(cleanTxRef) || cleanTxRef.includes(oRef))) return true;
+                        }
+                        if (cleanTxPhone && cleanTxPhone.length >= 7) {
+                          const p1 = (o.customer_phone || '').replace(/[^0-9]/g, '');
+                          const p2 = (o.sender_phone || '').replace(/[^0-9]/g, '');
+                          const phoneMatch = p1.endsWith(cleanTxPhone.slice(-7)) || p2.endsWith(cleanTxPhone.slice(-7));
+                          const amountMatch = Math.abs(Number(o.total_amount) - Number(tx.amount)) < 1;
+                          if (phoneMatch && amountMatch) return true;
+                        }
+                        return false;
+                      });
+
+                      const isMatched = tx.status === 'matched' || Boolean(matchedOrder);
+
+                      return (
+                        <tr key={tx.id} className="hover:bg-slate-800/40">
+                          <td className="p-4 text-slate-400">
+                            {new Date(tx.received_at).toLocaleString('ar-EG')}
+                          </td>
+                          <td className="p-4 font-sans font-bold text-white">
+                            {tx.payment_method}
+                          </td>
+                          <td className="p-4 text-amber-400 font-bold text-sm">
+                            {tx.amount} EGP
+                          </td>
+                          <td className="p-4 text-slate-300">
+                            {tx.sender_phone || 'غير محدد'}
+                          </td>
+                          <td className="p-4 text-[11px] text-slate-400 max-w-xs truncate font-sans">
+                            {tx.raw_sms}
+                          </td>
+                          <td className="p-4 font-sans">
+                            {isMatched ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] border border-emerald-500/30">
+                                <span>✅ مطابق للطلب</span>
+                                {matchedOrder && (
+                                  <span className="font-mono text-amber-300 font-extrabold mr-1">
+                                    (#{matchedOrder.order_code})
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 font-semibold text-[11px]">
+                                غير مطابق (لم تُربط بطلب)
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

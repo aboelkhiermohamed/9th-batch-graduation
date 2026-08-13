@@ -781,6 +781,28 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
   }
 }
 
+export async function updateTransactionStatusInSupabase(txId: string, status: string = 'matched', matchedOrderId?: string): Promise<boolean> {
+  try {
+    const payload: any = {
+      status,
+      updated_at: new Date().toISOString()
+    };
+    if (matchedOrderId) {
+      payload.matched_order_id = matchedOrderId;
+    }
+
+    const { error } = await supabase
+      .from('store_transactions')
+      .update(payload)
+      .eq('id', txId);
+
+    return !error;
+  } catch (err) {
+    console.error('Error updating transaction status in Supabase:', err);
+    return false;
+  }
+}
+
 export async function updateOrderStatusInSupabase(orderId: string, status: string, matchedTxId?: string): Promise<boolean> {
   try {
     const payload: any = {
@@ -798,6 +820,10 @@ export async function updateOrderStatusInSupabase(orderId: string, status: strin
       .from('store_orders')
       .update(payload)
       .eq('id', orderId);
+
+    if (matchedTxId) {
+      await updateTransactionStatusInSupabase(matchedTxId, 'matched', orderId);
+    }
 
     return !error;
   } catch (err) {
