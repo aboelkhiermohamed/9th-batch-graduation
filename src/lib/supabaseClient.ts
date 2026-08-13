@@ -362,6 +362,10 @@ export function cleanDisplayNotes(str?: string | null): string {
   cleaned = cleaned.replace(/\["[^"]*?@instapay[^"]*?"\]/gi, '');
   cleaned = cleaned.replace(/\[[a-z0-9_\-\.]+\.(jpg|jpeg|png|webp|pdf)\]/gi, '');
   cleaned = cleaned.replace(/[\{\}\[\]"']/g, '');
+  cleaned = cleaned.replace(/(,\s*)+$/g, '');
+  cleaned = cleaned.replace(/(،\s*)+$/g, '');
+  cleaned = cleaned.replace(/,+/g, ' ');
+  cleaned = cleaned.replace(/،+/g, ' ');
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
   return cleaned;
