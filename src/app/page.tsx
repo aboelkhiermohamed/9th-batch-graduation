@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { Product, CartItem, Order, PaymentMethod, StoreSettings, ProductAddon } from '@/types';
 import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS, cleanDisplayNotes, supabase } from '@/lib/supabaseClient';
+import OrdersHistory from '@/components/OrdersHistory';
 
 const fireConfetti = (options?: any) => {
   if (typeof window === 'undefined') return;
@@ -1510,77 +1511,13 @@ export default function StoreFrontPage() {
             </div>
 
             {/* Orders List */}
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-              {isCustomerOrdersLoading ? (
-                <div className="py-12 text-center text-slate-400 space-y-2">
-                  <span className="w-6 h-6 rounded-full border-2 border-amber-400 border-t-transparent animate-spin inline-block"></span>
-                  <p className="text-xs font-semibold">جاري جلب سجل طلباتك...</p>
-                </div>
-              ) : customerOrdersList.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 space-y-3">
-                  <Package className="w-12 h-12 stroke-1 mx-auto text-slate-600" />
-                  <p className="text-sm font-bold text-slate-300">لا توجد طلبات مسجلة برقم الموبايل هذا ({customerSession.phone_number})</p>
-                  <button
-                    onClick={() => {
-                      setIsCustomerOrdersOpen(false);
-                      router.push('/');
-                    }}
-                    className="px-5 py-2.5 rounded-xl gradient-purple-btn text-white text-xs font-bold shadow-lg"
-                  >
-                    تصفح متجر المنتجات واحجز الآن
-                  </button>
-                </div>
-              ) : (
-                customerOrdersList.map((order) => {
-                  const isVerified = order.status === 'auto_verified' || order.status === 'manual_verified';
-                  const isReady = order.status === 'ready_for_pickup';
-                  const isDelivered = order.status === 'delivered';
-
-                  return (
-                    <div key={order.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 text-right">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                        <div>
-                          <span className="text-xs text-slate-400">كود الطلب:</span>
-                          <span className="text-base font-extrabold text-amber-400 mr-2 font-mono">#{order.order_code}</span>
-                        </div>
-
-                        {/* Status Badge */}
-                        {isVerified && (
-                          <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/40">
-                            ✅ تم تأكيد الدفع بنجاح
-                          </span>
-                        )}
-                        {isReady && (
-                          <span className="px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-xs border border-indigo-500/40">
-                            📦 جاهز للاستلام بالمقر
-                          </span>
-                        )}
-                        {isDelivered && (
-                          <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 font-bold text-xs border border-purple-500/40">
-                            🎉 تم التسليم بنجاح
-                          </span>
-                        )}
-                        {!isVerified && !isReady && !isDelivered && (
-                          <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/40">
-                            ⏳ قيد المراجعة والتأكيد
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <p className="text-slate-400">تاريخ الطلب: <strong className="text-white">{new Date(order.created_at).toLocaleDateString('ar-EG')}</strong></p>
-                          <p className="text-slate-400">الرقم المرجعي: <strong className="text-amber-300 font-mono">{order.transaction_ref || 'غير مدخل'}</strong></p>
-                        </div>
-                        <div className="text-left">
-                          <p className="text-slate-400">المبلغ الإجمالي: <strong className="text-indigo-400 font-bold text-sm">{order.total_amount} ج.م</strong></p>
-                          <p className="text-slate-400">طريقة الدفع: <strong className="text-white">{order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}</strong></p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+            <div className="max-h-[65vh] overflow-y-auto pr-1">
+              <OrdersHistory
+                orders={customerOrdersList}
+                isLoading={isCustomerOrdersLoading}
+                onRefresh={() => customerSession && fetchCustomerOrders(customerSession.phone_number)}
+                storePickupNote={settings.pickup_note}
+              />
             </div>
           </div>
         </div>

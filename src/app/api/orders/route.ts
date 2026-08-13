@@ -37,11 +37,14 @@ export async function POST(req: NextRequest) {
       const qty = Number(item.quantity || 1);
       itemsSum += price * qty;
 
+      const imgUrl = item.image_url || item.product?.image_url || (Array.isArray(item.product?.images) ? item.product.images[0] : undefined);
+
       return {
         id: generateUUID(),
         order_id: orderId,
         product_id: item.product_id || item.product?.id,
         product_title: item.product_title || item.product?.title_ar || item.product?.title,
+        image_url: imgUrl,
         selected_size: item.selectedSize || item.selected_size,
         custom_text: item.customText || item.custom_text || null,
         customization_option: item.customizationOption || item.customization_option || null,

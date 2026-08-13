@@ -639,11 +639,15 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
           .replace(/\s*\.?\s*\[التطريز:.*?\]/gi, '')
           .trim();
 
+        const itemImg = item.image_url || item.product?.image_url || (Array.isArray(item.product?.images) ? item.product.images[0] : undefined);
+        const imgMarker = itemImg ? ` [IMG:${itemImg}]` : '';
+
         return {
           id: itemId,
           order_id: order.id,
           product_id: pId,
-          product_title: titleWithDetails,
+          product_title: titleWithDetails + imgMarker,
+          image_url: itemImg || null,
           selected_size: item.selected_size || (item as any).selectedSize || null,
           custom_text: customTextStr || null,
           customization_option: customOptStr || null,
@@ -710,6 +714,15 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         let title = item.product_title || '';
         let custOpt = item.customization_option || undefined;
         let custText = item.custom_text || undefined;
+        let itemImg = item.image_url || item.product_image || undefined;
+
+        if (title.includes('[IMG:')) {
+          const match = title.match(/\[IMG:(.*?)\]/);
+          if (match && match[1]) {
+            if (!itemImg) itemImg = match[1];
+            title = title.replace(/\[IMG:.*?\]/, '').trim();
+          }
+        }
 
         if (!custOpt && title.includes('[الإضافات:')) {
           const match = title.match(/\[الإضافات:\s*(.*?)\]/);
@@ -731,6 +744,7 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
           order_id: item.order_id,
           product_id: item.product_id,
           product_title: title,
+          image_url: itemImg,
           selected_size: item.selected_size,
           custom_text: custText,
           customization_option: custOpt,
