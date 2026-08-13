@@ -951,18 +951,32 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
       return getMemoryDevices();
     }
 
-    const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const devices: GatewayDevice[] = data.map((d: any) => ({
-      id: d.id,
-      device_name: d.device_name || 'Android Device',
-      phone_number: d.phone_number || undefined,
-      battery_level: d.battery_level !== undefined ? Number(d.battery_level) : 100,
-      status: (d.last_ping >= tenMinsAgo) ? 'online' : 'offline',
-      last_ping: d.last_ping || new Date().toISOString(),
-      total_sms_processed: Number(d.total_sms_processed || 0),
-      app_version: d.app_version || 'v2.5.0-android',
-      created_at: d.created_at || new Date().toISOString()
-    }));
+    const fourMinsAgo = new Date(Date.now() - 4 * 60 * 1000).toISOString();
+    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+    const devices: GatewayDevice[] = data.map((d: any) => {
+      const ping = d.last_ping || new Date().toISOString();
+      let devStatus: 'online' | 'standby' | 'offline' = 'offline';
+      if (ping >= fourMinsAgo) {
+        devStatus = 'online';
+      } else if (ping >= thirtyMinsAgo) {
+        devStatus = 'standby';
+      } else {
+        devStatus = 'offline';
+      }
+
+      return {
+        id: d.id,
+        device_name: d.device_name || 'Android Device',
+        phone_number: d.phone_number || undefined,
+        battery_level: d.battery_level !== undefined ? Number(d.battery_level) : 100,
+        status: devStatus,
+        last_ping: ping,
+        total_sms_processed: Number(d.total_sms_processed || 0),
+        app_version: d.app_version || 'v2.5.0-android',
+        created_at: d.created_at || new Date().toISOString()
+      };
+    });
 
     setMemoryDevices(devices);
     return devices;

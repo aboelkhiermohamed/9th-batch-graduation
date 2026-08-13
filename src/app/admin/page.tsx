@@ -2058,13 +2058,15 @@ export default function AdminDashboardPage() {
                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold ${
                           dev.status === 'online'
                             ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse'
+                            : dev.status === 'standby'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                             : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                         }`}>
                           <Smartphone className="w-6 h-6" />
                         </div>
 
                         <div className="space-y-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="font-bold text-white text-sm">{dev.device_name}</h4>
                             <button
                               onClick={() => handleEditDeviceName(dev)}
@@ -2074,9 +2076,17 @@ export default function AdminDashboardPage() {
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
                             <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                              dev.status === 'online' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                              dev.status === 'online'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : dev.status === 'standby'
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                             }`}>
-                              {dev.status === 'online' ? '🟢 اونلاين Online' : '🔴 أوفلاين Offline'}
+                              {dev.status === 'online'
+                                ? '🟢 اونلاين Online'
+                                : dev.status === 'standby'
+                                ? '🟡 خمول (الشاشة مغلقة / Lock)'
+                                : '🔴 أوفلاين Offline'}
                             </span>
                           </div>
                           <p className="text-xs font-mono text-slate-400">رقم SIM: {dev.phone_number || 'غير محدد'}</p>
