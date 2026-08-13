@@ -84,6 +84,7 @@ export interface StoreSettings {
   instapay_ipa: string;
   instapay_ipas?: string[];
   pickup_note: string;
+  support_phone?: string;
   maintenance_mode?: boolean;
   updated_at: string;
 }

@@ -25,6 +25,7 @@ export async function PUT(req: NextRequest) {
       instapay_ipa, 
       instapay_ipas, 
       pickup_note, 
+      support_phone,
       store_name 
     } = body;
 
@@ -45,6 +46,7 @@ export async function PUT(req: NextRequest) {
         ? instapay_ipas
         : (instapay_ipa ? [instapay_ipa] : current.instapay_ipas || [current.instapay_ipa]),
       pickup_note: pickup_note !== undefined ? pickup_note : current.pickup_note,
+      support_phone: support_phone !== undefined ? support_phone : (current.support_phone || '01555583154'),
       updated_at: new Date().toISOString()
     };
 

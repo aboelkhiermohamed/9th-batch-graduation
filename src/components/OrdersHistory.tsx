@@ -35,6 +35,7 @@ interface OrdersHistoryProps {
   onRefresh: () => void;
   productsMap?: Record<string, any>;
   storePickupNote?: string;
+  supportPhone?: string;
 }
 
 export default function OrdersHistory({
@@ -42,34 +43,56 @@ export default function OrdersHistory({
   isLoading,
   onRefresh,
   productsMap = {},
-  storePickupNote
+  storePickupNote,
+  supportPhone = '01555583154'
 }: OrdersHistoryProps) {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'pending' | 'ready' | 'delivered'>('all');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+  const [fetchedMap, setFetchedMap] = useState<Record<string, any>>({});
 
-  // Helper to find product image with multiple fallbacks
-  const getProductImage = (item: OrderItem): string | null => {
+  // Auto-fetch products if productsMap prop is empty
+  React.useEffect(() => {
+    async function loadProducts() {
+      try {
+        const res = await fetch('/api/products');
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list)) {
+            const map: Record<string, any> = {};
+            list.forEach(p => { map[p.id] = p; });
+            setFetchedMap(map);
+          }
+        }
+      } catch (e) {}
+    }
+    loadProducts();
+  }, []);
+
+  const mergedMap = { ...fetchedMap, ...productsMap };
+
+  // Helper to find product image with smart multi-tier fallbacks
+  const getProductImage = (item: OrderItem): string => {
     if (item.image_url) return item.image_url;
     if (item.product?.image_url) return item.product.image_url;
     if (Array.isArray(item.product?.images) && item.product.images.length > 0) {
       return item.product.images[0];
     }
     
-    // Fallback 1: By Product ID in productsMap
-    const mapProd = productsMap[item.product_id];
+    // Fallback 1: By Product ID in mergedMap
+    const mapProd = mergedMap[item.product_id];
     if (mapProd) {
       if (mapProd.image_url) return mapProd.image_url;
       if (Array.isArray(mapProd.images) && mapProd.images.length > 0) return mapProd.images[0];
     }
 
-    // Fallback 2: By Product Title match in productsMap values
-    const cleanTitle = (item.product_title || '').trim().toLowerCase();
-    const titleMatch = Object.values(productsMap).find(p => {
-      const pTitle = (p.title_ar || p.title || '').trim().toLowerCase();
-      return pTitle === cleanTitle || cleanTitle.includes(pTitle) || pTitle.includes(cleanTitle);
+    // Fallback 2: Clean Title Search in mergedMap values
+    const rawTitle = (item.product_title || '').replace(/^[\s\.\-]+/, '').trim().toLowerCase();
+    const titleMatch = Object.values(mergedMap).find(p => {
+      const pTitle = (p.title_ar || p.title || '').replace(/^[\s\.\-]+/, '').trim().toLowerCase();
+      return pTitle === rawTitle || rawTitle.includes(pTitle) || pTitle.includes(rawTitle);
     });
 
     if (titleMatch) {
@@ -77,7 +100,16 @@ export default function OrdersHistory({
       if (Array.isArray(titleMatch.images) && titleMatch.images.length > 0) return titleMatch.images[0];
     }
 
-    return null;
+    // Fallback 3: Category / Keyword Curated High-Res Graduation Artwork
+    if (rawTitle.includes('نوت') || rawTitle.includes('دفتر') || rawTitle.includes('notebook')) {
+      return 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80';
+    }
+    if (rawTitle.includes('ماج') || rawTitle.includes('كوب') || rawTitle.includes('mug')) {
+      return 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&auto=format&fit=crop&q=80';
+    }
+
+    // Default Graduation Apparel / Jacket Image
+    return 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&auto=format&fit=crop&q=80';
   };
 
   // Copy order code helper
@@ -723,16 +755,24 @@ export default function OrdersHistory({
                       </div>
 
                       {/* Contact Support Button */}
-                      <a
-                        href={`https://wa.me/201555583154?text=${encodeURIComponent(`مرحباً، أريد الاستفسار عن كود الطلب #${order.order_code} الخاص بي (${order.customer_name})`)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center gap-2"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>تواصل مع الدعم عبر الواتساب</span>
-                        <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
-                      </a>
+                      {(() => {
+                        const targetPhone = (supportPhone || '01555583154').replace(/[^0-9]/g, '');
+                        const cleanPhone = targetPhone.startsWith('20') ? targetPhone : `20${targetPhone.replace(/^0+/, '')}`;
+                        const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(`مرحباً، أريد الاستفسار عن كود الطلب #${order.order_code} الخاص بي (${order.customer_name})`)}`;
+
+                        return (
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center gap-2"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>تواصل مع الدعم عبر الواتساب</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
+                          </a>
+                        );
+                      })()}
                     </div>
 
                   </div>

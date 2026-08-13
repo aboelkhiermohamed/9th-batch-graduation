@@ -54,6 +54,7 @@ export default function CustomerProfilePage() {
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [productsMap, setProductsMap] = useState<Record<string, any>>({});
+  const [storeSettings, setStoreSettings] = useState<any>(null);
 
   // Security / Password State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -96,6 +97,8 @@ export default function CustomerProfilePage() {
 
   // Load Customer Session from localStorage or Supabase Google Auth
   useEffect(() => {
+    fetch('/api/admin/settings').then(res => res.json()).then(data => setStoreSettings(data)).catch(() => {});
+
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab');
@@ -845,6 +848,8 @@ export default function CustomerProfilePage() {
                   isLoading={isLoadingOrders}
                   onRefresh={() => customerSession && fetchCustomerOrders(customerSession.phone_number || customerSession.email || '')}
                   productsMap={productsMap}
+                  storePickupNote={storeSettings?.pickup_note}
+                  supportPhone={storeSettings?.support_phone}
                 />
               </div>
             )}

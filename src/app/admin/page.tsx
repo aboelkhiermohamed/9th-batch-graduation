@@ -162,6 +162,7 @@ export default function AdminDashboardPage() {
   const [vodaFeePercentInput, setVodaFeePercentInput] = useState('1');
   const [instaInput, setInstaInput] = useState('');
   const [pickupInput, setPickupInput] = useState('');
+  const [supportPhoneInput, setSupportPhoneInput] = useState('01555583154');
 
   // Search & Filter & Dynamic Origin URL
   const [orderSearch, setOrderSearch] = useState('');
@@ -283,6 +284,7 @@ export default function AdminDashboardPage() {
           const iIPAs = Array.isArray(s.instapay_ipas) ? s.instapay_ipas.join(', ') : (s.instapay_ipa || '');
           setInstaInput(iIPAs);
           setPickupInput(s.pickup_note || '');
+          setSupportPhoneInput(s.support_phone || '01555583154');
         }
       }
       if (smsRes.ok) setTransactions(await smsRes.json());
@@ -853,6 +855,7 @@ export default function AdminDashboardPage() {
           instapay_ipa: instaArray[0] || '9thbatch@instapay',
           instapay_ipas: instaArray.length > 0 ? instaArray : ['9thbatch@instapay'],
           pickup_note: pickupInput.trim(),
+          support_phone: supportPhoneInput.trim(),
           maintenance_mode: Boolean(settings.maintenance_mode)
         })
       });
@@ -2357,6 +2360,23 @@ export default function AdminDashboardPage() {
                   onChange={(e) => setPickupInput(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  رقم الواتساب والدعم الفني 💬 (المستخدم لرابط التواصل بصفحة الطلبات)
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="01555583154"
+                  value={supportPhoneInput}
+                  onChange={(e) => setSupportPhoneInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-emerald-500"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  الرقم الذي سيتم توجيه العميل إليه عند النقر على زر "تواصل مع الدعم عبر الواتساب" في سجل الطلبات.
+                </p>
               </div>
 
               <button

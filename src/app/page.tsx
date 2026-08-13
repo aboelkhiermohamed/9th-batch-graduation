@@ -1517,6 +1517,7 @@ export default function StoreFrontPage() {
                 isLoading={isCustomerOrdersLoading}
                 onRefresh={() => customerSession && fetchCustomerOrders(customerSession.phone_number)}
                 storePickupNote={settings.pickup_note}
+                supportPhone={settings.support_phone}
               />
             </div>
           </div>

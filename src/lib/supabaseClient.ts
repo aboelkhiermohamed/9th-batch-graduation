@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   instapay_ipa: '9thbatch@instapay',
   instapay_ipas: ['9thbatch@instapay'],
   pickup_note: 'تابع جروب التليجرام',
+  support_phone: '01555583154',
   updated_at: new Date().toISOString()
 };
 
@@ -465,6 +466,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
     const cleanNote = cleanDisplayNotes(rawNote) || 'تابع جروب التليجرام';
 
     const vodaFeePct = meta?.vf !== undefined ? Number(meta.vf) : (data.vodafone_cash_fee_percent !== undefined ? Number(data.vodafone_cash_fee_percent) : (currentMem.vodafone_cash_fee_percent ?? 1));
+    const supportPhone = meta?.sp || meta?.support_phone || data.support_phone || currentMem.support_phone || '01555583154';
 
     const settings: StoreSettings = {
       id: data.id,
@@ -476,6 +478,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
       instapay_ipa: defaultIpa,
       instapay_ipas: instaAccounts,
       pickup_note: cleanNote,
+      support_phone: supportPhone,
       maintenance_mode: isMaintenance,
       updated_at: data.updated_at || new Date().toISOString()
     };
@@ -505,6 +508,7 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       m: settings.maintenance_mode ? 1 : 0,
       vn: settings.vodafone_cash_numbers,
       ia: settings.instapay_ipas || [settings.instapay_ipa],
+      sp: settings.support_phone || '01555583154',
       del: getDeletedProductIds()
     };
 
