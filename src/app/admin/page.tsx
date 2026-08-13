@@ -924,6 +924,31 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleEditDeviceName = async (device: GatewayDevice) => {
+    const newName = window.prompt('اكتب الاسم المخصص لهذا الموبايل (مثال: موبايل فودافون كاش - أحمد):', device.device_name);
+    if (newName === null) return;
+    const cleanName = newName.trim();
+    if (!cleanName) return;
+
+    try {
+      const res = await fetch('/api/admin/devices', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: device.id,
+          device_name: cleanName,
+          phone_number: device.phone_number
+        })
+      });
+      if (res.ok) {
+        setDevices(prev => prev.map(d => d.id === device.id ? { ...d, device_name: cleanName } : d));
+        alert('تم تعديل وحفظ اسم الموبايل بنجاح! 📱');
+      }
+    } catch (e) {
+      alert('فشل تعديل اسم الموبايل');
+    }
+  };
+
   const handleAddAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAdminUsername.trim() || !newAdminPassword.trim() || !newAdminName.trim()) {
@@ -2041,6 +2066,13 @@ export default function AdminDashboardPage() {
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <h4 className="font-bold text-white text-sm">{dev.device_name}</h4>
+                            <button
+                              onClick={() => handleEditDeviceName(dev)}
+                              className="p-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/20 text-xs transition"
+                              title="تعديل اسم الموبايل (مثال: موبايل فودافون كاش - أحمد)"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
                             <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
                               dev.status === 'online' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
                             }`}>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchDevicesFromSupabase, upsertDevicePingInSupabase, deleteDeviceInSupabase, clearDevicesInSupabase } from '@/lib/supabaseClient';
+import { fetchDevicesFromSupabase, upsertDevicePingInSupabase, deleteDeviceInSupabase, clearDevicesInSupabase, updateDeviceDetailsInSupabase } from '@/lib/supabaseClient';
 
 export async function GET() {
   try {
@@ -49,6 +49,26 @@ export async function POST(req: NextRequest) {
       device,
       timestamp: new Date().toISOString()
     });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, device_name, phone_number } = body;
+
+    if (!id || !device_name) {
+      return NextResponse.json({ error: 'Missing id or device_name' }, { status: 400 });
+    }
+
+    const device = await updateDeviceDetailsInSupabase(id, {
+      device_name: device_name.trim(),
+      phone_number: phone_number?.trim()
+    });
+
+    return NextResponse.json({ success: true, device });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

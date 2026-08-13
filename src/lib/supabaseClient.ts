@@ -951,16 +951,16 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
       return getMemoryDevices();
     }
 
-    const threeMinsAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+    const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const devices: GatewayDevice[] = data.map((d: any) => ({
       id: d.id,
       device_name: d.device_name || 'Android Device',
       phone_number: d.phone_number || undefined,
       battery_level: d.battery_level !== undefined ? Number(d.battery_level) : 100,
-      status: (d.last_ping >= threeMinsAgo) ? 'online' : 'offline',
+      status: (d.last_ping >= tenMinsAgo) ? 'online' : 'offline',
       last_ping: d.last_ping || new Date().toISOString(),
       total_sms_processed: Number(d.total_sms_processed || 0),
-      app_version: d.app_version || '1.0.0',
+      app_version: d.app_version || 'v2.5.0-android',
       created_at: d.created_at || new Date().toISOString()
     }));
 
@@ -979,15 +979,19 @@ export async function upsertDevicePingInSupabase(device: Partial<GatewayDevice>)
   const existing = getMemoryDevices();
   const found = existing.find(d => d.id === devId);
 
+  // Preserve custom name set by admin if default generic name is passed
+  const isGenericName = !device.device_name || device.device_name.startsWith('Android Phone') || device.device_name.startsWith('Android Device') || device.device_name.startsWith('Android Gateway');
+  const finalName = (!isGenericName && device.device_name) ? device.device_name : (found?.device_name || device.device_name || 'Android Gateway Phone');
+
   const updatedDevice: GatewayDevice = {
     id: devId,
-    device_name: device.device_name || found?.device_name || 'Android Gateway Phone',
+    device_name: finalName,
     phone_number: device.phone_number || found?.phone_number || '01015339426',
     battery_level: device.battery_level !== undefined ? device.battery_level : (found?.battery_level || 90),
     status: 'online',
     last_ping: now,
     total_sms_processed: (found?.total_sms_processed || 0) + (device.total_sms_processed || 0),
-    app_version: device.app_version || found?.app_version || 'v2.4.0-android',
+    app_version: device.app_version || found?.app_version || 'v2.5.0-android',
     created_at: found?.created_at || now
   };
 
@@ -1012,6 +1016,44 @@ export async function upsertDevicePingInSupabase(device: Partial<GatewayDevice>)
   }
 
   return updatedDevice;
+}
+
+export async function updateDeviceDetailsInSupabase(id: string, details: { device_name?: string; phone_number?: string }): Promise<GatewayDevice | null> {
+  try {
+    const existing = getMemoryDevices();
+    const found = existing.find(d => d.id === id);
+
+    const updatedName = details.device_name?.trim() || found?.device_name || 'Android Gateway Phone';
+    const updatedPhone = details.phone_number !== undefined ? details.phone_number.trim() : (found?.phone_number || '01015339426');
+
+    const updatedDevice: GatewayDevice = {
+      id,
+      device_name: updatedName,
+      phone_number: updatedPhone,
+      battery_level: found?.battery_level || 100,
+      status: found?.status || 'online',
+      last_ping: found?.last_ping || new Date().toISOString(),
+      total_sms_processed: found?.total_sms_processed || 0,
+      app_version: found?.app_version || 'v2.5.0-android',
+      created_at: found?.created_at || new Date().toISOString()
+    };
+
+    const filtered = existing.filter(d => d.id !== id);
+    setMemoryDevices([updatedDevice, ...filtered]);
+
+    await supabase
+      .from('store_devices')
+      .update({
+        device_name: updatedName,
+        phone_number: updatedPhone
+      })
+      .eq('id', id);
+
+    return updatedDevice;
+  } catch (err) {
+    console.error('Error updating device details in Supabase:', err);
+    return null;
+  }
 }
 
 export async function clearDevicesInSupabase(): Promise<boolean> {
