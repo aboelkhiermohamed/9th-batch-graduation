@@ -1034,10 +1034,14 @@ export default function AdminDashboardPage() {
         }
 
         if (optStr) {
-          const parts = optStr.split(/[,،\+]/).map((p: string) => p.trim()).filter(Boolean);
+          const parts = optStr.split(/[,،\n]/).map((p: string) => p.trim()).filter(Boolean);
           parts.forEach((addon: string) => {
-            let cleanAddon = addon.replace(/\s*\(\+?\s*\d+[\s\S]*?\)/gi, '').trim();
-            if (!cleanAddon) cleanAddon = addon;
+            let cleanAddon = addon
+              .replace(/\s*\(\s*\+?\s*\d+[\s\S]*?\)/gi, '')
+              .replace(/\s*\+\s*\d+\s*(ج\.م|EGP|\$)?/gi, '')
+              .replace(/[\(\)]/g, '')
+              .trim();
+            if (!cleanAddon) cleanAddon = addon.trim();
 
             if (!addonTally[cleanAddon]) {
               addonTally[cleanAddon] = 0;
