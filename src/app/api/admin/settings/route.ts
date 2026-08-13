@@ -32,8 +32,8 @@ export async function PUT(req: NextRequest) {
     const updated = {
       ...current,
       store_name: store_name || current.store_name,
-      vodafone_cash_enabled: vodafone_cash_enabled !== undefined ? Boolean(vodafone_cash_enabled) : (current.vodafone_cash_enabled ?? true),
-      instapay_enabled: instapay_enabled !== undefined ? Boolean(instapay_enabled) : (current.instapay_enabled ?? true),
+      vodafone_cash_enabled: vodafone_cash_enabled !== undefined ? Boolean(vodafone_cash_enabled) : Boolean(current.vodafone_cash_enabled),
+      instapay_enabled: instapay_enabled !== undefined ? Boolean(instapay_enabled) : Boolean(current.instapay_enabled),
       maintenance_mode: maintenance_mode !== undefined ? Boolean(maintenance_mode) : Boolean(current.maintenance_mode),
       vodafone_cash_numbers: Array.isArray(vodafone_cash_numbers) 
         ? vodafone_cash_numbers 

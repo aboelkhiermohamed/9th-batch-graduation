@@ -11,7 +11,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   id: 'default',
   store_name: '9th batch graduation',
   vodafone_cash_enabled: true,
-  instapay_enabled: true,
+  instapay_enabled: false,
   vodafone_cash_numbers: ['01015339426'],
   instapay_ipa: '9thbatch@instapay',
   instapay_ipas: ['9thbatch@instapay'],
@@ -442,11 +442,11 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
     const currentMem = getMemorySettings();
     
     // Parse meta fields or fallback to column data
-    const vodaEnabled = meta ? (meta.v !== undefined ? meta.v === 1 : meta.vodafone_cash_enabled !== false)
-      : (data.vodafone_cash_enabled !== undefined ? Boolean(data.vodafone_cash_enabled) : (currentMem.vodafone_cash_enabled ?? true));
+    const vodaEnabled = meta ? (meta.v !== undefined ? meta.v === 1 : meta.vodafone_cash_enabled === true)
+      : (data.vodafone_cash_enabled !== undefined ? Boolean(data.vodafone_cash_enabled) : Boolean(currentMem.vodafone_cash_enabled));
       
-    const instaEnabled = meta ? (meta.i !== undefined ? meta.i === 1 : meta.instapay_enabled !== false)
-      : (data.instapay_enabled !== undefined ? Boolean(data.instapay_enabled) : (currentMem.instapay_enabled ?? true));
+    const instaEnabled = meta ? (meta.i !== undefined ? meta.i === 1 : meta.instapay_enabled === true)
+      : (data.instapay_enabled !== undefined ? Boolean(data.instapay_enabled) : Boolean(currentMem.instapay_enabled));
 
     const defaultIpa = meta?.ia?.[0] || meta?.instapay_ipa || data.instapay_ipa || currentMem.instapay_ipa || '9thbatch@instapay';
     const vodaNums = meta?.vn || meta?.vodafone_cash_numbers || parseArrayOrCommaString(data.vodafone_cash_numbers, currentMem.vodafone_cash_numbers || ['01015339426']);
@@ -495,8 +495,8 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
   try {
     // Ultra-compact metadata object (fits under 120 chars to avoid VARCHAR(255) overflow)
     const compactMeta = {
-      v: settings.vodafone_cash_enabled !== false ? 1 : 0,
-      i: settings.instapay_enabled !== false ? 1 : 0,
+      v: settings.vodafone_cash_enabled ? 1 : 0,
+      i: settings.instapay_enabled ? 1 : 0,
       m: settings.maintenance_mode ? 1 : 0,
       vn: settings.vodafone_cash_numbers,
       ia: settings.instapay_ipas || [settings.instapay_ipa],
@@ -513,8 +513,8 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
     const payload: any = {
       id: 'default',
       store_name: settings.store_name,
-      vodafone_cash_enabled: settings.vodafone_cash_enabled !== false,
-      instapay_enabled: settings.instapay_enabled !== false,
+      vodafone_cash_enabled: Boolean(settings.vodafone_cash_enabled),
+      instapay_enabled: Boolean(settings.instapay_enabled),
       vodafone_cash_numbers: settings.vodafone_cash_numbers.join(', '),
       instapay_ipa: (settings.instapay_ipas && settings.instapay_ipas[0]) || settings.instapay_ipa || '9thbatch@instapay',
       instapay_ipas: (settings.instapay_ipas || [settings.instapay_ipa]).join(', '),

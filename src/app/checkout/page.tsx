@@ -87,9 +87,9 @@ export default function CheckoutPage() {
           const setts = await setRes.json();
           if (setts) {
             setSettings(setts);
-            if (setts.vodafone_cash_enabled === false && setts.instapay_enabled !== false) {
+            if (!Boolean(setts.vodafone_cash_enabled) && Boolean(setts.instapay_enabled)) {
               setPaymentMethod('instapay');
-            } else if (setts.vodafone_cash_enabled !== false) {
+            } else if (Boolean(setts.vodafone_cash_enabled)) {
               setPaymentMethod('vodafone_cash');
             }
           }
@@ -488,8 +488,8 @@ export default function CheckoutPage() {
 
                 {/* Payment Method Selector Tabs */}
                 {(() => {
-                  const isVodaEnabled = settings.vodafone_cash_enabled !== false;
-                  const isInstaEnabled = settings.instapay_enabled !== false;
+                  const isVodaEnabled = Boolean(settings.vodafone_cash_enabled);
+                  const isInstaEnabled = Boolean(settings.instapay_enabled);
                   const vodaNums = settings.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0
                     ? settings.vodafone_cash_numbers
                     : ['01015339426'];

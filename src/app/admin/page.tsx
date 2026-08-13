@@ -274,8 +274,8 @@ export default function AdminDashboardPage() {
         const s = await setRes.json();
         if (s) {
           setSettings(s);
-          setVodaEnabled(s.vodafone_cash_enabled !== false);
-          setInstaEnabled(s.instapay_enabled !== false);
+          setVodaEnabled(Boolean(s.vodafone_cash_enabled));
+          setInstaEnabled(Boolean(s.instapay_enabled));
           const vNums = Array.isArray(s.vodafone_cash_numbers) ? s.vodafone_cash_numbers.join(', ') : (s.vodafone_cash_numbers || '01015339426');
           setVodaInput(vNums);
           const iIPAs = Array.isArray(s.instapay_ipas) ? s.instapay_ipas.join(', ') : (s.instapay_ipa || '');
