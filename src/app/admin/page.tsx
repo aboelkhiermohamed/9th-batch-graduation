@@ -281,7 +281,16 @@ export default function AdminDashboardPage() {
       });
     }
 
-    const merged = Array.from(map.values());
+    const threeMinsAgo = Date.now() - 3 * 60 * 1000;
+    const merged = Array.from(map.values()).map(d => {
+      const pingTime = d.last_ping ? new Date(d.last_ping).getTime() : 0;
+      const isOnline = pingTime >= threeMinsAgo;
+      return {
+        ...d,
+        status: (isOnline ? 'online' : 'offline') as 'online' | 'offline'
+      };
+    });
+
     if (merged.length > 0) {
       setDevices(merged);
       savePersistentDevices(merged);

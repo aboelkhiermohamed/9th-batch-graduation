@@ -964,14 +964,14 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
       if (d.id) map.set(d.id, d);
     });
 
-    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const threeMinsAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
 
     // 2. Merge DB devices
     if (data && Array.isArray(data) && data.length > 0) {
       data.forEach((d: any) => {
         if (!d.id) return;
         const ping = d.last_ping || new Date().toISOString();
-        const devStatus: 'online' | 'offline' = (ping >= fifteenMinsAgo) ? 'online' : 'offline';
+        const devStatus: 'online' | 'offline' = (ping >= threeMinsAgo) ? 'online' : 'offline';
 
         const existing = map.get(d.id);
         const resolvedName = (existing?.device_name && !isGenericDeviceName(existing.device_name))
