@@ -19,6 +19,7 @@ export async function PUT(req: NextRequest) {
     const { 
       vodafone_cash_enabled, 
       instapay_enabled, 
+      vodafone_cash_fee_percent,
       maintenance_mode,
       vodafone_cash_numbers, 
       instapay_ipa, 
@@ -34,6 +35,7 @@ export async function PUT(req: NextRequest) {
       store_name: store_name || current.store_name,
       vodafone_cash_enabled: vodafone_cash_enabled !== undefined ? Boolean(vodafone_cash_enabled) : Boolean(current.vodafone_cash_enabled),
       instapay_enabled: instapay_enabled !== undefined ? Boolean(instapay_enabled) : Boolean(current.instapay_enabled),
+      vodafone_cash_fee_percent: vodafone_cash_fee_percent !== undefined ? Number(vodafone_cash_fee_percent) : (current.vodafone_cash_fee_percent ?? 1),
       maintenance_mode: maintenance_mode !== undefined ? Boolean(maintenance_mode) : Boolean(current.maintenance_mode),
       vodafone_cash_numbers: Array.isArray(vodafone_cash_numbers) 
         ? vodafone_cash_numbers 

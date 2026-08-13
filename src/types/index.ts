@@ -78,6 +78,7 @@ export interface StoreSettings {
   store_name: string;
   vodafone_cash_enabled?: boolean;
   instapay_enabled?: boolean;
+  vodafone_cash_fee_percent?: number;
   vodafone_cash_numbers: string[];
   instapay_ipa: string;
   instapay_ipas?: string[];

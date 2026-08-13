@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   store_name: '9th batch graduation',
   vodafone_cash_enabled: true,
   instapay_enabled: false,
+  vodafone_cash_fee_percent: 1,
   vodafone_cash_numbers: ['01015339426'],
   instapay_ipa: '9thbatch@instapay',
   instapay_ipas: ['9thbatch@instapay'],
@@ -463,11 +464,14 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
 
     const cleanNote = cleanDisplayNotes(rawNote) || 'تابع جروب التليجرام';
 
+    const vodaFeePct = meta?.vf !== undefined ? Number(meta.vf) : (data.vodafone_cash_fee_percent !== undefined ? Number(data.vodafone_cash_fee_percent) : (currentMem.vodafone_cash_fee_percent ?? 1));
+
     const settings: StoreSettings = {
       id: data.id,
       store_name: meta?.store_name || data.store_name || currentMem.store_name || '9th batch graduation',
       vodafone_cash_enabled: vodaEnabled,
       instapay_enabled: instaEnabled,
+      vodafone_cash_fee_percent: vodaFeePct,
       vodafone_cash_numbers: vodaNums,
       instapay_ipa: defaultIpa,
       instapay_ipas: instaAccounts,
@@ -497,6 +501,7 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
     const compactMeta = {
       v: settings.vodafone_cash_enabled ? 1 : 0,
       i: settings.instapay_enabled ? 1 : 0,
+      vf: Number(settings.vodafone_cash_fee_percent || 0),
       m: settings.maintenance_mode ? 1 : 0,
       vn: settings.vodafone_cash_numbers,
       ia: settings.instapay_ipas || [settings.instapay_ipa],
@@ -515,6 +520,7 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       store_name: settings.store_name,
       vodafone_cash_enabled: Boolean(settings.vodafone_cash_enabled),
       instapay_enabled: Boolean(settings.instapay_enabled),
+      vodafone_cash_fee_percent: Number(settings.vodafone_cash_fee_percent || 0),
       vodafone_cash_numbers: settings.vodafone_cash_numbers.join(', '),
       instapay_ipa: (settings.instapay_ipas && settings.instapay_ipas[0]) || settings.instapay_ipa || '9thbatch@instapay',
       instapay_ipas: (settings.instapay_ipas || [settings.instapay_ipa]).join(', '),

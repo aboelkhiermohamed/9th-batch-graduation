@@ -159,6 +159,7 @@ export default function AdminDashboardPage() {
   const [vodaEnabled, setVodaEnabled] = useState(true);
   const [instaEnabled, setInstaEnabled] = useState(true);
   const [vodaInput, setVodaInput] = useState('');
+  const [vodaFeePercentInput, setVodaFeePercentInput] = useState('1');
   const [instaInput, setInstaInput] = useState('');
   const [pickupInput, setPickupInput] = useState('');
 
@@ -278,6 +279,7 @@ export default function AdminDashboardPage() {
           setInstaEnabled(Boolean(s.instapay_enabled));
           const vNums = Array.isArray(s.vodafone_cash_numbers) ? s.vodafone_cash_numbers.join(', ') : (s.vodafone_cash_numbers || '01015339426');
           setVodaInput(vNums);
+          setVodaFeePercentInput(s.vodafone_cash_fee_percent !== undefined ? String(s.vodafone_cash_fee_percent) : '1');
           const iIPAs = Array.isArray(s.instapay_ipas) ? s.instapay_ipas.join(', ') : (s.instapay_ipa || '');
           setInstaInput(iIPAs);
           setPickupInput(s.pickup_note || '');
@@ -846,6 +848,7 @@ export default function AdminDashboardPage() {
         body: JSON.stringify({
           vodafone_cash_enabled: vodaEnabled,
           instapay_enabled: instaEnabled,
+          vodafone_cash_fee_percent: Number(vodaFeePercentInput) || 0,
           vodafone_cash_numbers: vodaArray.length > 0 ? vodaArray : ['01015339426'],
           instapay_ipa: instaArray[0] || '9thbatch@instapay',
           instapay_ipas: instaArray.length > 0 ? instaArray : ['9thbatch@instapay'],
@@ -2261,6 +2264,28 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setVodaInput(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-rose-500"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    نسبة رسوم تحويل فودافون كاش (%) (تتحمل على العميل وتظهر بملخص السلة وتُقرّب لأقرب رقم صحيح)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={vodaFeePercentInput}
+                      onChange={(e) => setVodaFeePercentInput(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-rose-500 pl-8"
+                      placeholder="مثال: 1 أو 2"
+                    />
+                    <span className="absolute left-3 top-3 text-xs font-bold text-slate-400">%</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    يتم حساب هذه النسبة من إجمالي المنتجات وتقريب النتيجة لأقرب رقم صحيح، وتضاف تلقائياً لإجمالي التحويل للعميل عند اختيار فودافون كاش.
+                  </p>
                 </div>
 
                 {/* Display Parsed Badges */}

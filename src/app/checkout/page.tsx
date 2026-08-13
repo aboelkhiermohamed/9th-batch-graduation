@@ -110,13 +110,25 @@ export default function CheckoutPage() {
     }
   }, [cart, isLoaded]);
 
-  // Cart total calculations
+  // Cart total & Vodafone Cash fee calculations
   const cartTotal = cart.reduce((acc, item) => {
     const addonsPrice = item.selectedAddons ? item.selectedAddons.reduce((sum, a) => sum + (a.price || 0), 0) : 0;
     return acc + (item.product.price + addonsPrice) * item.quantity;
   }, 0);
 
+  const vodaFeePercent = Number(settings.vodafone_cash_fee_percent || 0);
+  const rawVodaFee = paymentMethod === 'vodafone_cash' && vodaFeePercent > 0 
+    ? (cartTotal * vodaFeePercent) / 100 
+    : 0;
+  const vodaFee = Math.round(rawVodaFee);
+  const finalPayableTotal = paymentMethod === 'vodafone_cash' ? (cartTotal + vodaFee) : cartTotal;
+
   const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
+
+  // Remove item helper
+  const handleRemoveItem = (idx: number) => {
+    setCart(prev => prev.filter((_, i) => i !== idx));
+  };
 
   // Update quantity helper
   const handleUpdateQuantity = (idx: number, delta: number) => {
@@ -231,6 +243,7 @@ export default function CheckoutPage() {
           paymentMethod,
           receiptUrl: receiptUrl || undefined,
           items: orderItems,
+          totalAmount: finalPayableTotal,
           notes: `المقاسات والتسليم: ${settings.pickup_note}`
         })
       });
@@ -482,7 +495,7 @@ export default function CheckoutPage() {
                 <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 text-center">
                   <span className="text-xs font-bold text-amber-400 block mb-1">إجمالي المبلغ المطلوب تحويله</span>
                   <span className="text-3xl sm:text-4xl font-black text-white">
-                    {cartTotal} <span className="text-amber-400 text-lg sm:text-xl">ج.م</span>
+                    {finalPayableTotal} <span className="text-amber-400 text-lg sm:text-xl">ج.م</span>
                   </span>
                 </div>
 
@@ -712,7 +725,7 @@ export default function CheckoutPage() {
                       </>
                     ) : (
                       <>
-                        <span>تأكيد وإرسال الطلب الآن ({cartTotal} ج.م)</span>
+                        <span>تأكيد وإرسال الطلب الآن ({finalPayableTotal} ج.م)</span>
                         <Send className="w-5 h-5 rotate-180" />
                       </>
                     )}
@@ -787,22 +800,33 @@ export default function CheckoutPage() {
                             {itemUnitPrice} ج.م × {item.quantity} = {itemTotalPrice} ج.م
                           </span>
 
-                          <div className="flex items-center gap-1 bg-slate-950 rounded-lg p-0.5 border border-slate-800">
+                          <div className="flex items-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => handleUpdateQuantity(idx, -1)}
-                              className="p-1 hover:bg-slate-800 text-slate-300 rounded"
+                              onClick={() => handleRemoveItem(idx)}
+                              className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 transition-all"
+                              title="حذف المنتج من السلة"
                             >
-                              <Minus className="w-3 h-3" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                            <span className="text-xs font-bold text-white px-1.5">{item.quantity}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateQuantity(idx, 1)}
-                              className="p-1 hover:bg-slate-800 text-slate-300 rounded"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </button>
+
+                            <div className="flex items-center gap-1 bg-slate-950 rounded-lg p-0.5 border border-slate-800">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQuantity(idx, -1)}
+                                className="p-1 hover:bg-slate-800 text-slate-300 rounded"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="text-xs font-bold text-white px-1.5">{item.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQuantity(idx, 1)}
+                                className="p-1 hover:bg-slate-800 text-slate-300 rounded"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -816,13 +840,22 @@ export default function CheckoutPage() {
                     <span>مجموع المنتجات:</span>
                     <span>{cartTotal} ج.م</span>
                   </div>
+
+                  {paymentMethod === 'vodafone_cash' && vodaFee > 0 && (
+                    <div className="flex justify-between items-center text-xs font-bold text-amber-400 bg-amber-500/10 p-2 rounded-xl border border-amber-500/20">
+                      <span>رسوم تحويل فودافون كاش ({vodaFeePercent}%):</span>
+                      <span className="font-mono">+{vodaFee} ج.م</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between text-xs text-slate-400">
                     <span>مكان التسليم:</span>
                     <span className="text-amber-400 font-semibold">{cleanDisplayNotes(settings.pickup_note)}</span>
                   </div>
+
                   <div className="flex justify-between items-center text-sm sm:text-base font-black pt-2 border-t border-slate-800">
                     <span className="text-white">المبلغ الكلي المطلوب:</span>
-                    <span className="gradient-gold-text text-xl sm:text-2xl">{cartTotal} ج.م</span>
+                    <span className="gradient-gold-text text-xl sm:text-2xl">{finalPayableTotal} ج.م</span>
                   </div>
                 </div>
 

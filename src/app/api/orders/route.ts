@@ -19,7 +19,7 @@ function generateUUID() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { customerName, customerPhone, senderPhone, transactionRef, paymentMethod, items, notes, receiptUrl, receipt_url } = body;
+    const { customerName, customerPhone, senderPhone, transactionRef, paymentMethod, items, notes, receiptUrl, receipt_url, totalAmount: customTotal, total_amount } = body;
 
     if (!customerName?.trim() || !customerPhone?.trim() || !transactionRef?.trim() || !items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -31,11 +31,11 @@ export async function POST(req: NextRequest) {
     const orderId = generateUUID();
     const orderCode = 'GRAD-' + Math.floor(10000 + Math.random() * 90000);
 
-    let totalAmount = 0;
+    let itemsSum = 0;
     const orderItems: OrderItem[] = items.map((item: any, idx: number) => {
       const price = Number(item.unit_price || item.product?.price || 0);
       const qty = Number(item.quantity || 1);
-      totalAmount += price * qty;
+      itemsSum += price * qty;
 
       return {
         id: generateUUID(),
@@ -50,6 +50,9 @@ export async function POST(req: NextRequest) {
         product: item.product
       };
     });
+
+    const overrideTotal = customTotal || total_amount;
+    const totalAmount = (overrideTotal && Number(overrideTotal) > 0) ? Number(overrideTotal) : itemsSum;
 
     const newOrder: Order = {
       id: orderId,

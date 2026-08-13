@@ -355,6 +355,10 @@ export default function StoreFrontPage() {
     });
   };
 
+  const handleRemoveItem = (idx: number) => {
+    setCart(prev => prev.filter((_, i) => i !== idx));
+  };
+
   const cartTotal = cart.reduce((acc, item) => {
     const addonsPrice = item.selectedAddons ? item.selectedAddons.reduce((sum, a) => sum + (a.price || 0), 0) : 0;
     return acc + (item.product.price + addonsPrice) * item.quantity;
@@ -1049,21 +1053,32 @@ export default function StoreFrontPage() {
                           {itemUnitPrice} ج.م × {item.quantity} = {itemTotalPrice} ج.م
                         </span>
 
-                        {/* Quantity Selector */}
-                        <div className="flex items-center gap-1 bg-slate-900 rounded-lg p-1 border border-slate-700">
+                        {/* Quantity Selector & Trash Button */}
+                        <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleUpdateQuantity(idx, -1)}
-                            className="p-1 hover:bg-slate-800 text-slate-300 rounded"
+                            type="button"
+                            onClick={() => handleRemoveItem(idx)}
+                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 transition-all flex items-center justify-center"
+                            title="حذف المنتج من السلة"
                           >
-                            <Minus className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                          <span className="text-xs font-bold text-white px-2">{item.quantity}</span>
-                          <button
-                            onClick={() => handleUpdateQuantity(idx, 1)}
-                            className="p-1 hover:bg-slate-800 text-slate-300 rounded"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
+
+                          <div className="flex items-center gap-1 bg-slate-900 rounded-lg p-1 border border-slate-700">
+                            <button
+                              onClick={() => handleUpdateQuantity(idx, -1)}
+                              className="p-1 hover:bg-slate-800 text-slate-300 rounded"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="text-xs font-bold text-white px-2">{item.quantity}</span>
+                            <button
+                              onClick={() => handleUpdateQuantity(idx, 1)}
+                              className="p-1 hover:bg-slate-800 text-slate-300 rounded"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
