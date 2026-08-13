@@ -1016,6 +1016,41 @@ export default function AdminDashboardPage() {
     return Object.values(stats);
   };
 
+  // Calculate aggregated counts for all Add-ons/Accessories from confirmed orders
+  const calculateAddonStats = () => {
+    const addonTally: Record<string, number> = {};
+
+    orders.forEach(order => {
+      const isConfirmed = order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered';
+      if (!isConfirmed) return;
+
+      const items = getOrderEffectiveItems(order);
+      items.forEach(item => {
+        let optStr = item.customization_option || (item as any).customizationOption || '';
+        const rawTitle = item.product_title || '';
+        if (!optStr && rawTitle.includes('[الإضافات:')) {
+          const match = rawTitle.match(/\[الإضافات:\s*(.*?)\]/);
+          if (match && match[1]) optStr = match[1];
+        }
+
+        if (optStr) {
+          const parts = optStr.split(/[,،\+]/).map((p: string) => p.trim()).filter(Boolean);
+          parts.forEach((addon: string) => {
+            let cleanAddon = addon.replace(/\s*\(\+?\s*\d+[\s\S]*?\)/gi, '').trim();
+            if (!cleanAddon) cleanAddon = addon;
+
+            if (!addonTally[cleanAddon]) {
+              addonTally[cleanAddon] = 0;
+            }
+            addonTally[cleanAddon] += (item.quantity || 1);
+          });
+        }
+      });
+    });
+
+    return Object.entries(addonTally).map(([name, count]) => ({ name, count }));
+  };
+
   const printStandalonePdfReport = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -1025,6 +1060,8 @@ export default function AdminDashboardPage() {
 
     const reportDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
     const reportTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    const productSizeStats = calculateProductSizeStats();
+    const addonStats = calculateAddonStats();
     const totalUnitsCount = productSizeStats.reduce((acc, p) => acc + p.totalUnits, 0);
 
     const htmlContent = `
@@ -1206,6 +1243,27 @@ export default function AdminDashboardPage() {
             `).join('')}
           </tbody>
         </table>
+
+        <!-- Section 1.5: Add-ons & Accessories Breakdown -->
+        ${addonStats.length > 0 ? `
+          <div class="section-header">1.5. بيان حصر الإضافات والملحقات المطلوبة (Add-ons & Accessories)</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 70%;">اسم الإضافة / الملحق المطلوبة</th>
+                <th class="text-center" style="width: 30%;">إجمالي الكمية المطلوبة للتجهيز</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${addonStats.map(ad => `
+                <tr>
+                  <td><strong>💎 ${ad.name}</strong></td>
+                  <td class="text-center font-mono text-amber"><strong>${ad.count} قطعة</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
 
         <!-- Section 2: Detailed Orders Breakdown -->
         <div class="section-header">2. كشوفات تسليم طلبات العملاء وتفاصيل التطريز</div>
@@ -3539,6 +3597,39 @@ export default function AdminDashboardPage() {
                   </table>
                 </div>
               </div>
+
+              {/* SECTION 1.5: Add-ons & Accessories Breakdown Table */}
+              {calculateAddonStats().length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <h3 className="text-base font-extrabold text-slate-900 border-r-4 border-indigo-500 pr-3">
+                    1.5. بيان حصر الإضافات والملحقات المطلوبة (Add-ons & Accessories)
+                  </h3>
+                  
+                  <div className="overflow-x-auto rounded-xl border border-slate-300">
+                    <table className="w-full text-right text-xs">
+                      <thead className="bg-indigo-50 text-indigo-950 font-extrabold border-b border-indigo-200">
+                        <tr>
+                          <th className="p-3">اسم الإضافة / الملحق المطلوبة</th>
+                          <th className="p-3 text-center">إجمالي الكمية المطلوبة للتجهيز</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 font-bold">
+                        {calculateAddonStats().map((ad, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50">
+                            <td className="p-3 font-extrabold text-slate-900 flex items-center gap-1.5">
+                              <span>💎</span>
+                              <span>{ad.name}</span>
+                            </td>
+                            <td className="p-3 text-center font-mono font-black text-indigo-900 bg-indigo-100/50">
+                              {ad.count} قطعة
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* SECTION 2: Detailed Customer Orders Table */}
               <div className="space-y-3 pt-4">
