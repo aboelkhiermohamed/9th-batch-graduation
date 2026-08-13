@@ -110,6 +110,32 @@ export default function CheckoutPage() {
     }
   }, [cart, isLoaded]);
 
+  // Real-time live polling for order verification status when createdOrder exists
+  useEffect(() => {
+    let interval: any;
+    if (createdOrder && createdOrder.id) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/orders?id=${createdOrder.id}`);
+          if (res.ok) {
+            const updated = await res.json();
+            if (updated && updated.status && updated.status !== createdOrder.status) {
+              setCreatedOrder(updated);
+              if (updated.status === 'auto_verified' || updated.status === 'manual_verified') {
+                fireConfetti();
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Polling status error', e);
+        }
+      }, 3000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [createdOrder]);
+
   // Cart total & Vodafone Cash fee calculations
   const cartTotal = cart.reduce((acc, item) => {
     const addonsPrice = item.selectedAddons ? item.selectedAddons.reduce((sum, a) => sum + (a.price || 0), 0) : 0;
@@ -321,15 +347,15 @@ export default function CheckoutPage() {
             </div>
             <div className="flex items-center justify-between text-xs pt-1">
               <span className="text-slate-400">حالة الطلب الآن:</span>
-              {createdOrder.status === 'auto_verified' ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/30">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>🤖 مؤكد تلقائياً</span>
+              {createdOrder.status === 'auto_verified' || createdOrder.status === 'manual_verified' ? (
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/40 shadow-lg shadow-emerald-500/20 animate-pulse">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>{createdOrder.status === 'auto_verified' ? '🤖 تم التأكيد تلقائياً' : '✅ تم التأكيد والتجهيز'}</span>
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>معلق وفي انتظار التأكيد</span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30">
+                  <Clock className="w-4 h-4 text-amber-400 animate-spin" />
+                  <span>معلق وفي انتظار التأكيد (جاري التحديث تلقائياً...)</span>
                 </span>
               )}
             </div>
@@ -381,10 +407,10 @@ export default function CheckoutPage() {
 
           <div className="pt-2 flex flex-col sm:flex-row gap-3">
             <button
-              onClick={() => router.push(`/?tracker=true&code=${encodeURIComponent(createdOrder.order_code)}`)}
-              className="flex-1 py-3.5 px-6 rounded-2xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30"
+              onClick={() => router.push('/profile?tab=orders')}
+              className="flex-1 py-3.5 px-6 rounded-2xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2"
             >
-              متابعة وتتبع حالة الطلب 🔍
+              <span>متابعة وتتبع حالة الطلب 🔍</span>
             </button>
             <button
               onClick={() => router.push('/')}

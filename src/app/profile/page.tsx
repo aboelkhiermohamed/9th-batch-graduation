@@ -52,6 +52,7 @@ export default function CustomerProfilePage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [productsMap, setProductsMap] = useState<Record<string, any>>({});
 
   // Security / Password State
   const [currentPassword, setCurrentPassword] = useState('');
@@ -92,8 +93,16 @@ export default function CustomerProfilePage() {
   const [completeEmail, setCompleteEmail] = useState('');
   const [isSavingCompleteProfile, setIsSavingCompleteProfile] = useState(false);
 
-  // Load customer session on mount (including Supabase Google OAuth redirect)
+  // Load Customer Session from localStorage or Supabase Google Auth
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab');
+      if (tabParam === 'orders' || tabParam === 'security' || tabParam === 'personal') {
+        setActiveTab(tabParam as any);
+      }
+    }
+
     async function initSession() {
       try {
         const saved = localStorage.getItem('graduation_customer_session');
@@ -226,9 +235,22 @@ export default function CustomerProfilePage() {
     if (!phone) return;
     setIsLoadingOrders(true);
     try {
-      const res = await fetch(`/api/orders?search=${encodeURIComponent(phone)}`);
-      if (res.ok) {
-        const data = await res.json();
+      const [resOrders, resProd] = await Promise.all([
+        fetch(`/api/orders?search=${encodeURIComponent(phone)}`),
+        fetch('/api/products')
+      ]);
+
+      if (resProd.ok) {
+        const prodList = await resProd.json();
+        const pMap: Record<string, any> = {};
+        if (Array.isArray(prodList)) {
+          prodList.forEach((p: any) => { pMap[p.id] = p; });
+        }
+        setProductsMap(pMap);
+      }
+
+      if (resOrders.ok) {
+        const data = await resOrders.json();
         setOrders(data);
       }
     } catch (err) {
@@ -915,27 +937,63 @@ export default function CustomerProfilePage() {
 
                               {/* Items List */}
                               <div>
-                                <h4 className="text-xs font-bold text-slate-300 mb-2">المنتجات المطلوبة:</h4>
-                                <div className="space-y-2">
+                                <h4 className="text-xs font-bold text-slate-300 mb-2">محتويات الطلب والمنتجات ({order.items?.length || 0}):</h4>
+                                <div className="space-y-2.5">
                                   {order.items && order.items.length > 0 ? (
-                                    order.items.map((item, idx) => (
-                                      <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs">
-                                        <div>
-                                          <span className="font-bold text-slate-200">{item.product_title}</span>
-                                          {item.selected_size && (
-                                            <span className="mr-2 px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
-                                              {item.selected_size}
-                                            </span>
-                                          )}
-                                          {item.custom_text && (
-                                            <p className="text-[11px] text-amber-400 mt-0.5">تطريز: {item.custom_text}</p>
-                                          )}
+                                    order.items.map((item, idx) => {
+                                      const prodObj = item.product || productsMap[item.product_id];
+                                      const prodImg = prodObj?.image_url || (Array.isArray(prodObj?.image_urls) ? prodObj.image_urls[0] : null);
+
+                                      return (
+                                        <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 rounded-2xl bg-slate-950 border border-slate-800 gap-3">
+                                          <div className="flex items-center gap-3">
+                                            {/* Product Image Thumbnail */}
+                                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl bg-slate-900 border border-slate-800 flex-shrink-0 overflow-hidden relative">
+                                              {prodImg ? (
+                                                <img src={prodImg} alt={item.product_title} className="w-full h-full object-cover" />
+                                              ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                                  <Package className="w-6 h-6" />
+                                                </div>
+                                              )}
+                                            </div>
+
+                                            <div className="space-y-1">
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-bold text-slate-100 text-sm">{item.product_title}</span>
+                                                <span className="px-2 py-0.5 rounded-md bg-slate-800 text-amber-300 font-mono text-[11px] font-bold">
+                                                  × {item.quantity}
+                                                </span>
+                                              </div>
+
+                                              {item.selected_size && (
+                                                <span className="inline-block px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[11px] font-bold">
+                                                  المقاس: {item.selected_size}
+                                                </span>
+                                              )}
+
+                                              {item.custom_text && (
+                                                <p className="text-xs text-amber-400 font-medium flex items-center gap-1">
+                                                  <span>✨ التطريز:</span>
+                                                  <span className="font-semibold">&quot;{item.custom_text}&quot;</span>
+                                                </p>
+                                              )}
+
+                                              {item.customization_option && (
+                                                <p className="text-xs text-emerald-400 font-medium flex items-center gap-1">
+                                                  <span>💎 الإضافات:</span>
+                                                  <span>{item.customization_option}</span>
+                                                </p>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          <div className="text-left font-mono font-extrabold text-amber-400 text-xs sm:text-sm self-end sm:self-center">
+                                            {item.unit_price} ج.م × {item.quantity} = {item.unit_price * item.quantity} ج.م
+                                          </div>
                                         </div>
-                                        <div className="text-left font-bold text-slate-300">
-                                          {item.quantity} × {item.unit_price} ج.م
-                                        </div>
-                                      </div>
-                                    ))
+                                      );
+                                    })
                                   ) : (
                                     <p className="text-xs text-slate-500">ملاحظة: تفاصيل المنتجات متاحة بالفاتورة الإجمالية</p>
                                   )}
