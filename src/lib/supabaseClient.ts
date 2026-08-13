@@ -100,7 +100,19 @@ export const DEFAULT_PRODUCTS: Product[] = [
   }
 ];
 
-export const DEFAULT_DEVICES: GatewayDevice[] = [];
+export const DEFAULT_DEVICES: GatewayDevice[] = [
+  {
+    id: 'dev-44f26a85aa395afd',
+    device_name: 'Android Gateway (44f26a85)',
+    phone_number: '01015339426',
+    battery_level: 100,
+    status: 'online',
+    last_ping: new Date().toISOString(),
+    total_sms_processed: 0,
+    app_version: 'v2.5.0-android',
+    created_at: new Date().toISOString()
+  }
+];
 
 // Memory/LocalStorage cache state for seamless offline & fallback execution
 let memoryProducts: Product[] = [...DEFAULT_PRODUCTS];
@@ -947,38 +959,37 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
       .select('*')
       .order('last_ping', { ascending: false });
 
-    const memDevices = getMemoryDevices();
     const map = new Map<string, GatewayDevice>();
+
+    // 1. Add DEFAULT & memory devices first
+    const memDevices = getMemoryDevices();
+    [...DEFAULT_DEVICES, ...memDevices].forEach(d => {
+      if (d.id) map.set(d.id, d);
+    });
 
     const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
-    // 1. Add DB devices
+    // 2. Override with DB devices if present
     if (data && Array.isArray(data) && data.length > 0) {
       data.forEach((d: any) => {
         if (!d.id) return;
         const ping = d.last_ping || new Date().toISOString();
         const devStatus: 'online' | 'offline' = (ping >= tenMinsAgo) ? 'online' : 'offline';
 
+        const existing = map.get(d.id);
         map.set(d.id, {
           id: d.id,
-          device_name: d.device_name || 'Android Gateway Phone',
-          phone_number: d.phone_number || undefined,
-          battery_level: d.battery_level !== undefined ? Number(d.battery_level) : 100,
+          device_name: d.device_name || existing?.device_name || 'Android Gateway Phone',
+          phone_number: d.phone_number || existing?.phone_number || '01015339426',
+          battery_level: d.battery_level !== undefined ? Number(d.battery_level) : (existing?.battery_level || 100),
           status: devStatus,
           last_ping: ping,
-          total_sms_processed: Number(d.total_sms_processed || 0),
-          app_version: d.app_version || 'v2.5.0-android',
-          created_at: d.created_at || new Date().toISOString()
+          total_sms_processed: Number(d.total_sms_processed || existing?.total_sms_processed || 0),
+          app_version: d.app_version || existing?.app_version || 'v2.5.0-android',
+          created_at: d.created_at || existing?.created_at || new Date().toISOString()
         });
       });
     }
-
-    // 2. Add memory-only devices if not present
-    memDevices.forEach(m => {
-      if (m.id && !map.has(m.id)) {
-        map.set(m.id, m);
-      }
-    });
 
     const result = Array.from(map.values()).sort((a, b) => new Date(b.last_ping).getTime() - new Date(a.last_ping).getTime());
     setMemoryDevices(result);

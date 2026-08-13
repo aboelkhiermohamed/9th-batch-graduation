@@ -59,25 +59,27 @@ export async function POST(req: NextRequest) {
     const messageText = body.message || body.rawMessage || body.text || body.body || body.sms || '';
     const receivedAt = body.receivedAt || body.timestamp || new Date().toISOString();
 
-    // 2b. Handle Device Heartbeat Ping / Telemetry (when no SMS message body is present)
+    const devId = body.deviceId || body.device_id || body.androidId || 'dev-44f26a85aa395afd';
+    const battery = body.battery !== undefined ? Number(body.battery) : (body.battery_level !== undefined ? Number(body.battery_level) : 100);
+    const phone = body.phone_number || body.phone || '01015339426';
+    const name = body.device_name || body.deviceName || 'Android Gateway (44f26a85)';
+
+    // Always update device telemetry & ping timestamp
+    try {
+      await upsertDevicePingInSupabase({
+        id: devId,
+        device_name: name,
+        phone_number: phone,
+        battery_level: battery,
+        total_sms_processed: messageText ? 1 : 0,
+        app_version: body.app_version || 'v2.5.0-android'
+      });
+    } catch (e) {
+      console.warn('Device ping recorded locally:', e);
+    }
+
+    // 2b. Handle Pure Device Heartbeat Ping (when no SMS message text is present)
     if (!messageText) {
-      const devId = body.deviceId || body.device_id || body.androidId || '44f26a85aa395afd';
-      const battery = body.battery !== undefined ? Number(body.battery) : (body.battery_level !== undefined ? Number(body.battery_level) : 100);
-      const phone = body.phone_number || body.phone || undefined;
-      const name = body.device_name || body.deviceName || `Android Phone (${devId.slice(0, 8)})`;
-
-      try {
-        await upsertDevicePingInSupabase({
-          id: devId,
-          device_name: name,
-          phone_number: phone,
-          battery_level: battery,
-          app_version: body.app_version || 'v2.5.0-android'
-        });
-      } catch (e) {
-        console.warn('Device ping recorded locally:', e);
-      }
-
       return NextResponse.json({
         status: 'online',
         success: true,
