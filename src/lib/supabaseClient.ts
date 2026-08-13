@@ -940,6 +940,15 @@ export async function fetchTransactionsFromSupabase(): Promise<IncomingTransacti
 
 // --- GATEWAY DEVICES PERSISTENCE HELPERS ---
 
+const isGenericDeviceName = (name?: string) => {
+  if (!name) return true;
+  const lower = name.toLowerCase().trim();
+  return lower.startsWith('android phone') ||
+         lower.startsWith('android device') ||
+         lower.startsWith('android gateway') ||
+         lower.startsWith('dev-');
+};
+
 export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
   try {
     const { data, error } = await supabase
@@ -965,9 +974,13 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
         const devStatus: 'online' | 'offline' = (ping >= fifteenMinsAgo) ? 'online' : 'offline';
 
         const existing = map.get(d.id);
+        const resolvedName = (existing?.device_name && !isGenericDeviceName(existing.device_name))
+          ? existing.device_name
+          : (d.device_name && !isGenericDeviceName(d.device_name) ? d.device_name : (existing?.device_name || d.device_name || `Android Gateway (${d.id.slice(0, 8)})`));
+
         map.set(d.id, {
           id: d.id,
-          device_name: existing?.device_name || d.device_name || `Android Gateway (${d.id.slice(0, 8)})`,
+          device_name: resolvedName,
           phone_number: d.phone_number || existing?.phone_number || undefined,
           battery_level: d.battery_level !== undefined ? Number(d.battery_level) : (existing?.battery_level || 100),
           status: devStatus,
@@ -1007,12 +1020,11 @@ export async function upsertDevicePingInSupabase(device: Partial<GatewayDevice>)
   });
 
   const targetId = found?.id || rawId;
-  const isGenericName = !device.device_name || device.device_name.startsWith('Android Phone') || device.device_name.startsWith('Android Device');
-  
-  // ALWAYS keep custom name set by admin
-  const finalName = found?.device_name
+
+  // STRICT RULE: If the device already has a custom name set by admin, NEVER overwrite it with generic names
+  const finalName = (found?.device_name && !isGenericDeviceName(found.device_name))
     ? found.device_name
-    : (!isGenericName && device.device_name ? device.device_name : `Android Gateway (${targetId.slice(0, 8)})`);
+    : (device.device_name && !isGenericDeviceName(device.device_name) ? device.device_name : (found?.device_name || `Android Gateway (${targetId.slice(0, 8)})`));
 
   const updatedDevice: GatewayDevice = {
     id: targetId,
@@ -1041,7 +1053,7 @@ export async function upsertDevicePingInSupabase(device: Partial<GatewayDevice>)
         last_ping: now,
         total_sms_processed: updatedDevice.total_sms_processed,
         app_version: updatedDevice.app_version
-      });
+      }, { onConflict: 'id' });
   } catch (e) {
     console.warn('Failed to upsert device in Supabase:', e);
   }
@@ -1054,8 +1066,8 @@ export async function updateDeviceDetailsInSupabase(id: string, details: { devic
     const existing = getMemoryDevices();
     const found = existing.find(d => d.id === id);
 
-    const updatedName = details.device_name?.trim() || found?.device_name || 'Android Gateway Phone';
-    const updatedPhone = details.phone_number !== undefined ? details.phone_number.trim() : (found?.phone_number || '01015339426');
+    const updatedName = details.device_name?.trim() || found?.device_name || `Android Gateway (${id.slice(0, 8)})`;
+    const updatedPhone = details.phone_number !== undefined ? details.phone_number.trim() : found?.phone_number;
 
     const updatedDevice: GatewayDevice = {
       id,
@@ -1074,11 +1086,16 @@ export async function updateDeviceDetailsInSupabase(id: string, details: { devic
 
     await supabase
       .from('store_devices')
-      .update({
+      .upsert({
+        id: updatedDevice.id,
         device_name: updatedName,
-        phone_number: updatedPhone
-      })
-      .eq('id', id);
+        phone_number: updatedPhone,
+        battery_level: updatedDevice.battery_level,
+        status: updatedDevice.status,
+        last_ping: updatedDevice.last_ping,
+        total_sms_processed: updatedDevice.total_sms_processed,
+        app_version: updatedDevice.app_version
+      }, { onConflict: 'id' });
 
     return updatedDevice;
   } catch (err) {
