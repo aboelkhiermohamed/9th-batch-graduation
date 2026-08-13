@@ -947,39 +947,50 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
       .select('*')
       .order('last_ping', { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      return getMemoryDevices();
-    }
+    const memDevices = getMemoryDevices();
+    const map = new Map<string, GatewayDevice>();
 
-    const fourMinsAgo = new Date(Date.now() - 4 * 60 * 1000).toISOString();
+    const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
-    const devices: GatewayDevice[] = data.map((d: any) => {
-      const ping = d.last_ping || new Date().toISOString();
-      let devStatus: 'online' | 'standby' | 'offline' = 'offline';
-      if (ping >= fourMinsAgo) {
-        devStatus = 'online';
-      } else if (ping >= thirtyMinsAgo) {
-        devStatus = 'standby';
-      } else {
-        devStatus = 'offline';
-      }
+    // 1. Add DB devices
+    if (data && Array.isArray(data) && data.length > 0) {
+      data.forEach((d: any) => {
+        if (!d.id) return;
+        const ping = d.last_ping || new Date().toISOString();
+        let devStatus: 'online' | 'standby' | 'offline' = 'offline';
+        if (ping >= tenMinsAgo) {
+          devStatus = 'online';
+        } else if (ping >= thirtyMinsAgo) {
+          devStatus = 'standby';
+        } else {
+          devStatus = 'offline';
+        }
 
-      return {
-        id: d.id,
-        device_name: d.device_name || 'Android Device',
-        phone_number: d.phone_number || undefined,
-        battery_level: d.battery_level !== undefined ? Number(d.battery_level) : 100,
-        status: devStatus,
-        last_ping: ping,
-        total_sms_processed: Number(d.total_sms_processed || 0),
-        app_version: d.app_version || 'v2.5.0-android',
-        created_at: d.created_at || new Date().toISOString()
-      };
+        map.set(d.id, {
+          id: d.id,
+          device_name: d.device_name || 'Android Gateway Phone',
+          phone_number: d.phone_number || undefined,
+          battery_level: d.battery_level !== undefined ? Number(d.battery_level) : 100,
+          status: devStatus,
+          last_ping: ping,
+          total_sms_processed: Number(d.total_sms_processed || 0),
+          app_version: d.app_version || 'v2.5.0-android',
+          created_at: d.created_at || new Date().toISOString()
+        });
+      });
+    }
+
+    // 2. Add memory-only devices if not present
+    memDevices.forEach(m => {
+      if (m.id && !map.has(m.id)) {
+        map.set(m.id, m);
+      }
     });
 
-    setMemoryDevices(devices);
-    return devices;
+    const result = Array.from(map.values()).sort((a, b) => new Date(b.last_ping).getTime() - new Date(a.last_ping).getTime());
+    setMemoryDevices(result);
+    return result;
   } catch (err) {
     console.warn('Error fetching devices from Supabase:', err);
     return getMemoryDevices();
