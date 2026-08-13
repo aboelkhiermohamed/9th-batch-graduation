@@ -119,6 +119,27 @@ export default function StoreFrontPage() {
     };
   }, []);
 
+  // Dismiss Duaa Toast immediately upon any user interaction (scroll, click, touch, keydown)
+  useEffect(() => {
+    if (!showDuaaToast) return;
+
+    const handleUserInteraction = () => {
+      setShowDuaaToast(false);
+    };
+
+    window.addEventListener('scroll', handleUserInteraction, { passive: true, once: true });
+    window.addEventListener('click', handleUserInteraction, { once: true });
+    window.addEventListener('touchstart', handleUserInteraction, { passive: true, once: true });
+    window.addEventListener('keydown', handleUserInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleUserInteraction);
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, [showDuaaToast]);
+
   // Load cart and customer session from localStorage on mount
   useEffect(() => {
     try {
