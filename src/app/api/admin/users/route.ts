@@ -57,11 +57,13 @@ export async function POST(req: Request) {
         .select('id, username, display_name, role, is_active, created_at')
         .single();
 
-      if (error) {
-        return NextResponse.json({ error: 'اسم المستخدم مأخوذ بالفعل أو حدث خطأ: ' + error.message }, { status: 400 });
+      if (!error && data) {
+        return NextResponse.json(data);
       }
 
-      return NextResponse.json(data);
+      if (error && !error.message.includes('Could not find the table') && error.code !== '42P01') {
+        return NextResponse.json({ error: 'اسم المستخدم مأخوذ بالفعل أو حدث خطأ: ' + error.message }, { status: 400 });
+      }
     }
 
     // Memory fallback
@@ -96,13 +98,12 @@ export async function DELETE(req: Request) {
         .delete()
         .eq('id', id);
 
-      if (error) {
+      if (error && !error.message.includes('Could not find the table') && error.code !== '42P01') {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
-    } else {
-      MEMORY_ADMINS = MEMORY_ADMINS.filter(a => a.id !== id);
     }
 
+    MEMORY_ADMINS = MEMORY_ADMINS.filter(a => a.id !== id);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'فشل حذف المشرف' }, { status: 500 });
