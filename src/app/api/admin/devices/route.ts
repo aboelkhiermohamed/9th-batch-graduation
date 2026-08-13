@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
         body = {};
       }
     }
-    const devId = body.deviceId || body.device_id || 'dev-android';
+    const devId = body.deviceId || body.device_id || body.androidId || ((body.phone_number || body.phone) ? 'dev-' + (body.phone_number || body.phone).replace(/[^0-9]/g, '') : 'dev-android-gateway');
     const battery = body.battery !== undefined ? Number(body.battery) : (body.battery_level !== undefined ? Number(body.battery_level) : 100);
     const phone = body.phone_number || body.phone || undefined;
     const name = body.device_name || body.deviceName || `Android Phone (${devId.slice(0, 8)})`;
