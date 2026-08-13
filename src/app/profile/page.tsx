@@ -96,49 +96,38 @@ export default function CustomerProfilePage() {
   useEffect(() => {
     async function initSession() {
       try {
-        // Parse Supabase OAuth Hash Token directly if present in URL
-        if (typeof window !== 'undefined' && window.location.hash && window.location.hash.includes('access_token=')) {
-          if (supabase) {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-              const gUser = session.user;
-              const googleSess = {
-                id: gUser.id,
-                full_name: gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google',
-                email: gUser.email || '',
-                phone_number: gUser.phone || gUser.user_metadata?.phone || '',
-                created_at: gUser.created_at || new Date().toISOString()
-              };
-              setCustomerSession(googleSess);
-              localStorage.setItem('graduation_customer_session', JSON.stringify(googleSess));
-              setFullNameInput(googleSess.full_name);
-              setEmailInput(googleSess.email);
-              setPhoneInput(googleSess.phone_number);
-              
-              // Clean hash from address bar nicely
-              window.history.replaceState(null, '', window.location.pathname);
-
-              if (!googleSess.phone_number || !googleSess.full_name) {
-                setCompleteFullName(googleSess.full_name);
-                setCompletePhone(googleSess.phone_number);
-                setCompleteEmail(googleSess.email);
-                setIsCompleteProfileOpen(true);
-              }
-              setIsSessionLoaded(true);
-              return;
-            }
-          }
+        const saved = localStorage.getItem('graduation_customer_session');
+        let savedSession: any = null;
+        if (saved) {
+          try {
+            savedSession = JSON.parse(saved);
+          } catch (e) {}
         }
 
-        // 1. Check local session
-        const saved = localStorage.getItem('graduation_customer_session');
-        if (saved) {
-          const sess = JSON.parse(saved);
-          setCustomerSession(sess);
-          setFullNameInput(sess.full_name || '');
-          setEmailInput(sess.email || '');
-          setPhoneInput(sess.phone_number || '');
-          fetchCustomerOrders(sess.phone_number || sess.email || '');
+        // 1. Check local session first
+        if (savedSession) {
+          setCustomerSession(savedSession);
+          setFullNameInput(savedSession.full_name || '');
+          setEmailInput(savedSession.email || '');
+          setPhoneInput(savedSession.phone_number || '');
+          if (savedSession.phone_number || savedSession.email) {
+            fetchCustomerOrders(savedSession.phone_number || savedSession.email);
+          }
+
+          // Clean hash token from address bar if present
+          if (typeof window !== 'undefined' && window.location.hash && window.location.hash.includes('access_token=')) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+
+          // If session already has a phone number or user previously dismissed/completed, don't show modal again!
+          const isDismissed = localStorage.getItem('graduation_profile_dismissed');
+          if (!savedSession.phone_number && !isDismissed) {
+            setCompleteFullName(savedSession.full_name || '');
+            setCompletePhone('');
+            setCompleteEmail(savedSession.email || '');
+            setIsCompleteProfileOpen(true);
+          }
+
           setIsSessionLoaded(true);
           return;
         }
@@ -155,19 +144,26 @@ export default function CustomerProfilePage() {
               phone_number: gUser.phone || gUser.user_metadata?.phone || '',
               created_at: gUser.created_at || new Date().toISOString()
             };
+
             setCustomerSession(googleSess);
             localStorage.setItem('graduation_customer_session', JSON.stringify(googleSess));
             setFullNameInput(googleSess.full_name);
             setEmailInput(googleSess.email);
             setPhoneInput(googleSess.phone_number);
+
             if (googleSess.phone_number || googleSess.email) {
               fetchCustomerOrders(googleSess.phone_number || googleSess.email);
             }
 
-            // Prompt user to complete missing fields (e.g. phone or name)
-            if (!googleSess.phone_number || !googleSess.full_name) {
+            // Clean hash from address bar
+            if (typeof window !== 'undefined' && window.location.hash && window.location.hash.includes('access_token=')) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+
+            const isDismissed = localStorage.getItem('graduation_profile_dismissed');
+            if (!googleSess.phone_number && !isDismissed) {
               setCompleteFullName(googleSess.full_name);
-              setCompletePhone(googleSess.phone_number);
+              setCompletePhone('');
               setCompleteEmail(googleSess.email);
               setIsCompleteProfileOpen(true);
             }
@@ -185,6 +181,18 @@ export default function CustomerProfilePage() {
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
           const gUser = session.user;
+          const saved = localStorage.getItem('graduation_customer_session');
+          let savedSess: any = null;
+          if (saved) {
+            try { savedSess = JSON.parse(saved); } catch (e) {}
+          }
+
+          // If local session already exists with phone_number, keep it!
+          if (savedSess && savedSess.phone_number) {
+            setCustomerSession(savedSess);
+            return;
+          }
+
           const googleSess = {
             id: gUser.id,
             full_name: gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google',
@@ -192,15 +200,17 @@ export default function CustomerProfilePage() {
             phone_number: gUser.phone || gUser.user_metadata?.phone || '',
             created_at: gUser.created_at || new Date().toISOString()
           };
+
           setCustomerSession(googleSess);
           localStorage.setItem('graduation_customer_session', JSON.stringify(googleSess));
           setFullNameInput(googleSess.full_name);
           setEmailInput(googleSess.email);
           setPhoneInput(googleSess.phone_number);
 
-          if (!googleSess.phone_number || !googleSess.full_name) {
+          const isDismissed = localStorage.getItem('graduation_profile_dismissed');
+          if (!googleSess.phone_number && !isDismissed) {
             setCompleteFullName(googleSess.full_name);
-            setCompletePhone(googleSess.phone_number);
+            setCompletePhone('');
             setCompleteEmail(googleSess.email);
             setIsCompleteProfileOpen(true);
           }
@@ -520,6 +530,7 @@ export default function CustomerProfilePage() {
 
       setCustomerSession(updatedSess);
       localStorage.setItem('graduation_customer_session', JSON.stringify(updatedSess));
+      localStorage.setItem('graduation_profile_dismissed', 'true');
       setFullNameInput(updatedSess.full_name);
       setPhoneInput(updatedSess.phone_number);
       setEmailInput(updatedSess.email || '');
@@ -536,6 +547,10 @@ export default function CustomerProfilePage() {
   const handleLogout = () => {
     if (confirm('هل أنت تأكد من تسجيل الخروج من حسابك؟')) {
       localStorage.removeItem('graduation_customer_session');
+      localStorage.removeItem('graduation_profile_dismissed');
+      if (supabase) {
+        supabase.auth.signOut();
+      }
       setCustomerSession(null);
       router.push('/');
     }
@@ -1221,7 +1236,10 @@ export default function CustomerProfilePage() {
             <div className="text-center pt-2">
               <button
                 type="button"
-                onClick={() => setIsCompleteProfileOpen(false)}
+                onClick={() => {
+                  localStorage.setItem('graduation_profile_dismissed', 'true');
+                  setIsCompleteProfileOpen(false);
+                }}
                 className="text-xs text-slate-500 hover:text-slate-300 underline"
               >
                 تخطي الآن والمتابعة للبروفايل
