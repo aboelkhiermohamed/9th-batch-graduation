@@ -109,7 +109,7 @@ export interface GatewayDevice {
   device_name: string;
   phone_number?: string;
   battery_level?: number;
-  status: 'online' | 'offline' | 'standby';
+  status: 'online' | 'offline';
   last_ping: string;
   total_sms_processed: number;
   app_version?: string;

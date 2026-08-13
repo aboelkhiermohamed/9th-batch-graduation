@@ -951,21 +951,13 @@ export async function fetchDevicesFromSupabase(): Promise<GatewayDevice[]> {
     const map = new Map<string, GatewayDevice>();
 
     const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
     // 1. Add DB devices
     if (data && Array.isArray(data) && data.length > 0) {
       data.forEach((d: any) => {
         if (!d.id) return;
         const ping = d.last_ping || new Date().toISOString();
-        let devStatus: 'online' | 'standby' | 'offline' = 'offline';
-        if (ping >= tenMinsAgo) {
-          devStatus = 'online';
-        } else if (ping >= thirtyMinsAgo) {
-          devStatus = 'standby';
-        } else {
-          devStatus = 'offline';
-        }
+        const devStatus: 'online' | 'offline' = (ping >= tenMinsAgo) ? 'online' : 'offline';
 
         map.set(d.id, {
           id: d.id,
