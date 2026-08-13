@@ -51,18 +51,6 @@ export async function POST(req: Request) {
       });
     }
 
-    if (cleanUsername === 'admin' && cleanPassword === 'admin123') {
-      return NextResponse.json({
-        success: true,
-        admin: {
-          id: 'default-admin',
-          username: 'admin',
-          display_name: 'المدير العام (Super Admin)',
-          role: 'superadmin'
-        }
-      });
-    }
-
     return NextResponse.json({ error: 'اسم المستخدم أو كلمة المرور غير صحيحة' }, { status: 401 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'خطأ أثناء تسجيل دخول المشرف' }, { status: 500 });

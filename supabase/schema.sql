@@ -176,9 +176,7 @@ CREATE TABLE IF NOT EXISTS public.store_customers (
 
 -- INSERT INITIAL DEFAULT SUPER ADMIN
 INSERT INTO public.store_admins (username, password_hash, display_name, role)
-VALUES 
-  ('mohamedahmed077m@gmail.com', '19312@Mo', 'محمد أحمد (Super Admin)', 'superadmin'),
-  ('admin', 'admin123', 'المدير العام (Super Admin)', 'superadmin')
+VALUES ('mohamedahmed077m@gmail.com', '19312@Mo', 'محمد ابو الخير (Super Admin)', 'superadmin')
 ON CONFLICT (username) DO NOTHING;
 
 -- RLS POLICIES

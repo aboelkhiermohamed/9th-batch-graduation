@@ -64,7 +64,7 @@ function generateUUID() {
 export default function AdminDashboardPage() {
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState('admin');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [currentAdmin, setCurrentAdmin] = useState<{ id: string; username: string; display_name: string; role: string } | null>(null);
@@ -228,7 +228,7 @@ export default function AdminDashboardPage() {
         setAuthError(data.error || 'اسم المستخدم أو كلمة المرور غير صحيحة');
       }
     } catch (err: any) {
-      if (password === 'admin123' || password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+      if (password === '19312@Mo' || password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
         setIsAuthenticated(true);
         sessionStorage.setItem('admin_authenticated', 'true');
         fetchAllData();
@@ -1289,12 +1289,12 @@ export default function AdminDashboardPage() {
           <form onSubmit={handleLogin} className="space-y-4 text-right">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
-                اسم المستخدم (Username)
+                اسم المستخدم / البريد الإلكتروني
               </label>
               <input
                 type="text"
                 required
-                placeholder="أدخل اسم المستخدم (الافتراضي: admin)"
+                placeholder="أدخل اسم المستخدم أو الإيميل"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500"
@@ -1308,7 +1308,7 @@ export default function AdminDashboardPage() {
               <input
                 type="password"
                 required
-                placeholder="أدخل كلمة المرور (الافتراضية: admin123)"
+                placeholder="أدخل كلمة المرور"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500"

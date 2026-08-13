@@ -9,14 +9,6 @@ let MEMORY_ADMINS = [
     role: 'superadmin',
     is_active: true,
     created_at: new Date().toISOString()
-  },
-  {
-    id: 'default-admin',
-    username: 'admin',
-    display_name: 'المدير العام (Super Admin)',
-    role: 'superadmin',
-    is_active: true,
-    created_at: new Date().toISOString()
   }
 ];
 
