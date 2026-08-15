@@ -52,7 +52,7 @@ import {
   Ruler
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
-import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase } from '@/lib/supabaseClient';
+import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase } from '@/lib/supabaseClient';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -302,6 +302,19 @@ export default function AdminDashboardPage() {
       fetchAllData();
     }
   }, []);
+
+  // Periodic polling to keep orders list live updated (every 8 seconds)
+  useEffect(() => {
+    let interval: any;
+    if (isAuthenticated) {
+      interval = setInterval(() => {
+        fetchOrdersFromSupabase().then(res => {
+          if (res && res.length > 0) setOrders(res);
+        });
+      }, 8000);
+    }
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   // Helper to resolve matched transaction for an order
   const findMatchedTx = (o: Order) => {

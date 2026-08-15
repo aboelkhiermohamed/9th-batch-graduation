@@ -711,6 +711,10 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
       }
     }
 
+    // Always sync new order to memory cache
+    const currentMem = getMemoryOrders();
+    setMemoryOrders([order, ...currentMem.filter(o => o.id !== order.id)]);
+
     return true;
   } catch (err) {
     console.error('Failed to persist order to Supabase:', err);
