@@ -620,19 +620,20 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
 
     // Smart Column Fallback Loop for store_orders
     let attempts = 0;
-    while (orderError && attempts < 5) {
-      attempts++;
-      const match = orderError.message.match(/Could not find the '([^']+)' column/i) || orderError.message.match(/column "([^"]+)"/i);
-      if (match && match[1]) {
-        const missingCol = match[1];
+    const optionalCols = ['paid_amount', 'difference_amount', 'is_difference_pending', 'edit_history', 'matched_device_name', 'matched_device_id', 'confirmed_line'];
+    while (orderError && attempts < optionalCols.length) {
+      const match = orderError.message.match(/Could not find the '([^']+)' column/i) || orderError.message.match(/column "?([^"'\s]+)"?/i);
+      let missingCol = match ? match[1] : optionalCols[attempts];
+      if (missingCol && orderPayload[missingCol] !== undefined) {
         console.warn(`Stripping missing column '${missingCol}' from order payload...`);
         delete orderPayload[missingCol];
-        const res = await supabase.from('store_orders').insert(orderPayload).select().single();
-        insertedOrder = res.data;
-        orderError = res.error;
-      } else {
-        break;
+      } else if (optionalCols[attempts] && orderPayload[optionalCols[attempts]] !== undefined) {
+        delete orderPayload[optionalCols[attempts]];
       }
+      attempts++;
+      const res = await supabase.from('store_orders').insert(orderPayload).select().single();
+      insertedOrder = res.data;
+      orderError = res.error;
     }
 
     if (orderError) {
