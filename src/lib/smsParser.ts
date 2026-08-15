@@ -6,6 +6,7 @@ export interface ParsedSMS {
   amount: number;
   senderPhone?: string;
   senderName?: string;
+  recipientPhone?: string;
   transactionRef?: string;
   error?: string;
 }
@@ -78,6 +79,21 @@ export function parsePaymentSMS(sender: string, message: string): ParsedSMS {
     }
   }
 
+  // Extract Recipient Phone (e.g. على رقم محفظتك 01015339426)
+  let recipientPhone: string | undefined = undefined;
+  const recipientRegexes = [
+    /(?:على رقم محفظتك|على محفظتك|إلى رقم|إلى محفظة)\s*(01[0125]\d{8})/i,
+    /(?:to wallet|to number|to)\s*(01[0125]\d{8})/i
+  ];
+
+  for (const regex of recipientRegexes) {
+    const match = text.match(regex);
+    if (match && match[1]) {
+      recipientPhone = normalizePhoneNumber(match[1]);
+      break;
+    }
+  }
+
   // Extract Transaction Reference / Number
   let transactionRef: string | undefined = undefined;
   const refRegexes = [
@@ -107,6 +123,7 @@ export function parsePaymentSMS(sender: string, message: string): ParsedSMS {
     paymentMethod,
     amount,
     senderPhone,
+    recipientPhone,
     transactionRef
   };
 }

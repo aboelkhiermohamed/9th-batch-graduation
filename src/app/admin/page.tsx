@@ -198,6 +198,29 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
+  // Helper to resolve matched transaction for an order
+  const findMatchedTx = (o: Order) => {
+    return transactions.find(t => t.matched_order_id === o.id || (o.matched_transaction_id && t.id === o.matched_transaction_id));
+  };
+
+  // Dynamic helper to resolve confirmed line even for legacy/past matched orders
+  const getEffectiveConfirmedLine = (o: Order) => {
+    if (o.confirmed_line) return o.confirmed_line;
+    if (o.notes && o.notes.includes('[CONFIRMED_LINE:')) {
+      const match = o.notes.match(/\[CONFIRMED_LINE:\s*(.*?)\]/);
+      if (match && match[1]) return match[1];
+    }
+    const tx = findMatchedTx(o);
+    if (tx) {
+      if (tx.recipient_phone) return tx.recipient_phone;
+      if (tx.raw_sms) {
+        const match = tx.raw_sms.match(/(?:على رقم محفظتك|على محفظتك|محفظة|إلى رقم|إلى)\s*(01[0125]\d{8})/i);
+        if (match && match[1]) return match[1];
+      }
+    }
+    return undefined;
+  };
+
   // Filtered orders list
   const filteredOrders = orders.filter(o => {
     const matchSearch = 
@@ -206,9 +229,10 @@ export default function AdminDashboardPage() {
       o.customer_phone.includes(orderSearch);
 
     const matchStatus = statusFilter === 'all' || o.status === statusFilter;
+    const effectiveLine = getEffectiveConfirmedLine(o);
     const matchLine = lineFilter === 'all' ||
-      (lineFilter === 'manual' ? Boolean(!o.confirmed_line && o.verified_by) :
-      (o.confirmed_line && o.confirmed_line.includes(lineFilter)));
+      (lineFilter === 'manual' ? Boolean(!effectiveLine && o.verified_by) :
+      (effectiveLine && effectiveLine.includes(lineFilter)));
 
     return matchSearch && matchStatus && matchLine;
   });
@@ -1873,11 +1897,14 @@ export default function AdminDashboardPage() {
                           )}
 
                           {/* CONFIRMED LINE BADGE */}
-                          {order.confirmed_line && (
-                            <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-500/30 block w-fit truncate max-w-[170px]" title={order.confirmed_line}>
-                              📱 {order.confirmed_line}
-                            </span>
-                          )}
+                          {(() => {
+                            const lineToDisplay = getEffectiveConfirmedLine(order);
+                            return lineToDisplay ? (
+                              <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-500/30 block w-fit truncate max-w-[170px]" title={lineToDisplay}>
+                                📱 {settings.line_labels?.[lineToDisplay] || lineToDisplay}
+                              </span>
+                            ) : null;
+                          })()}
                         </td>
                         <td className="p-4 text-center">
                           <button
@@ -4117,24 +4144,27 @@ export default function AdminDashboardPage() {
               )}
 
               {/* CONFIRMED LINE BADGE IN MODAL */}
-              {selectedOrderModal.confirmed_line && (
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-transparent border border-emerald-500/40 text-emerald-300 text-xs font-bold flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Smartphone className="w-5 h-5 text-emerald-400" />
-                    <span>📱 الخط والمحفظة التي تم تأكيد استلام المبلغ عليها:</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="bg-slate-950 px-3.5 py-1.5 rounded-xl text-emerald-300 font-mono font-black text-sm border border-emerald-500/40 shadow-inner">
-                      {selectedOrderModal.confirmed_line}
-                    </span>
-                    {selectedOrderModal.matched_device_name && (
-                      <span className="text-[11px] text-slate-400 font-mono">
-                        (جهاز: {selectedOrderModal.matched_device_name})
+              {(() => {
+                const lineToDisplay = getEffectiveConfirmedLine(selectedOrderModal);
+                return lineToDisplay ? (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-transparent border border-emerald-500/40 text-emerald-300 text-xs font-bold flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="w-5 h-5 text-emerald-400" />
+                      <span>📱 الخط والمحفظة التي تم تأكيد استلام المبلغ عليها:</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="bg-slate-950 px-3.5 py-1.5 rounded-xl text-emerald-300 font-mono font-black text-sm border border-emerald-500/40 shadow-inner">
+                        {settings.line_labels?.[lineToDisplay] ? `${settings.line_labels[lineToDisplay]} (${lineToDisplay})` : lineToDisplay}
                       </span>
-                    )}
+                      {selectedOrderModal.matched_device_name && (
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          (جهاز: {selectedOrderModal.matched_device_name})
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                ) : null;
+              })()}
             </div>
 
             {/* CONFIRMATION SMS & VERIFICATION AUDIT BOX */}

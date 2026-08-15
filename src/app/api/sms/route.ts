@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       sender_phone: senderPhone,
       sender_name: senderName,
       transaction_ref: transactionRef,
-      recipient_phone: phone,
+      recipient_phone: phone || parsed.recipientPhone,
       device_id: devId,
       device_name: name,
       status: 'unmatched',
