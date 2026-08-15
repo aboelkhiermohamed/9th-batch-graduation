@@ -1845,7 +1845,17 @@ export default function AdminDashboardPage() {
                           {order.total_amount} ج.م
                         </td>
                         <td className="p-4 font-medium text-slate-300">
-                          {order.payment_method === 'vodafone_cash' ? '🔴 فودافون كاش' : '🟣 InstaPay'}
+                          {order.payment_method === 'vodafone_cash' ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 font-bold text-xs">
+                              <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-4 h-4 object-contain" />
+                              <span>فودافون كاش</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 font-bold text-xs">
+                              <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                              <span>InstaPay</span>
+                            </span>
+                          )}
                         </td>
                         <td className="p-4 space-y-1">
                           {order.status === 'auto_verified' && (
@@ -2684,7 +2694,10 @@ export default function AdminDashboardPage() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-center space-y-1">
-                          <p className="text-xs font-bold text-rose-300">🔴 فودافون كاش</p>
+                          <p className="text-xs font-bold text-rose-300 flex items-center justify-center gap-1.5">
+                            <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-4 h-4 object-contain" />
+                            <span>فودافون كاش</span>
+                          </p>
                           <p className="text-2xl font-black text-white">{vodaCount} <span className="text-xs text-slate-400">طلب</span></p>
                           <p className="text-xs font-mono font-bold text-rose-400">{vodaPct}% من الإجمالي</p>
                         </div>
@@ -4063,9 +4076,20 @@ export default function AdminDashboardPage() {
                   <span>تفاصيل وسيلة الدفع والمبلغ</span>
                 </h4>
                 <div className="space-y-1 text-xs">
-                  <p className="text-white font-bold">
-                    طريقة الدفع: {selectedOrderModal.payment_method === 'vodafone_cash' ? '🔴 فودافون كاش (Vodafone Cash)' : '🟣 InstaPay'}
-                  </p>
+                  <div className="text-white font-bold flex items-center gap-1.5">
+                    <span>طريقة الدفع:</span>
+                    {selectedOrderModal.payment_method === 'vodafone_cash' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 font-bold text-xs">
+                        <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-4 h-4 object-contain" />
+                        <span>فودافون كاش (Vodafone Cash)</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 font-bold text-xs">
+                        <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                        <span>InstaPay</span>
+                      </span>
+                    )}
+                  </div>
                   <p className="text-emerald-400 font-black text-sm">
                     إجمالي المبلغ: {selectedOrderModal.total_amount} ج.م
                   </p>

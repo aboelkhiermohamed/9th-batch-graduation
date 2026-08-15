@@ -574,7 +574,14 @@ export default function OrdersHistory({
                         <span className="text-slate-500 block mb-1 font-medium">وسيلة الدفع المحولة</span>
                         <span className="font-bold text-slate-200 flex items-center gap-1.5">
                           <CreditCard className="w-3.5 h-3.5 text-amber-400" />
-                          <span>{order.payment_method === 'vodafone_cash' ? 'فودافون كاش (Vodafone Cash)' : 'انستا باي (InstaPay)'}</span>
+                          {order.payment_method === 'vodafone_cash' ? (
+                            <span className="inline-flex items-center gap-1.5 text-red-300 font-semibold">
+                              <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-4 h-4 object-contain" />
+                              <span>فودافون كاش (Vodafone Cash)</span>
+                            </span>
+                          ) : (
+                            <span>انستا باي (InstaPay)</span>
+                          )}
                         </span>
                       </div>
 

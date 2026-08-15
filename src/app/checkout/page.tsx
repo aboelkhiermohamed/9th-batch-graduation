@@ -552,13 +552,13 @@ export default function CheckoutPage() {
                           <button
                             type="button"
                             onClick={() => setPaymentMethod('vodafone_cash')}
-                            className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all ${
+                            className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 border transition-all ${
                               paymentMethod === 'vodafone_cash'
-                                ? 'bg-rose-600/20 border-rose-500 text-rose-300 shadow-lg shadow-rose-600/10'
+                                ? 'bg-red-500/10 border-red-500/80 text-red-300 shadow-md shadow-red-500/10 ring-1 ring-red-500/30'
                                 : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
                             }`}
                           >
-                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0"></span>
+                            <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-5 h-5 object-contain flex-shrink-0" />
                             <span>فودافون كاش (Vodafone Cash)</span>
                           </button>
                         )}
@@ -567,13 +567,13 @@ export default function CheckoutPage() {
                           <button
                             type="button"
                             onClick={() => setPaymentMethod('instapay')}
-                            className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border transition-all ${
+                            className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 border transition-all ${
                               paymentMethod === 'instapay'
-                                ? 'bg-purple-600/20 border-purple-500 text-purple-300 shadow-lg shadow-purple-600/10'
+                                ? 'bg-purple-600/20 border-purple-500 text-purple-300 shadow-md shadow-purple-600/10 ring-1 ring-purple-500/30'
                                 : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'
                             }`}
                           >
-                            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 flex-shrink-0"></span>
+                            <span className="w-2.5 h-2.5 rounded-full bg-purple-400 flex-shrink-0"></span>
                             <span>إنستا باي (InstaPay)</span>
                           </button>
                         )}
@@ -583,8 +583,11 @@ export default function CheckoutPage() {
                       {paymentMethod === 'vodafone_cash' && isVodaEnabled && (
                         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
                           <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span>حول المبلغ المطلوب على أحد خطوط فودافون كاش التالية:</span>
-                            <span className="text-rose-400 font-semibold flex-shrink-0">خطوط الاستلام ({vodaNums.length})</span>
+                            <span className="flex items-center gap-1.5">
+                              <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-4 h-4 object-contain" />
+                              <span>حول المبلغ المطلوب على أحد خطوط فودافون كاش التالية:</span>
+                            </span>
+                            <span className="text-red-400 font-semibold flex-shrink-0">خطوط الاستلام ({vodaNums.length})</span>
                           </div>
 
                           <div className="space-y-2">
@@ -877,7 +880,10 @@ export default function CheckoutPage() {
 
                   {paymentMethod === 'vodafone_cash' && vodaFee > 0 && (
                     <div className="flex justify-between items-center text-xs font-bold text-amber-400 bg-amber-500/10 p-2 rounded-xl border border-amber-500/20">
-                      <span>رسوم تحويل فودافون كاش ({vodaFeePercent}%):</span>
+                      <span className="flex items-center gap-1.5">
+                        <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-4 h-4 object-contain" />
+                        <span>رسوم تحويل فودافون كاش ({vodaFeePercent}%):</span>
+                      </span>
                       <span className="font-mono">+{vodaFee} ج.م</span>
                     </div>
                   )}
