@@ -579,7 +579,15 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
     const receiptMarker = order.receipt_url ? ` [RECEIPT_URL:${order.receipt_url}]` : '';
     const lineMarker = order.confirmed_line ? ` [CONFIRMED_LINE:${order.confirmed_line}]` : '';
     const devMarker = order.matched_device_name ? ` [MATCHED_DEV:${order.matched_device_name}]` : '';
-    const orderNotes = (order.notes || '') + receiptMarker + lineMarker + devMarker;
+    const partialMeta = ` [PARTIAL_META:${JSON.stringify({
+      p: order.paid_amount || 0,
+      d: order.difference_amount || 0,
+      dp: Boolean(order.is_difference_pending),
+      h: order.edit_history || []
+    })}]`;
+
+    let cleanBaseNotes = (order.notes || '').replace(/\[PARTIAL_META:.*?\]/g, '').trim();
+    const orderNotes = (cleanBaseNotes + receiptMarker + lineMarker + devMarker + partialMeta).trim();
 
     const orderPayload: any = {
       order_code: order.order_code,
@@ -588,6 +596,9 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
       payment_method: order.payment_method,
       status: order.status,
       total_amount: order.total_amount,
+      paid_amount: order.paid_amount || 0,
+      difference_amount: order.difference_amount || 0,
+      is_difference_pending: Boolean(order.is_difference_pending),
       sender_phone: order.sender_phone || order.customer_phone,
       transaction_ref: order.transaction_ref || null,
       receipt_url: order.receipt_url || null,
@@ -758,9 +769,9 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         }
       }
 
-      let paidAmount = o.paid_amount !== undefined ? Number(o.paid_amount) : undefined;
-      let differenceAmount = o.difference_amount !== undefined ? Number(o.difference_amount) : undefined;
-      let isDiffPending = o.is_difference_pending !== undefined ? Boolean(o.is_difference_pending) : false;
+      let paidAmount: number | undefined = (o.paid_amount !== null && o.paid_amount !== undefined) ? Number(o.paid_amount) : undefined;
+      let differenceAmount: number | undefined = (o.difference_amount !== null && o.difference_amount !== undefined) ? Number(o.difference_amount) : undefined;
+      let isDiffPending: boolean = (o.is_difference_pending !== null && o.is_difference_pending !== undefined) ? Boolean(o.is_difference_pending) : false;
       let editHistory = o.edit_history || undefined;
 
       if (rawNotes.includes('[PARTIAL_META:')) {
@@ -768,8 +779,8 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         if (match && match[1]) {
           try {
             const parsed = JSON.parse(match[1]);
-            if (paidAmount === undefined) paidAmount = Number(parsed.p || 0);
-            if (differenceAmount === undefined) differenceAmount = Number(parsed.d || 0);
+            if (parsed.p !== undefined) paidAmount = Number(parsed.p);
+            if (parsed.d !== undefined) differenceAmount = Number(parsed.d);
             if (parsed.dp !== undefined) isDiffPending = Boolean(parsed.dp);
             if (parsed.h && Array.isArray(parsed.h)) editHistory = parsed.h;
             rawNotes = rawNotes.replace(/\[PARTIAL_META:.*?\]/, '').trim();
