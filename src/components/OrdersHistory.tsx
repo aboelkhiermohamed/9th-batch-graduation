@@ -537,25 +537,34 @@ export default function OrdersHistory({
                   <div className="p-5 sm:p-6 border-t border-slate-800/80 bg-slate-900/40 space-y-6">
                     
                     {/* PARTIAL INVOICE / PRICE DIFFERENCE PENDING BANNER */}
-                    {(order.is_difference_pending || order.status === 'pending_difference' || (order.difference_amount && order.difference_amount > 0)) && (
-                      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
-                        <div className="flex items-center gap-2.5">
-                          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0" />
-                          <div>
-                            <h4 className="text-xs font-bold text-amber-300">⚠️ تم تعديل الطلب بواسطة إدارة المتجر (يوجد فرق سعر مستحق)</h4>
-                            <p className="text-[11px] text-slate-300">
-                              المبلغ المدفوع سابقاً: <span className="font-mono text-emerald-400 font-bold">{order.paid_amount || 0} ج.م</span> | فرق السعر المطلوب سداده الآن: <span className="font-mono text-amber-400 font-black">{order.difference_amount || (order.total_amount - (order.paid_amount || 0))} ج.م</span>
-                            </p>
+                    {(order.is_difference_pending || order.status === 'pending_difference' || (order.difference_amount && order.difference_amount > 0)) && (() => {
+                      const diffToPay = (order.difference_amount !== undefined && order.difference_amount > 0)
+                        ? order.difference_amount
+                        : Math.max(0, order.total_amount - (order.paid_amount || 0));
+                      const displayPaid = (order.paid_amount !== undefined && order.paid_amount > 0)
+                        ? order.paid_amount
+                        : Math.max(0, order.total_amount - diffToPay);
+
+                      return (
+                        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                          <div className="flex items-center gap-2.5">
+                            <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                            <div>
+                              <h4 className="text-xs font-bold text-amber-300">⚠️ تم تعديل الطلب بواسطة إدارة المتجر (يوجد فرق سعر مستحق)</h4>
+                              <p className="text-[11px] text-slate-300">
+                                المبلغ المدفوع سابقاً: <span className="font-mono text-emerald-400 font-bold">{displayPaid} ج.م</span> | فرق السعر المطلوب سداده الآن: <span className="font-mono text-amber-400 font-black">{diffToPay} ج.م</span>
+                              </p>
+                            </div>
                           </div>
+                          <button
+                            onClick={() => router.push(`/pay-difference/${order.id}`)}
+                            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md flex items-center justify-center gap-1.5 flex-shrink-0"
+                          >
+                            <span>سداد فرق السعر الآن 💳</span>
+                          </button>
                         </div>
-                        <button
-                          onClick={() => router.push(`/pay-difference/${order.id}`)}
-                          className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md flex items-center justify-center gap-1.5 flex-shrink-0"
-                        >
-                          <span>سداد فرق السعر الآن 💳</span>
-                        </button>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* A. STATUS STEPPER PROGRESS TIMELINE */}
                     {order.status !== 'cancelled' && (

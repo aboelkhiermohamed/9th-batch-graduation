@@ -116,11 +116,23 @@ export default function AdminDashboardPage() {
   const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [editOrderItems, setEditOrderItems] = useState<any[]>([]);
+  const [editPaidAmount, setEditPaidAmount] = useState<string>('0');
   const [isSavingOrderEdits, setIsSavingOrderEdits] = useState(false);
 
   const handleOpenEditOrder = (order: Order) => {
     setEditingOrder(order);
     setEditOrderItems(JSON.parse(JSON.stringify(order.items || [])));
+
+    let initialPaid = 0;
+    if (order.paid_amount !== undefined && order.paid_amount > 0) {
+      initialPaid = order.paid_amount;
+    } else if (order.difference_amount && order.difference_amount > 0) {
+      initialPaid = Math.max(0, order.total_amount - order.difference_amount);
+    } else {
+      initialPaid = order.total_amount || 0;
+    }
+
+    setEditPaidAmount(String(initialPaid));
     setIsEditOrderModalOpen(true);
   };
 
@@ -166,11 +178,9 @@ export default function AdminDashboardPage() {
     setIsSavingOrderEdits(true);
 
     const newTotal = editOrderItems.reduce((sum, item) => sum + (Number(item.unit_price) * Number(item.quantity)), 0);
-    const prevPaid = editingOrder.paid_amount !== undefined 
-      ? editingOrder.paid_amount 
-      : (editingOrder.status === 'auto_verified' || editingOrder.status === 'manual_verified' ? editingOrder.total_amount : 0);
+    const prevPaid = Number(editPaidAmount) || 0;
 
-    const priceDiff = newTotal - prevPaid;
+    const priceDiff = Math.max(0, newTotal - prevPaid);
     const isDiffPending = priceDiff > 0;
 
     const newStatus = isDiffPending ? 'pending_difference' : editingOrder.status;
@@ -188,7 +198,7 @@ export default function AdminDashboardPage() {
       items: editOrderItems,
       total_amount: newTotal,
       paid_amount: prevPaid,
-      difference_amount: isDiffPending ? priceDiff : 0,
+      difference_amount: priceDiff,
       is_difference_pending: isDiffPending,
       status: newStatus,
       edit_history: editHistory,
@@ -4675,25 +4685,31 @@ export default function AdminDashboardPage() {
             {/* Summary & Price Difference Calculation Box */}
             {(() => {
               const newTotal = editOrderItems.reduce((sum, item) => sum + (Number(item.unit_price) * Number(item.quantity)), 0);
-              const prevPaid = editingOrder.paid_amount !== undefined 
-                ? editingOrder.paid_amount 
-                : (editingOrder.status === 'auto_verified' || editingOrder.status === 'manual_verified' ? editingOrder.total_amount : 0);
+              const prevPaid = Number(editPaidAmount) || 0;
               const priceDiff = newTotal - prevPaid;
 
               return (
-                <div className="p-4 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-2 text-xs">
-                  <div className="flex justify-between text-slate-400">
-                    <span>المبلغ المدفوع والمؤكد سابقاً:</span>
-                    <span className="font-mono font-bold text-emerald-400">{prevPaid} ج.م</span>
+                <div className="p-4 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-3 text-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <label className="text-slate-300 font-bold">
+                      المبلغ المدفوع والمؤكد سابقاً قبل التعديل (ج.م):
+                    </label>
+                    <input
+                      type="number"
+                      value={editPaidAmount}
+                      onChange={e => setEditPaidAmount(e.target.value)}
+                      placeholder="أدخل المبلغ المدفوع سابقاً"
+                      className="w-full sm:w-36 bg-slate-900 text-emerald-400 font-mono font-bold text-sm p-2 rounded-xl border border-slate-800 text-center"
+                    />
                   </div>
 
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-slate-400 pt-1 border-t border-slate-900">
                     <span>إجمالي الطلب الجديد بعد التعديلات:</span>
                     <span className="font-mono font-bold text-white text-sm">{newTotal} ج.م</span>
                   </div>
 
                   <div className="flex justify-between items-center pt-2 border-t border-slate-800 font-bold">
-                    <span className="text-amber-400">فرق السعر المستحق (الفاتورة الجزئية):</span>
+                    <span className="text-amber-400">فرق السعر المستحق لسداد الفاتورة الجزئية:</span>
                     <span className={`font-mono text-base ${priceDiff > 0 ? 'text-amber-400 font-black' : 'text-slate-400'}`}>
                       {priceDiff > 0 ? `+${priceDiff} ج.م (فاتورة تكملة 💳)` : '0 ج.م (لا يوجد فارق)'}
                     </span>
