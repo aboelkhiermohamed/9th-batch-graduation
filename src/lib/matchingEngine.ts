@@ -27,16 +27,26 @@ export interface MatchResult {
  */
 export async function matchTransactionWithOrders(tx: IncomingTransaction): Promise<MatchResult> {
   const orders = await fetchOrdersFromSupabase();
-  const pendingOrders = orders.filter(o => o.status === 'pending');
+  const pendingOrders = orders.filter(
+    o => o.status === 'pending' || o.status === 'pending_difference' || (o.is_difference_pending && (o.difference_amount || 0) > 0)
+  );
 
   if (pendingOrders.length === 0) {
-    return { matched: false, message: 'No pending orders found' };
+    return { matched: false, message: 'No pending orders or partial invoices found' };
   }
 
   const cleanTxPhone = tx.sender_phone ? normalizePhoneNumber(tx.sender_phone) : '';
   const txRefClean = tx.transaction_ref ? tx.transaction_ref.trim().toLowerCase() : '';
 
   let matchedOrder: Order | undefined = undefined;
+
+  // Helper to get expected amount for matching (difference_amount if pending difference, else total_amount)
+  const getExpectedAmount = (o: Order) => {
+    if ((o.is_difference_pending || o.status === 'pending_difference') && o.difference_amount && o.difference_amount > 0) {
+      return o.difference_amount;
+    }
+    return o.total_amount;
+  };
 
   // 1. Highest Priority: Match by Transaction Reference Number (الرقم المرجعي)
   if (txRefClean) {
@@ -51,7 +61,8 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
   // 2. Second Priority: Amount + Phone Match
   if (!matchedOrder) {
     for (const order of pendingOrders) {
-      const amountDiff = Math.abs(Number(order.total_amount) - Number(tx.amount));
+      const targetAmount = getExpectedAmount(order);
+      const amountDiff = Math.abs(Number(targetAmount) - Number(tx.amount));
       const isAmountMatch = amountDiff < 0.01 || tx.amount === 0;
 
       const cleanCustomerPhone = normalizePhoneNumber(order.customer_phone);
@@ -88,7 +99,7 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
   // 4. Fallback: If amount matches only 1 single pending order
   if (!matchedOrder) {
     const amountMatches = pendingOrders.filter(
-      o => Math.abs(Number(o.total_amount) - Number(tx.amount)) < 0.01
+      o => Math.abs(Number(getExpectedAmount(o)) - Number(tx.amount)) < 0.01
     );
     if (amountMatches.length === 1) {
       matchedOrder = amountMatches[0];
@@ -97,6 +108,10 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
 
   if (matchedOrder) {
     const confirmedLine = tx.recipient_phone || tx.device_name || undefined;
+    const isPartialSettlement = Boolean(matchedOrder.is_difference_pending || matchedOrder.status === 'pending_difference');
+    const newPaidAmount = isPartialSettlement 
+      ? ((matchedOrder.paid_amount || 0) + tx.amount) 
+      : (matchedOrder.total_amount || tx.amount);
 
     // Update order status in memory & Supabase
     const updatedOrders = orders.map(o => {
@@ -104,6 +119,9 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
         return {
           ...o,
           status: 'auto_verified' as const,
+          paid_amount: newPaidAmount,
+          difference_amount: 0,
+          is_difference_pending: false,
           matched_transaction_id: tx.id,
           confirmed_line: confirmedLine || o.confirmed_line,
           matched_device_name: tx.device_name || o.matched_device_name,

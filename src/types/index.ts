@@ -4,6 +4,7 @@ export type PaymentMethod = 'vodafone_cash' | 'instapay';
 
 export type OrderStatus =
   | 'pending'
+  | 'pending_difference'
   | 'auto_verified'
   | 'manual_verified'
   | 'ready_for_pickup'
@@ -55,6 +56,13 @@ export interface OrderItem {
   product?: Product;
 }
 
+export interface OrderEditRecord {
+  date: string;
+  note: string;
+  admin: string;
+  price_diff: number;
+}
+
 export interface Order {
   id: string;
   order_code: string;
@@ -63,6 +71,10 @@ export interface Order {
   payment_method: PaymentMethod;
   status: OrderStatus;
   total_amount: number;
+  paid_amount?: number;
+  difference_amount?: number;
+  is_difference_pending?: boolean;
+  edit_history?: OrderEditRecord[];
   sender_phone?: string;
   transaction_ref?: string;
   receipt_url?: string;

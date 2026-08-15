@@ -758,6 +758,25 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         }
       }
 
+      let paidAmount = o.paid_amount !== undefined ? Number(o.paid_amount) : undefined;
+      let differenceAmount = o.difference_amount !== undefined ? Number(o.difference_amount) : undefined;
+      let isDiffPending = o.is_difference_pending !== undefined ? Boolean(o.is_difference_pending) : false;
+      let editHistory = o.edit_history || undefined;
+
+      if (rawNotes.includes('[PARTIAL_META:')) {
+        const match = rawNotes.match(/\[PARTIAL_META:(.*?)\]/);
+        if (match && match[1]) {
+          try {
+            const parsed = JSON.parse(match[1]);
+            if (paidAmount === undefined) paidAmount = Number(parsed.p || 0);
+            if (differenceAmount === undefined) differenceAmount = Number(parsed.d || 0);
+            if (parsed.dp !== undefined) isDiffPending = Boolean(parsed.dp);
+            if (parsed.h && Array.isArray(parsed.h)) editHistory = parsed.h;
+            rawNotes = rawNotes.replace(/\[PARTIAL_META:.*?\]/, '').trim();
+          } catch (e) {}
+        }
+      }
+
       const items = (o.store_order_items || []).map((item: any) => {
         let title = item.product_title || '';
         let custOpt = item.customization_option || undefined;
@@ -810,6 +829,10 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         payment_method: o.payment_method,
         status: o.status,
         total_amount: Number(o.total_amount || 0),
+        paid_amount: paidAmount,
+        difference_amount: differenceAmount,
+        is_difference_pending: isDiffPending,
+        edit_history: editHistory,
         transaction_ref: o.transaction_ref || '',
         receipt_url: extractedReceiptUrl,
         notes: rawNotes,
@@ -938,6 +961,83 @@ export async function updateOrderStatusInSupabase(
     return !error;
   } catch (err) {
     console.error('Error updating status in Supabase:', err);
+    return false;
+  }
+}
+
+export async function updateOrderInSupabase(updatedOrder: Order): Promise<boolean> {
+  // Update memory state first
+  const memory = getMemoryOrders();
+  const updatedMemory = memory.map(o => o.id === updatedOrder.id ? { ...o, ...updatedOrder } : o);
+  setMemoryOrders(updatedMemory);
+
+  try {
+    const metaTag = `[PARTIAL_META:${JSON.stringify({
+      p: updatedOrder.paid_amount || 0,
+      d: updatedOrder.difference_amount || 0,
+      dp: Boolean(updatedOrder.is_difference_pending),
+      h: updatedOrder.edit_history || []
+    })}]`;
+
+    let cleanNotes = (updatedOrder.notes || '').replace(/\[PARTIAL_META:.*?\]/g, '').trim();
+    const finalNotes = `${cleanNotes} ${metaTag}`.trim();
+
+    const payload: any = {
+      status: updatedOrder.status,
+      total_amount: updatedOrder.total_amount,
+      paid_amount: updatedOrder.paid_amount || 0,
+      difference_amount: updatedOrder.difference_amount || 0,
+      is_difference_pending: Boolean(updatedOrder.is_difference_pending),
+      notes: finalNotes,
+      updated_at: new Date().toISOString()
+    };
+
+    if (updatedOrder.confirmed_line) payload.confirmed_line = updatedOrder.confirmed_line;
+    if (updatedOrder.matched_device_name) payload.matched_device_name = updatedOrder.matched_device_name;
+    if (updatedOrder.matched_device_id) payload.matched_device_id = updatedOrder.matched_device_id;
+    if (updatedOrder.verified_at) payload.verified_at = updatedOrder.verified_at;
+    if (updatedOrder.verified_by) payload.verified_by = updatedOrder.verified_by;
+
+    let { error } = await supabase.from('store_orders').update(payload).eq('id', updatedOrder.id);
+
+    // Fallback Loop for missing column errors
+    let attempts = 0;
+    while (error && attempts < 5) {
+      attempts++;
+      const match = error.message.match(/Could not find the '([^']+)' column/i) || error.message.match(/column "([^"]+)"/i);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        delete payload[missingCol];
+        const res = await supabase.from('store_orders').update(payload).eq('id', updatedOrder.id);
+        error = res.error;
+      } else {
+        break;
+      }
+    }
+
+    // Re-insert items in store_order_items if present
+    if (updatedOrder.items && updatedOrder.items.length > 0) {
+      await supabase.from('store_order_items').delete().eq('order_id', updatedOrder.id);
+      
+      const itemsPayload = updatedOrder.items.map(item => ({
+        id: (item.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)) ? item.id : undefined,
+        order_id: updatedOrder.id,
+        product_id: item.product_id || item.product?.id,
+        product_title: item.product_title,
+        image_url: item.image_url || null,
+        selected_size: item.selected_size || null,
+        custom_text: item.custom_text || null,
+        customization_option: item.customization_option || null,
+        quantity: item.quantity,
+        unit_price: item.unit_price
+      }));
+
+      await supabase.from('store_order_items').insert(itemsPayload);
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Failed to update order in Supabase:', err);
     return false;
   }
 }

@@ -52,7 +52,7 @@ import {
   Ruler
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
-import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase } from '@/lib/supabaseClient';
+import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase } from '@/lib/supabaseClient';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -111,6 +111,101 @@ export default function AdminDashboardPage() {
 
   // Full Order Details & SMS Modal State
   const [selectedOrderModal, setSelectedOrderModal] = useState<Order | null>(null);
+
+  // Order Items Editing Modal State
+  const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [editOrderItems, setEditOrderItems] = useState<any[]>([]);
+  const [isSavingOrderEdits, setIsSavingOrderEdits] = useState(false);
+
+  const handleOpenEditOrder = (order: Order) => {
+    setEditingOrder(order);
+    setEditOrderItems(JSON.parse(JSON.stringify(order.items || [])));
+    setIsEditOrderModalOpen(true);
+  };
+
+  const handleUpdateEditItemSize = (idx: number, size: string) => {
+    const updated = [...editOrderItems];
+    updated[idx].selected_size = size;
+    setEditOrderItems(updated);
+  };
+
+  const handleUpdateEditItemCustomText = (idx: number, text: string) => {
+    const updated = [...editOrderItems];
+    updated[idx].custom_text = text;
+    setEditOrderItems(updated);
+  };
+
+  const handleUpdateEditItemQuantity = (idx: number, qty: number) => {
+    const updated = [...editOrderItems];
+    updated[idx].quantity = Math.max(1, qty);
+    setEditOrderItems(updated);
+  };
+
+  const handleRemoveEditItem = (idx: number) => {
+    const updated = editOrderItems.filter((_, i) => i !== idx);
+    setEditOrderItems(updated);
+  };
+
+  const handleAddProductToEditOrder = (prod: Product) => {
+    const newItem = {
+      id: generateUUID(),
+      order_id: editingOrder?.id,
+      product_id: prod.id,
+      product_title: prod.title_ar || prod.title,
+      image_url: prod.image_url,
+      selected_size: prod.sizes && prod.sizes.length > 0 ? prod.sizes[0] : 'Free Size',
+      quantity: 1,
+      unit_price: prod.price
+    };
+    setEditOrderItems([...editOrderItems, newItem]);
+  };
+
+  const handleSaveOrderEdits = async () => {
+    if (!editingOrder) return;
+    setIsSavingOrderEdits(true);
+
+    const newTotal = editOrderItems.reduce((sum, item) => sum + (Number(item.unit_price) * Number(item.quantity)), 0);
+    const prevPaid = editingOrder.paid_amount !== undefined 
+      ? editingOrder.paid_amount 
+      : (editingOrder.status === 'auto_verified' || editingOrder.status === 'manual_verified' ? editingOrder.total_amount : 0);
+
+    const priceDiff = newTotal - prevPaid;
+    const isDiffPending = priceDiff > 0;
+
+    const newStatus = isDiffPending ? 'pending_difference' : editingOrder.status;
+
+    const editHistory = editingOrder.edit_history || [];
+    editHistory.push({
+      date: new Date().toISOString(),
+      note: `تعديل عناصر الطلب بواسطة الأدمن (${currentAdmin?.display_name || 'الإدارة'})`,
+      admin: currentAdmin?.display_name || 'Admin',
+      price_diff: priceDiff
+    });
+
+    const updatedOrder: Order = {
+      ...editingOrder,
+      items: editOrderItems,
+      total_amount: newTotal,
+      paid_amount: prevPaid,
+      difference_amount: isDiffPending ? priceDiff : 0,
+      is_difference_pending: isDiffPending,
+      status: newStatus,
+      edit_history: editHistory,
+      updated_at: new Date().toISOString()
+    };
+
+    await updateOrderInSupabase(updatedOrder);
+
+    // Update local state
+    setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+    if (selectedOrderModal?.id === updatedOrder.id) {
+      setSelectedOrderModal(updatedOrder);
+    }
+
+    setIsSavingOrderEdits(false);
+    setIsEditOrderModalOpen(false);
+  };
 
   // New product form modal state
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -4103,12 +4198,68 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Order Items Breakdown with Embroidery Highlighting */}
+            {/* Order Items Breakdown & Edit Order Trigger */}
             <div className="space-y-3">
-              <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <Package className="w-4 h-4 text-indigo-400" />
-                <span>المنتجات والمقاسات والتطريز المطلوب ({selectedOrderModal.items?.length || 0} صنف)</span>
-              </h4>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Package className="w-4 h-4 text-indigo-400" />
+                  <span>المنتجات والمقاسات والتطريز المطلوب ({selectedOrderModal.items?.length || 0} صنف)</span>
+                </h4>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenEditOrder(selectedOrderModal)}
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>تعديل عناصر الطلب والمقاسات ✏️</span>
+                </button>
+              </div>
+
+              {/* PENDING DIFFERENCE STATUS BANNER IN ADMIN MODAL */}
+              {(selectedOrderModal.is_difference_pending || selectedOrderModal.status === 'pending_difference' || (selectedOrderModal.difference_amount && selectedOrderModal.difference_amount > 0)) && (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-amber-300 text-xs font-bold">
+                      <AlertCircle className="w-5 h-5 text-amber-400" />
+                      <span>⚠️ الطلب به فرق سعر مستحق قيد الانتظار:</span>
+                    </div>
+                    <span className="text-sm font-mono font-black text-amber-400 bg-slate-950 px-3 py-1 rounded-xl border border-amber-500/30">
+                      مطلوب: {selectedOrderModal.difference_amount} ج.م
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span>المبلغ المدفوع سابقاً: <strong className="font-mono text-emerald-400">{selectedOrderModal.paid_amount || 0} ج.م</strong></span>
+                    <span>إجمالي الطلب التراكمي: <strong className="font-mono text-white">{selectedOrderModal.total_amount} ج.م</strong></span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm('هل تأكدت من استلام فرق السعر المتبقي يدوياً؟')) return;
+                      const updatedOrder: Order = {
+                        ...selectedOrderModal,
+                        paid_amount: selectedOrderModal.total_amount,
+                        difference_amount: 0,
+                        is_difference_pending: false,
+                        status: 'manual_verified',
+                        verified_by: currentAdmin?.display_name || 'Admin',
+                        verified_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                      };
+                      await updateOrderInSupabase(updatedOrder);
+                      setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+                      setSelectedOrderModal(updatedOrder);
+                      alert('تم تأكيد سداد فرق السعر يدوياً بنجاح! 🎉');
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>تأكيد استلام فرق السعر يدوياً ({selectedOrderModal.difference_amount} ج.م)</span>
+                  </button>
+                </div>
+              )}
 
               <div className="space-y-2">
                 {(!selectedOrderModal.items || selectedOrderModal.items.length === 0) ? (
@@ -4385,6 +4536,189 @@ export default function AdminDashboardPage() {
                 className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
               >
                 إغلاق ✖
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* EDIT ORDER ITEMS & SIZES MODAL */}
+      {isEditOrderModalOpen && editingOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-2xl bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 space-y-6 shadow-2xl my-8">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">تعديل عناصر الطلب والمقاسات</h3>
+                  <p className="text-xs text-slate-400 font-mono">الطلب #{editingOrder.order_code} - {editingOrder.customer_name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEditOrderModalOpen(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Current Items Editor List */}
+            <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+              {editOrderItems.length === 0 ? (
+                <p className="text-xs text-amber-400 text-center py-6">لا توجد منتجات بالطلب حالياً. أضف منتج جديد أدناه.</p>
+              ) : (
+                editOrderItems.map((item, idx) => (
+                  <div key={idx} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <h4 className="text-xs font-bold text-white mb-1">{item.product_title}</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                          <div>
+                            <label className="block text-[10px] text-slate-400 font-bold mb-0.5">المقاس:</label>
+                            <select
+                              value={item.selected_size || ''}
+                              onChange={e => handleUpdateEditItemSize(idx, e.target.value)}
+                              className="w-full bg-slate-900 text-xs text-amber-300 font-bold p-2 rounded-xl border border-slate-800"
+                            >
+                              <option value="S">S</option>
+                              <option value="M">M</option>
+                              <option value="L">L</option>
+                              <option value="XL">XL</option>
+                              <option value="XXL">XXL</option>
+                              <option value="3XL">3XL</option>
+                              <option value="Free Size">Free Size</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] text-slate-400 font-bold mb-0.5">سعر القطعة (ج.م):</label>
+                            <input
+                              type="number"
+                              value={item.unit_price}
+                              onChange={e => {
+                                const updated = [...editOrderItems];
+                                updated[idx].unit_price = Number(e.target.value);
+                                setEditOrderItems(updated);
+                              }}
+                              className="w-full bg-slate-900 text-xs text-white font-mono font-bold p-2 rounded-xl border border-slate-800"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-2">
+                          <label className="block text-[10px] text-slate-400 font-bold mb-0.5">✨ الاسم المطلوب للتطريز على هذه القطعة:</label>
+                          <input
+                            type="text"
+                            value={item.custom_text || ''}
+                            onChange={e => handleUpdateEditItemCustomText(idx, e.target.value)}
+                            placeholder="مثال: د. محمد أحمد"
+                            className="w-full bg-slate-900 text-xs text-amber-300 p-2 rounded-xl border border-slate-800"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end justify-between space-y-3">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEditItem(idx)}
+                          className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20"
+                          title="حذف هذا المنتج من الطلب"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+
+                        <div className="flex items-center gap-1 bg-slate-900 rounded-xl p-1 border border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateEditItemQuantity(idx, item.quantity - 1)}
+                            className="p-1 hover:bg-slate-800 text-slate-300 rounded-lg"
+                          >
+                            -
+                          </button>
+                          <span className="text-xs font-mono font-bold text-white px-2">{item.quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateEditItemQuantity(idx, item.quantity + 1)}
+                            className="p-1 hover:bg-slate-800 text-slate-300 rounded-lg"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Add Product Selector */}
+            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
+              <span className="text-xs text-slate-400 font-bold block mb-2">➕ إضافة منتج جديد للطلب:</span>
+              <div className="flex flex-wrap gap-2">
+                {products.map(p => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleAddProductToEditOrder(p)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 text-xs font-semibold flex items-center gap-1 transition"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{p.title_ar || p.title} ({p.price} ج.م)</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Summary & Price Difference Calculation Box */}
+            {(() => {
+              const newTotal = editOrderItems.reduce((sum, item) => sum + (Number(item.unit_price) * Number(item.quantity)), 0);
+              const prevPaid = editingOrder.paid_amount !== undefined 
+                ? editingOrder.paid_amount 
+                : (editingOrder.status === 'auto_verified' || editingOrder.status === 'manual_verified' ? editingOrder.total_amount : 0);
+              const priceDiff = newTotal - prevPaid;
+
+              return (
+                <div className="p-4 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-2 text-xs">
+                  <div className="flex justify-between text-slate-400">
+                    <span>المبلغ المدفوع والمؤكد سابقاً:</span>
+                    <span className="font-mono font-bold text-emerald-400">{prevPaid} ج.م</span>
+                  </div>
+
+                  <div className="flex justify-between text-slate-400">
+                    <span>إجمالي الطلب الجديد بعد التعديلات:</span>
+                    <span className="font-mono font-bold text-white text-sm">{newTotal} ج.م</span>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-800 font-bold">
+                    <span className="text-amber-400">فرق السعر المستحق (الفاتورة الجزئية):</span>
+                    <span className={`font-mono text-base ${priceDiff > 0 ? 'text-amber-400 font-black' : 'text-slate-400'}`}>
+                      {priceDiff > 0 ? `+${priceDiff} ج.م (فاتورة تكملة 💳)` : '0 ج.م (لا يوجد فارق)'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsEditOrderModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveOrderEdits}
+                disabled={isSavingOrderEdits}
+                className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                <span>{isSavingOrderEdits ? 'جاري التعديل...' : 'حفظ التعديلات وتوليد الفاتورة 💾'}</span>
               </button>
             </div>
 
