@@ -794,74 +794,96 @@ export default function CheckoutPage() {
                 <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
                   {cart.map((item, idx) => {
                     const addonsExtra = item.selectedAddons ? item.selectedAddons.reduce((s, a) => s + (a.price || 0), 0) : 0;
-                    const itemUnitPrice = item.product.price + addonsExtra;
+                    const baseProductPrice = item.product.price;
+                    const itemUnitPrice = baseProductPrice + addonsExtra;
                     const itemTotalPrice = itemUnitPrice * item.quantity;
 
                     return (
                       <div
                         key={`${item.product.id}-${item.selectedSize || 'nosize'}-${idx}`}
-                        className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3"
+                        className="p-4 rounded-2xl bg-slate-900 border border-slate-800/80 space-y-3 shadow-md"
                       >
                         <div className="flex items-start gap-3">
                           <img
                             src={item.product.image_url}
-                            alt={item.product.title_ar}
-                            className="w-14 h-14 rounded-xl object-cover bg-slate-950 flex-shrink-0"
+                            alt={item.product.title_ar || item.product.title}
+                            className="w-16 h-16 rounded-xl object-cover bg-slate-950 flex-shrink-0 border border-slate-800"
                           />
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <h4 className="text-xs sm:text-sm font-bold text-white leading-snug">
-                              {item.product.title_ar || item.product.title}
-                            </h4>
-                            {item.selectedSize && (
-                              <span className="inline-block text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">
-                                المقاس: {item.selectedSize}
-                              </span>
-                            )}
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="text-xs sm:text-sm font-bold text-white leading-snug">
+                                {item.product.title_ar || item.product.title}
+                              </h4>
+                              {item.selectedSize && (
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 font-mono font-bold border border-amber-500/30 flex-shrink-0">
+                                  المقاس: {item.selectedSize}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Base price hint */}
+                            <p className="text-[11px] text-slate-400 font-medium">
+                              سعر القطعة الأساسي: <span className="text-slate-200 font-mono font-bold">{baseProductPrice} ج.م</span>
+                            </p>
+
+                            {/* Embroidery Customization Badge */}
                             {item.customText && (
-                              <p className="text-[10px] text-amber-300 font-medium truncate">
-                                ✨ التطريز: &quot;{item.customText}&quot;
-                              </p>
+                              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+                                <span className="font-bold text-amber-400">✨ الاسم للتطريز:</span> &quot;{item.customText}&quot;
+                              </div>
                             )}
+
+                            {/* Selected Addons Breakdown */}
                             {item.selectedAddons && item.selectedAddons.length > 0 && (
-                              <div className="text-[10px] text-indigo-300 space-y-0.5">
+                              <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1">
+                                <span className="text-[10px] font-bold text-emerald-400 block mb-0.5">💎 الإضافات المختارة:</span>
                                 {item.selectedAddons.map(a => (
-                                  <p key={a.id}>➕ {a.name} (+{a.price} ج.م)</p>
+                                  <div key={a.id} className="flex justify-between text-[11px] text-slate-300">
+                                    <span>+ {a.name}</span>
+                                    <span className="font-mono text-emerald-300 font-bold">+{a.price} ج.م</span>
+                                  </div>
                                 ))}
                               </div>
                             )}
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
-                          <span className="font-extrabold text-indigo-400 dir-ltr">
-                            {itemUnitPrice} ج.م × {item.quantity} = {itemTotalPrice} ج.م
-                          </span>
+                        {/* Quantity and Line Total Bar */}
+                        <div className="flex items-center justify-between pt-2.5 border-t border-slate-800 text-xs">
+                          <div>
+                            <span className="text-[11px] text-slate-400 block">إجمالي القطعة:</span>
+                            <span className="font-extrabold text-indigo-300 font-mono text-sm">
+                              {itemTotalPrice} ج.م <span className="text-[10px] text-slate-500 font-sans font-normal">({item.quantity} × {itemUnitPrice} ج.م)</span>
+                            </span>
+                          </div>
 
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(idx)}
-                              className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 transition-all"
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 transition-all"
                               title="حذف المنتج من السلة"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
 
-                            <div className="flex items-center gap-1 bg-slate-950 rounded-lg p-0.5 border border-slate-800">
+                            <div className="flex items-center gap-1 bg-slate-950 rounded-xl p-1 border border-slate-800">
                               <button
                                 type="button"
                                 onClick={() => handleUpdateQuantity(idx, -1)}
-                                className="p-1 hover:bg-slate-800 text-slate-300 rounded"
+                                className="p-1 hover:bg-slate-800 text-slate-300 rounded-lg transition"
+                                title="إنقاص الكمية"
                               >
-                                <Minus className="w-3 h-3" />
+                                <Minus className="w-3.5 h-3.5" />
                               </button>
-                              <span className="text-xs font-bold text-white px-1.5">{item.quantity}</span>
+                              <span className="text-xs font-mono font-bold text-white px-2">{item.quantity}</span>
                               <button
                                 type="button"
                                 onClick={() => handleUpdateQuantity(idx, 1)}
-                                className="p-1 hover:bg-slate-800 text-slate-300 rounded"
+                                className="p-1 hover:bg-slate-800 text-slate-300 rounded-lg transition"
+                                title="زيادة الكمية"
                               >
-                                <Plus className="w-3 h-3" />
+                                <Plus className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
@@ -872,30 +894,32 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Total Summary Breakdown */}
-                <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 pt-3">
+                <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 pt-3 shadow-lg">
                   <div className="flex justify-between text-xs text-slate-400">
-                    <span>مجموع المنتجات:</span>
-                    <span>{cartTotal} ج.م</span>
+                    <span>مجموع المنتجات والإضافات:</span>
+                    <span className="font-mono font-bold text-slate-200">{cartTotal} ج.م</span>
                   </div>
 
                   {paymentMethod === 'vodafone_cash' && vodaFee > 0 && (
-                    <div className="flex justify-between items-center text-xs font-bold text-amber-400 bg-amber-500/10 p-2 rounded-xl border border-amber-500/20">
-                      <span className="flex items-center gap-1.5">
-                        <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-4 h-4 object-contain" />
+                    <div className="flex justify-between items-center text-xs font-bold text-amber-300 bg-slate-950 p-2.5 rounded-xl border border-amber-500/30">
+                      <span className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full bg-white p-0.5 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
+                          <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-full h-full object-contain" />
+                        </div>
                         <span>رسوم تحويل فودافون كاش ({vodaFeePercent}%):</span>
                       </span>
-                      <span className="font-mono">+{vodaFee} ج.م</span>
+                      <span className="font-mono text-sm text-amber-400">+{vodaFee} ج.م</span>
                     </div>
                   )}
 
                   <div className="flex justify-between text-xs text-slate-400">
-                    <span>مكان التسليم:</span>
+                    <span>مكان الاستلام والتسليم:</span>
                     <span className="text-amber-400 font-semibold">{cleanDisplayNotes(settings.pickup_note)}</span>
                   </div>
 
-                  <div className="flex justify-between items-center text-sm sm:text-base font-black pt-2 border-t border-slate-800">
-                    <span className="text-white">المبلغ الكلي المطلوب:</span>
-                    <span className="gradient-gold-text text-xl sm:text-2xl">{finalPayableTotal} ج.م</span>
+                  <div className="flex justify-between items-center text-sm sm:text-base font-black pt-3 border-t border-slate-800">
+                    <span className="text-white">المبلغ الكلي المطلوب تحويله:</span>
+                    <span className="gradient-gold-text text-2xl font-mono">{finalPayableTotal} ج.م</span>
                   </div>
                 </div>
 
