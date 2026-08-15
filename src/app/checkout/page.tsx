@@ -146,7 +146,7 @@ export default function CheckoutPage() {
   const rawVodaFee = paymentMethod === 'vodafone_cash' && vodaFeePercent > 0 
     ? (cartTotal * vodaFeePercent) / 100 
     : 0;
-  const vodaFee = Math.round(rawVodaFee);
+  const vodaFee = Math.ceil(rawVodaFee);
   const finalPayableTotal = paymentMethod === 'vodafone_cash' ? (cartTotal + vodaFee) : cartTotal;
 
   const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
