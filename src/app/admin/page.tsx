@@ -1805,9 +1805,9 @@ export default function AdminDashboardPage() {
                             {order.transaction_ref ? `Ref# ${order.transaction_ref}` : '—'}
                           </p>
                         </td>
-                        <td className="p-4 space-y-1.5">
+                        <td className="p-4 space-y-1.5 min-w-[220px]">
                           {(!order.items || order.items.length === 0) ? (
-                            <div className="text-amber-300 bg-amber-500/10 p-2 rounded-xl border border-amber-500/20 text-xs font-bold space-y-1">
+                            <div className="text-amber-300 bg-amber-500/10 p-2 rounded-xl border border-amber-500/20 text-xs font-semibold space-y-1">
                               <p className="flex items-center gap-1 text-white">
                                 <Package className="w-3.5 h-3.5 text-amber-400" />
                                 <span>طلب منتج تخرج ({order.total_amount} ج.م)</span>
@@ -1818,91 +1818,90 @@ export default function AdminDashboardPage() {
                             </div>
                           ) : (
                             order.items.map((item, i) => (
-                              <div key={i} className="text-slate-300 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
-                                <div className="flex items-center justify-between font-bold text-xs text-white">
-                                  <span>{item.product_title} × {item.quantity}</span>
+                              <div key={i} className="py-1 border-b border-slate-800/80 last:border-0 text-slate-300">
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs text-white">
+                                  <span className="font-semibold">{item.product_title}</span>
+                                  <span className="text-slate-400 font-mono">× {item.quantity}</span>
                                   {item.selected_size && (
-                                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[11px]">
-                                      المقاس: {item.selected_size}
+                                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 font-mono text-[10px] border border-slate-700 font-bold">
+                                      {item.selected_size}
                                     </span>
                                   )}
                                 </div>
                                 {item.custom_text && (
-                                  <p className="text-[11px] text-amber-400 font-medium mt-1">
+                                  <p className="text-[11px] text-amber-400/90 font-medium mt-0.5">
                                     ✨ التطريز: &quot;{item.custom_text}&quot;
                                   </p>
                                 )}
                                 {item.customization_option && (
-                                  <p className="text-[11px] text-emerald-400 font-medium mt-0.5">
-                                    💎 الإضافات: {item.customization_option}
+                                  <p className="text-[11px] text-emerald-400/90 font-medium mt-0.5">
+                                    💎 {item.customization_option}
                                   </p>
                                 )}
                               </div>
                             ))
                           )}
                         </td>
-                        <td className="p-4 font-black text-sm text-white">
+                        <td className="p-4 font-mono font-bold text-sm text-white whitespace-nowrap">
                           {order.total_amount} ج.م
                         </td>
-                        <td className="p-4 font-medium text-slate-300">
+                        <td className="p-4 whitespace-nowrap">
                           {order.payment_method === 'vodafone_cash' ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 font-bold text-xs">
-                              <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-4 h-4 object-contain" />
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-slate-200 text-xs font-semibold shadow-sm">
+                              <div className="w-5 h-5 rounded-full bg-white p-0.5 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
+                                <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-full h-full object-contain" />
+                              </div>
                               <span>فودافون كاش</span>
-                            </span>
+                            </div>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 font-bold text-xs">
-                              <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-slate-200 text-xs font-semibold shadow-sm">
+                              <div className="w-5 h-5 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center flex-shrink-0">
+                                <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                              </div>
                               <span>InstaPay</span>
-                            </span>
+                            </div>
                           )}
                         </td>
-                        <td className="p-4 space-y-1">
+                        <td className="p-4 space-y-1.5 whitespace-nowrap">
                           {order.status === 'auto_verified' && (
-                            <div className="space-y-1">
-                              <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] border border-emerald-500/30 flex items-center gap-1.5 w-fit">
-                                <Bot className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>🤖 مؤكد تلقائياً</span>
-                              </span>
-                            </div>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium text-[11px]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                              <span>مؤكد تلقائياً</span>
+                            </span>
                           )}
                           {order.status === 'manual_verified' && (
                             <div className="space-y-1">
-                              <span className="px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 font-bold text-[11px] border border-cyan-500/30 flex items-center gap-1.5 w-fit">
-                                <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
-                                <span>👤 مؤكد يدوي</span>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium text-[11px]">
+                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                                <span>مؤكد يدوياً</span>
                               </span>
-                              <p className="text-[10px] text-cyan-300/80 font-mono font-bold">
+                              <p className="text-[10px] text-slate-400 font-mono">
                                 بواسطة {order.verified_by || currentAdmin?.display_name || currentAdmin?.username || 'أدمن المتجر'}
                               </p>
                             </div>
                           )}
                           {order.status === 'pending' && (
-                            <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[11px] border border-amber-500/30 flex items-center gap-1.5 w-fit animate-pulse">
-                              <Clock className="w-3.5 h-3.5" />
-                              <span>⏳ بانتظار الـ SMS</span>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium text-[11px]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                              <span>قيد الانتظار</span>
                             </span>
                           )}
                           {order.status === 'ready_for_pickup' && (
-                            <div className="space-y-1">
-                              <span className="px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-[11px] border border-indigo-500/30 flex items-center gap-1.5 w-fit">
-                                <Package className="w-3.5 h-3.5 text-indigo-400" />
-                                <span>📦 جاهز للاستلام</span>
-                              </span>
-                            </div>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium text-[11px]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                              <span>جاهز للاستلام</span>
+                            </span>
                           )}
                           {order.status === 'delivered' && (
-                            <div className="space-y-1">
-                              <span className="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[11px] border border-blue-500/30 flex items-center gap-1.5 w-fit">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
-                                <span>🎉 تم التسليم</span>
-                              </span>
-                            </div>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium text-[11px]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                              <span>تم التسليم</span>
+                            </span>
                           )}
                           {order.status === 'cancelled' && (
-                            <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 font-bold text-[11px] border border-rose-500/30 flex items-center gap-1.5 w-fit">
-                              <XCircle className="w-3.5 h-3.5 text-rose-400" />
-                              <span>❌ ملغي</span>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium text-[11px]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                              <span>ملغي</span>
                             </span>
                           )}
 
@@ -1910,20 +1909,23 @@ export default function AdminDashboardPage() {
                           {(() => {
                             const lineToDisplay = getEffectiveConfirmedLine(order);
                             return lineToDisplay ? (
-                              <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-500/30 block w-fit truncate max-w-[170px]" title={lineToDisplay}>
-                                📱 {settings.line_labels?.[lineToDisplay] || lineToDisplay}
-                              </span>
+                              <div className="mt-1 flex items-center gap-1 text-[11px] text-emerald-400 font-mono font-medium">
+                                <span className="text-slate-500">الخط:</span>
+                                <span className="bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-emerald-300">
+                                  {settings.line_labels?.[lineToDisplay] || lineToDisplay}
+                                </span>
+                              </div>
                             ) : null;
                           })()}
                         </td>
-                        <td className="p-4 text-center">
+                        <td className="p-4 text-center whitespace-nowrap">
                           <button
                             onClick={() => setSelectedOrderModal(order)}
-                            className="px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-600/30 to-purple-600/30 hover:from-indigo-600 hover:to-purple-600 text-white font-bold text-xs border border-indigo-500/40 shadow-md transition flex items-center gap-1.5 mx-auto"
+                            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition flex items-center gap-1.5 mx-auto shadow-sm"
                             title="عرض تفاصيل الطلب والرسالة والتأكيد بالكامل"
                           >
-                            <Eye className="w-4 h-4 text-amber-400" />
-                            <span>عرض تفاصيل الطلب 👁️</span>
+                            <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>عرض التفاصيل</span>
                           </button>
                         </td>
                       </tr>
