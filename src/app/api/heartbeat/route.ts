@@ -15,7 +15,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const devId = body.deviceId || body.device_id || '44f26a85aa395afd';
+    const headerDevId = req.headers.get('x-device-id') || req.headers.get('X-Device-Id');
+    const devId = body.deviceId || body.device_id || headerDevId || '44f26a85aa395afd';
     const battery = body.battery !== undefined ? Number(body.battery) : 100;
     const phone = body.phone_number || body.phone || undefined;
     const name = body.device_name || body.deviceName || `Android Gateway (${devId.slice(0, 8)})`;

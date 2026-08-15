@@ -96,6 +96,8 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
   }
 
   if (matchedOrder) {
+    const confirmedLine = tx.recipient_phone || tx.device_name || undefined;
+
     // Update order status in memory & Supabase
     const updatedOrders = orders.map(o => {
       if (o.id === matchedOrder!.id) {
@@ -103,6 +105,9 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
           ...o,
           status: 'auto_verified' as const,
           matched_transaction_id: tx.id,
+          confirmed_line: confirmedLine || o.confirmed_line,
+          matched_device_name: tx.device_name || o.matched_device_name,
+          matched_device_id: tx.device_id || o.matched_device_id,
           verified_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -111,7 +116,7 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
     });
 
     setMemoryOrders(updatedOrders);
-    await updateOrderStatusInSupabase(matchedOrder.id, 'auto_verified', tx.id);
+    await updateOrderStatusInSupabase(matchedOrder.id, 'auto_verified', tx.id, undefined, confirmedLine, tx.device_name, tx.device_id);
     await updateTransactionStatusInSupabase(tx.id, 'matched', matchedOrder.id);
 
     // Update transaction status
@@ -217,8 +222,13 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
     }
 
     if (matchedTx) {
+      const confirmedLine = matchedTx.recipient_phone || matchedTx.device_name || undefined;
+
       newOrder.status = 'auto_verified';
       newOrder.matched_transaction_id = matchedTx.id;
+      newOrder.confirmed_line = confirmedLine;
+      newOrder.matched_device_name = matchedTx.device_name;
+      newOrder.matched_device_id = matchedTx.device_id;
       newOrder.verified_at = new Date().toISOString();
       newOrder.updated_at = new Date().toISOString();
 

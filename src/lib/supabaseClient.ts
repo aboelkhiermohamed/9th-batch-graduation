@@ -14,6 +14,9 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   instapay_enabled: false,
   vodafone_cash_fee_percent: 1,
   vodafone_cash_numbers: ['01015339426'],
+  line_labels: {
+    '01015339426': 'خط 1 - المحفظة الرئيسية'
+  },
   instapay_ipa: '9thbatch@instapay',
   instapay_ipas: ['9thbatch@instapay'],
   pickup_note: 'تابع جروب التليجرام',
@@ -361,6 +364,8 @@ export function cleanDisplayNotes(str?: string | null): string {
   cleaned = cleaned.replace(/\[\s*RECEIPT_URL:[\s\S]*?\]/gi, '');
   cleaned = cleaned.replace(/RECEIPT_URL:\s*https?:\/\/\S+/gi, '');
   cleaned = cleaned.replace(/\[VERIFIED_BY:.*?\]/gi, '');
+  cleaned = cleaned.replace(/\[CONFIRMED_LINE:.*?\]/gi, '');
+  cleaned = cleaned.replace(/\[MATCHED_DEV:.*?\]/gi, '');
   cleaned = cleaned.replace(/\[\[[\s\S]*?\]\]/gi, '');
   cleaned = cleaned.replace(/\["[^"]*?@instapay[^"]*?"\]/gi, '');
   cleaned = cleaned.replace(/\[[a-z0-9_\-\.]+\.(jpg|jpeg|png|webp|pdf)\]/gi, '');
@@ -570,9 +575,11 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
   try {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(order.id);
 
-    // Embed receipt_url into notes as backup marker if column is missing in DB schema
+    // Embed markers into notes as backup if columns are missing in DB schema
     const receiptMarker = order.receipt_url ? ` [RECEIPT_URL:${order.receipt_url}]` : '';
-    const orderNotes = (order.notes || '') + receiptMarker;
+    const lineMarker = order.confirmed_line ? ` [CONFIRMED_LINE:${order.confirmed_line}]` : '';
+    const devMarker = order.matched_device_name ? ` [MATCHED_DEV:${order.matched_device_name}]` : '';
+    const orderNotes = (order.notes || '') + receiptMarker + lineMarker + devMarker;
 
     const orderPayload: any = {
       order_code: order.order_code,
@@ -584,6 +591,9 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
       sender_phone: order.sender_phone || order.customer_phone,
       transaction_ref: order.transaction_ref || null,
       receipt_url: order.receipt_url || null,
+      confirmed_line: order.confirmed_line || null,
+      matched_device_name: order.matched_device_name || null,
+      matched_device_id: order.matched_device_id || null,
       notes: orderNotes
     };
 
@@ -712,6 +722,9 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
       let rawNotes = o.notes || '';
       let extractedReceiptUrl = o.receipt_url || undefined;
       let verifiedBy = o.verified_by || undefined;
+      let confirmedLine = o.confirmed_line || undefined;
+      let matchedDevName = o.matched_device_name || undefined;
+      let matchedDevId = o.matched_device_id || undefined;
 
       if (!extractedReceiptUrl && rawNotes.includes('[RECEIPT_URL:')) {
         const match = rawNotes.match(/\[RECEIPT_URL:(.*?)\]/);
@@ -726,6 +739,22 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         if (match && match[1]) {
           verifiedBy = match[1];
           rawNotes = rawNotes.replace(/\[VERIFIED_BY:.*?\]/, '').trim();
+        }
+      }
+
+      if (!confirmedLine && rawNotes.includes('[CONFIRMED_LINE:')) {
+        const match = rawNotes.match(/\[CONFIRMED_LINE:(.*?)\]/);
+        if (match && match[1]) {
+          confirmedLine = match[1];
+          rawNotes = rawNotes.replace(/\[CONFIRMED_LINE:.*?\]/, '').trim();
+        }
+      }
+
+      if (!matchedDevName && rawNotes.includes('[MATCHED_DEV:')) {
+        const match = rawNotes.match(/\[MATCHED_DEV:(.*?)\]/);
+        if (match && match[1]) {
+          matchedDevName = match[1];
+          rawNotes = rawNotes.replace(/\[MATCHED_DEV:.*?\]/, '').trim();
         }
       }
 
@@ -785,6 +814,9 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         receipt_url: extractedReceiptUrl,
         notes: rawNotes,
         matched_transaction_id: o.matched_transaction_id || undefined,
+        confirmed_line: confirmedLine,
+        matched_device_name: matchedDevName,
+        matched_device_id: matchedDevId,
         verified_at: o.verified_at || undefined,
         verified_by: verifiedBy,
         created_at: o.created_at || new Date().toISOString(),
@@ -837,7 +869,15 @@ export async function updateTransactionStatusInSupabase(txId: string, status: st
   }
 }
 
-export async function updateOrderStatusInSupabase(orderId: string, status: string, matchedTxId?: string, verifiedBy?: string): Promise<boolean> {
+export async function updateOrderStatusInSupabase(
+  orderId: string, 
+  status: string, 
+  matchedTxId?: string, 
+  verifiedBy?: string,
+  confirmedLine?: string,
+  matchedDevName?: string,
+  matchedDevId?: string
+): Promise<boolean> {
   try {
     const payload: any = {
       status,
@@ -850,16 +890,45 @@ export async function updateOrderStatusInSupabase(orderId: string, status: strin
     if (matchedTxId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matchedTxId)) {
       payload.matched_transaction_id = matchedTxId;
     }
+    if (confirmedLine) payload.confirmed_line = confirmedLine;
+    if (matchedDevName) payload.matched_device_name = matchedDevName;
+    if (matchedDevId) payload.matched_device_id = matchedDevId;
+
+    // Update memory order state first
+    const memOrders = getMemoryOrders();
+    const target = memOrders.find(o => o.id === orderId);
+    if (target) {
+      target.status = status as any;
+      if (matchedTxId) target.matched_transaction_id = matchedTxId;
+      if (verifiedBy) target.verified_by = verifiedBy;
+      if (confirmedLine) target.confirmed_line = confirmedLine;
+      if (matchedDevName) target.matched_device_name = matchedDevName;
+      if (matchedDevId) target.matched_device_id = matchedDevId;
+      if (status === 'auto_verified' || status === 'manual_verified') {
+        target.verified_at = target.verified_at || new Date().toISOString();
+      }
+      target.updated_at = new Date().toISOString();
+      setMemoryOrders(memOrders);
+    }
 
     let { error } = await supabase
       .from('store_orders')
       .update(payload)
       .eq('id', orderId);
 
-    if (error && verifiedBy && (error.message.includes('verified_by') || error.message.includes('column'))) {
-      delete payload.verified_by;
-      const res = await supabase.from('store_orders').update(payload).eq('id', orderId);
-      error = res.error;
+    // Column Fallback Loop
+    let attempts = 0;
+    while (error && attempts < 5) {
+      attempts++;
+      const match = error.message.match(/Could not find the '([^']+)' column/i) || error.message.match(/column "([^"]+)"/i);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        delete payload[missingCol];
+        const res = await supabase.from('store_orders').update(payload).eq('id', orderId);
+        error = res.error;
+      } else {
+        break;
+      }
     }
 
     if (matchedTxId) {

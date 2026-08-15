@@ -59,9 +59,10 @@ export async function POST(req: NextRequest) {
     const messageText = body.message || body.rawMessage || body.text || body.body || body.sms || '';
     const receivedAt = body.receivedAt || body.timestamp || new Date().toISOString();
 
-    const devId = body.deviceId || body.device_id || body.androidId || ((body.phone_number || body.phone) ? 'dev-' + (body.phone_number || body.phone).replace(/[^0-9]/g, '') : 'dev-android-gateway');
+    const headerDevId = req.headers.get('x-device-id') || req.headers.get('X-Device-Id');
+    const devId = headerDevId || body.deviceId || body.device_id || body.androidId || ((body.phone_number || body.phone) ? 'dev-' + (body.phone_number || body.phone).replace(/[^0-9]/g, '') : 'dev-android-gateway');
     const battery = body.battery !== undefined ? Number(body.battery) : (body.battery_level !== undefined ? Number(body.battery_level) : 100);
-    const phone = body.phone_number || body.phone || undefined;
+    const phone = body.phone_number || body.phone || body.recipient || body.to || undefined;
     const name = body.device_name || body.deviceName || `Android Gateway (${devId.slice(0, 8)})`;
 
     // Always update device telemetry & ping timestamp
@@ -103,6 +104,9 @@ export async function POST(req: NextRequest) {
       sender_phone: senderPhone,
       sender_name: senderName,
       transaction_ref: transactionRef,
+      recipient_phone: phone,
+      device_id: devId,
+      device_name: name,
       status: 'unmatched',
       raw_sms: messageText,
       received_at: receivedAt,

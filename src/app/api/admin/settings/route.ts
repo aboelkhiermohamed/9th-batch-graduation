@@ -22,6 +22,7 @@ export async function PUT(req: NextRequest) {
       vodafone_cash_fee_percent,
       maintenance_mode,
       vodafone_cash_numbers, 
+      line_labels,
       instapay_ipa, 
       instapay_ipas, 
       pickup_note, 
@@ -41,6 +42,7 @@ export async function PUT(req: NextRequest) {
       vodafone_cash_numbers: Array.isArray(vodafone_cash_numbers) 
         ? vodafone_cash_numbers 
         : current.vodafone_cash_numbers,
+      line_labels: line_labels || current.line_labels || {},
       instapay_ipa: instapay_ipa || (Array.isArray(instapay_ipas) && instapay_ipas[0]) || current.instapay_ipa,
       instapay_ipas: Array.isArray(instapay_ipas)
         ? instapay_ipas

@@ -592,6 +592,13 @@ export default function OrdersHistory({
                         </span>
                       </div>
 
+                      {order.confirmed_line && (
+                        <div className="sm:col-span-3 pt-2 border-t border-slate-800/60 text-slate-300 flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span>الخط المؤكِّد للاستلام: <strong className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 font-mono">{order.confirmed_line}</strong></span>
+                        </div>
+                      )}
+
                       {storePickupNote && (
                         <div className="sm:col-span-3 pt-2 border-t border-slate-800/60 text-slate-300 flex items-center gap-2">
                           <MapPin className="w-4 h-4 text-indigo-400 flex-shrink-0" />

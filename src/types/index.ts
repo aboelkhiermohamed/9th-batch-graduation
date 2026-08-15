@@ -68,6 +68,9 @@ export interface Order {
   receipt_url?: string;
   notes?: string;
   matched_transaction_id?: string;
+  confirmed_line?: string; // e.g. "خط 1 - المحفظة الرئيسية (01015339426)"
+  matched_device_name?: string;
+  matched_device_id?: string;
   verified_at?: string;
   verified_by?: string;
   created_at: string;
@@ -82,6 +85,7 @@ export interface StoreSettings {
   instapay_enabled?: boolean;
   vodafone_cash_fee_percent?: number;
   vodafone_cash_numbers: string[];
+  line_labels?: Record<string, string>; // Maps phone numbers or index to custom line titles e.g. {"01015339426": "خط 1 - المحفظة الرئيسية"}
   instapay_ipa: string;
   instapay_ipas?: string[];
   pickup_note: string;
@@ -98,6 +102,9 @@ export interface IncomingTransaction {
   sender_name?: string;
   transaction_ref?: string;
   matched_order_id?: string;
+  recipient_phone?: string; // Receiving wallet line phone number
+  device_id?: string;       // Android Gateway device ID
+  device_name?: string;     // Friendly name of the Android Gateway
   status: 'unmatched' | 'matched' | 'manual_matched';
   raw_sms: string;
   received_at: string;

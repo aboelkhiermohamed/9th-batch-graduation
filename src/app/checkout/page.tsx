@@ -583,26 +583,34 @@ export default function CheckoutPage() {
                       {paymentMethod === 'vodafone_cash' && isVodaEnabled && (
                         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
                           <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span>حول المبلغ المطلوب على أحد أرقام فودافون كاش التالية:</span>
-                            <span className="text-rose-400 font-semibold flex-shrink-0">محفظة كاش ({vodaNums.length})</span>
+                            <span>حول المبلغ المطلوب على أحد خطوط فودافون كاش التالية:</span>
+                            <span className="text-rose-400 font-semibold flex-shrink-0">خطوط الاستلام ({vodaNums.length})</span>
                           </div>
 
                           <div className="space-y-2">
-                            {vodaNums.map((num, idx) => (
-                              <div key={idx} className="flex flex-wrap xs:flex-nowrap items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
-                                <span className="text-base sm:text-lg font-mono font-extrabold text-white tracking-wider truncate dir-ltr select-all">
-                                  {num}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopy(num, `voda-${idx}`)}
-                                  className="w-full xs:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition flex-shrink-0"
-                                >
-                                  {copiedText === `voda-${idx}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                  <span>{copiedText === `voda-${idx}` ? 'تم النسخ' : 'نسخ الرقم'}</span>
-                                </button>
-                              </div>
-                            ))}
+                            {vodaNums.map((num, idx) => {
+                              const lineLabel = settings.line_labels?.[num] || `خط ${idx + 1}`;
+                              return (
+                                <div key={idx} className="flex flex-col xs:flex-row items-stretch xs:items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <span className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 font-bold text-xs border border-rose-500/30 flex-shrink-0">
+                                      {lineLabel}
+                                    </span>
+                                    <span className="text-base sm:text-lg font-mono font-extrabold text-white tracking-wider truncate dir-ltr select-all">
+                                      {num}
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopy(num, `voda-${idx}`)}
+                                    className="w-full xs:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition flex-shrink-0"
+                                  >
+                                    {copiedText === `voda-${idx}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                    <span>{copiedText === `voda-${idx}` ? 'تم النسخ' : 'نسخ الرقم'}</span>
+                                  </button>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}

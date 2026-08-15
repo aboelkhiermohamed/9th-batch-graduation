@@ -159,6 +159,7 @@ export default function AdminDashboardPage() {
   const [vodaEnabled, setVodaEnabled] = useState(true);
   const [instaEnabled, setInstaEnabled] = useState(true);
   const [vodaInput, setVodaInput] = useState('');
+  const [lineLabelsMap, setLineLabelsMap] = useState<Record<string, string>>({});
   const [vodaFeePercentInput, setVodaFeePercentInput] = useState('1');
   const [instaInput, setInstaInput] = useState('');
   const [pickupInput, setPickupInput] = useState('');
@@ -167,6 +168,7 @@ export default function AdminDashboardPage() {
   // Search & Filter & Dynamic Origin URL
   const [orderSearch, setOrderSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [lineFilter, setLineFilter] = useState<string>('all');
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedBaseUrl, setCopiedBaseUrl] = useState(false);
   const [originUrl, setOriginUrl] = useState('https://graduation-store.com');
@@ -195,6 +197,21 @@ export default function AdminDashboardPage() {
       fetchAllData();
     }
   }, []);
+
+  // Filtered orders list
+  const filteredOrders = orders.filter(o => {
+    const matchSearch = 
+      o.order_code.toLowerCase().includes(orderSearch.toLowerCase()) ||
+      o.customer_name.includes(orderSearch) ||
+      o.customer_phone.includes(orderSearch);
+
+    const matchStatus = statusFilter === 'all' || o.status === statusFilter;
+    const matchLine = lineFilter === 'all' ||
+      (lineFilter === 'manual' ? Boolean(!o.confirmed_line && o.verified_by) :
+      (o.confirmed_line && o.confirmed_line.includes(lineFilter)));
+
+    return matchSearch && matchStatus && matchLine;
+  });
 
   // Periodic poll for devices when gateway tab is active (Every 10 seconds)
   useEffect(() => {
@@ -337,6 +354,7 @@ export default function AdminDashboardPage() {
         const s = await setRes.json();
         if (s) {
           setSettings(s);
+          if (s.line_labels) setLineLabelsMap(s.line_labels);
           setVodaEnabled(Boolean(s.vodafone_cash_enabled));
           setInstaEnabled(Boolean(s.instapay_enabled));
           const vNums = Array.isArray(s.vodafone_cash_numbers) ? s.vodafone_cash_numbers.join(', ') : (s.vodafone_cash_numbers || '01015339426');
@@ -927,6 +945,7 @@ export default function AdminDashboardPage() {
           instapay_enabled: instaEnabled,
           vodafone_cash_fee_percent: Number(vodaFeePercentInput) || 0,
           vodafone_cash_numbers: vodaArray.length > 0 ? vodaArray : ['01015339426'],
+          line_labels: lineLabelsMap,
           instapay_ipa: instaArray[0] || '9thbatch@instapay',
           instapay_ipas: instaArray.length > 0 ? instaArray : ['9thbatch@instapay'],
           pickup_note: pickupInput.trim(),
@@ -1074,17 +1093,6 @@ export default function AdminDashboardPage() {
       console.warn(e);
     }
   };
-
-  // Filtered orders list
-  const filteredOrders = orders.filter(o => {
-    const matchSearch = 
-      o.order_code.toLowerCase().includes(orderSearch.toLowerCase()) ||
-      o.customer_name.includes(orderSearch) ||
-      o.customer_phone.includes(orderSearch);
-
-    const matchStatus = statusFilter === 'all' || o.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
 
   // Calculate statistics for PDF export & breakdown (Confirmed Orders Only for Factory Manufacturing)
   const calculateProductSizeStats = () => {
@@ -1693,22 +1701,36 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              {/* Status Filter Dropdown & Export PDF */}
+              {/* Status & Line Filter Dropdown & Export PDF */}
               <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 w-full sm:w-auto">
-                <div className="flex items-center gap-2 flex-1 sm:flex-none">
-                  <span className="text-xs text-slate-400 font-semibold flex-shrink-0">حالة الطلب:</span>
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 sm:flex-none">
+                  <span className="text-xs text-slate-400 font-semibold flex-shrink-0">تصفية:</span>
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full sm:w-auto bg-slate-950 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-800 focus:outline-none"
+                    className="bg-slate-950 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-800 focus:outline-none"
                   >
-                    <option value="all">كل الطلبات</option>
+                    <option value="all">كل الحالات</option>
                     <option value="pending">معلق (Pending)</option>
                     <option value="auto_verified">مؤكد تلقائياً (Auto Verified)</option>
                     <option value="manual_verified">مؤكد يدوي (Manual Verified)</option>
                     <option value="ready_for_pickup">جاهز للاستلام بالمقر</option>
                     <option value="delivered">تم التسليم</option>
                     <option value="cancelled">ملغي</option>
+                  </select>
+
+                  <select
+                    value={lineFilter}
+                    onChange={(e) => setLineFilter(e.target.value)}
+                    className="bg-slate-950 text-amber-300 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-800 focus:outline-none"
+                  >
+                    <option value="all">📱 كافة الخطوط</option>
+                    {settings.vodafone_cash_numbers.map((num, idx) => (
+                      <option key={idx} value={num}>
+                        {settings.line_labels?.[num] || `خط ${idx + 1}`} ({num})
+                      </option>
+                    ))}
+                    <option value="manual">👤 تأكيد يدوي (أدمن)</option>
                   </select>
                 </div>
 
@@ -1733,7 +1755,7 @@ export default function AdminDashboardPage() {
                     <th className="p-4">المنتجات والمقاس والتطريز</th>
                     <th className="p-4">إجمالي المبلغ</th>
                     <th className="p-4">طريقة الدفع</th>
-                    <th className="p-4">الحالة والتأكيد</th>
+                    <th className="p-4">الحالة والخط المؤكِّد</th>
                     <th className="p-4 text-center">إجراءات الإدارة</th>
                   </tr>
                 </thead>
@@ -1801,21 +1823,20 @@ export default function AdminDashboardPage() {
                         <td className="p-4 font-medium text-slate-300">
                           {order.payment_method === 'vodafone_cash' ? '🔴 فودافون كاش' : '🟣 InstaPay'}
                         </td>
-                        <td className="p-4">
+                        <td className="p-4 space-y-1">
                           {order.status === 'auto_verified' && (
                             <div className="space-y-1">
                               <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[11px] border border-emerald-500/30 flex items-center gap-1.5 w-fit">
                                 <Bot className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>🤖 مؤكد تلقائياً (SMS)</span>
+                                <span>🤖 مؤكد تلقائياً</span>
                               </span>
-                              <p className="text-[10px] text-slate-400 font-mono">عبر بوابة الموبايل</p>
                             </div>
                           )}
                           {order.status === 'manual_verified' && (
                             <div className="space-y-1">
                               <span className="px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 font-bold text-[11px] border border-cyan-500/30 flex items-center gap-1.5 w-fit">
                                 <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
-                                <span>👤 مؤكد يدوي (الإدارة)</span>
+                                <span>👤 مؤكد يدوي</span>
                               </span>
                               <p className="text-[10px] text-cyan-300/80 font-mono font-bold">
                                 بواسطة {order.verified_by || currentAdmin?.display_name || currentAdmin?.username || 'أدمن المتجر'}
@@ -1834,11 +1855,6 @@ export default function AdminDashboardPage() {
                                 <Package className="w-3.5 h-3.5 text-indigo-400" />
                                 <span>📦 جاهز للاستلام</span>
                               </span>
-                              {order.matched_transaction_id ? (
-                                <span className="text-[10px] text-emerald-400 font-mono block">🤖 (تأكيد تلقائي)</span>
-                              ) : (
-                                <span className="text-[10px] text-cyan-400 font-mono block">👤 (تأكيد يدوي)</span>
-                              )}
                             </div>
                           )}
                           {order.status === 'delivered' && (
@@ -1853,6 +1869,13 @@ export default function AdminDashboardPage() {
                             <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 font-bold text-[11px] border border-rose-500/30 flex items-center gap-1.5 w-fit">
                               <XCircle className="w-3.5 h-3.5 text-rose-400" />
                               <span>❌ ملغي</span>
+                            </span>
+                          )}
+
+                          {/* CONFIRMED LINE BADGE */}
+                          {order.confirmed_line && (
+                            <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-500/30 block w-fit truncate max-w-[170px]" title={order.confirmed_line}>
+                              📱 {order.confirmed_line}
                             </span>
                           )}
                         </td>
@@ -2371,17 +2394,41 @@ export default function AdminDashboardPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    أرقام محفظة فودافون كاش (يمكنك إدخال أكثر من رقم مفصولة بفاصلة)
+                    أرقام وخطوط محفظة فودافون كاش (يمكنك إدخال حتى 4 أرقام مفصولة بفاصلة)
                   </label>
                   <input
                     type="text"
                     required={vodaEnabled}
-                    placeholder="01015339426, 01099998888"
+                    placeholder="01015339426, 01022223333, 01033334444, 01044445555"
                     value={vodaInput}
                     onChange={(e) => setVodaInput(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-rose-500"
                   />
                 </div>
+
+                {/* Line Custom Labeling Editor */}
+                {vodaInput.split(',').map(n => n.trim()).filter(Boolean).length > 0 && (
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                    <p className="text-xs font-bold text-amber-400">🏷️ تخصيص وتسمية خطوط الاستلام (للتوضيح في صفحة الكاشير وللإدارة):</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {vodaInput.split(',').map(n => n.trim()).filter(Boolean).map((num, i) => (
+                        <div key={i} className="flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-800">
+                          <span className="text-[11px] font-mono font-bold text-slate-300 dir-ltr flex-shrink-0">{num}:</span>
+                          <input
+                            type="text"
+                            placeholder={`خط ${i + 1}`}
+                            value={lineLabelsMap[num] || `خط ${i + 1}`}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setLineLabelsMap(prev => ({ ...prev, [num]: val }));
+                            }}
+                            className="w-full px-2.5 py-1 rounded bg-slate-950 text-amber-300 text-xs font-semibold border border-slate-800 focus:outline-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -4066,6 +4113,26 @@ export default function AdminDashboardPage() {
               {cleanDisplayNotes(selectedOrderModal.notes) && (
                 <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
                   <span className="font-bold text-amber-400">ملاحظات إضافية من العميل:</span> {cleanDisplayNotes(selectedOrderModal.notes)}
+                </div>
+              )}
+
+              {/* CONFIRMED LINE BADGE IN MODAL */}
+              {selectedOrderModal.confirmed_line && (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-transparent border border-emerald-500/40 text-emerald-300 text-xs font-bold flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="w-5 h-5 text-emerald-400" />
+                    <span>📱 الخط والمحفظة التي تم تأكيد استلام المبلغ عليها:</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-slate-950 px-3.5 py-1.5 rounded-xl text-emerald-300 font-mono font-black text-sm border border-emerald-500/40 shadow-inner">
+                      {selectedOrderModal.confirmed_line}
+                    </span>
+                    {selectedOrderModal.matched_device_name && (
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        (جهاز: {selectedOrderModal.matched_device_name})
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
