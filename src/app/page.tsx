@@ -556,8 +556,8 @@ export default function StoreFrontPage() {
             <a href="/" className="flex items-center gap-3 group">
               <img 
                 src="/logo-removebg-preview.png" 
-                alt="themedix" 
-                className="h-8 sm:h-11 w-auto object-contain filter drop-shadow-[0_0_12px_rgba(142,208,0,0.35)] transition group-hover:scale-105" 
+                alt="the medix" 
+                className="h-10 sm:h-13 w-auto object-contain filter drop-shadow-[0_0_15px_rgba(142,208,0,0.45)] transition group-hover:scale-105" 
               />
               <span className="text-[10px] sm:text-xs text-lime-300 font-bold bg-lime-500/10 border border-lime-500/30 px-2.5 py-1 rounded-full hidden sm:inline-block">
                 🎓 الدفعة التاسعة
@@ -570,20 +570,20 @@ export default function StoreFrontPage() {
             {/* Customer Account / Profile Button */}
             <button
               onClick={() => router.push('/profile')}
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs sm:text-sm font-bold text-amber-300 transition-all shadow-md shadow-amber-500/10"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-purple-950/70 hover:bg-purple-900 border border-purple-800/80 hover:border-lime-500/40 text-xs sm:text-sm font-semibold text-slate-200 transition-all shadow-md shadow-purple-950/40"
             >
-              <User className="w-4 h-4 text-amber-400" />
+              <User className="w-4 h-4 text-lime-400" />
               <span>
                 {customerSession 
                   ? `البروفايل (${customerSession.full_name?.split(' ')[0] || 'حسابي'})` 
-                  : 'تسجيل / دخول 🔑'}
+                  : 'تسجيل الدخول 🔑'}
               </span>
             </button>
 
             {/* Cart Button */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative flex items-center gap-1.5 sm:gap-2.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl gradient-purple-btn text-slate-950 text-xs sm:text-sm font-extrabold shadow-lg shadow-lime-500/20"
+              className="relative flex items-center gap-1.5 sm:gap-2.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl gradient-lime-btn text-slate-950 text-xs sm:text-sm font-extrabold shadow-lg shadow-lime-500/20"
             >
               <ShoppingBag className="w-4 h-4" />
               <span>السلة</span>
@@ -597,7 +597,7 @@ export default function StoreFrontPage() {
             {/* Admin Dashboard Link */}
             <a
               href="/admin"
-              className="p-1.5 sm:p-2 rounded-xl bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 text-[11px] sm:text-xs transition flex-shrink-0"
+              className="p-1.5 sm:p-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/60 text-slate-400 hover:text-slate-200 border border-purple-900/60 text-[11px] sm:text-xs transition flex-shrink-0"
               title="لوحة التحكم"
             >
               🔒 الإدارة
@@ -639,27 +639,25 @@ export default function StoreFrontPage() {
       ) : (
         <>
       {/* --- HERO SECTION --- */}
-      <section className="relative overflow-hidden border-b border-purple-900/40 bg-gradient-to-b from-purple-950/60 via-slate-950 to-slate-950 py-12 sm:py-16">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_center,rgba(142,208,0,0.12),transparent_60%)]"></div>
+      <section className="relative overflow-hidden border-b border-purple-900/40 bg-gradient-to-b from-purple-950/70 via-slate-950 to-slate-950 py-12 sm:py-16">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_center,rgba(142,208,0,0.14),transparent_60%)]"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-6">
           
           <div className="flex justify-center">
             <img 
               src="/logo-removebg-preview.png" 
-              alt="themedix" 
-              className="h-16 sm:h-24 w-auto object-contain filter drop-shadow-[0_0_25px_rgba(142,208,0,0.4)] transition hover:scale-105 duration-300"
+              alt="the medix" 
+              className="h-20 sm:h-28 w-auto object-contain filter drop-shadow-[0_0_35px_rgba(142,208,0,0.45)] transition hover:scale-105 duration-300"
             />
           </div>
 
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-lime-500/10 border border-lime-500/30 text-lime-300 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5 text-lime-400" />
-            <span>
-              <span className="inline-flex items-baseline font-sans dir-ltr font-bold text-xs"><span className="italic text-[#8ed000] font-serif">the</span><span className="text-white font-normal">medix</span></span> • المتجر الرسمي لمستلزمات تخرج الدفعة التاسعة
-            </span>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-lime-500/10 border border-lime-500/30 text-lime-300 text-xs font-bold">
+            <Sparkles className="w-4 h-4 text-lime-400" />
+            <span>المتجر الرسمي لمستلزمات تخرج الدفعة التاسعة</span>
           </div>
 
           <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
-            احجز منتجات <span className="inline-flex items-baseline font-sans dir-ltr mx-1.5"><span className="italic text-[#8ed000] font-serif font-bold">the</span><span className="text-white font-light lowercase">medix</span></span> الآن 🎓
+            احجز منتجات التخرج الرسمية الآن 🎓
           </h2>
           <p className="max-w-2xl mx-auto text-slate-300 text-sm sm:text-base leading-relaxed">
             اختر المنتجات والمقاسات والتطريز المخصص بالاسم، وادفع فوراً عبر فودافون كاش أو إنستا باي مع التوثيق المباشر للطلب.

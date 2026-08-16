@@ -7,49 +7,49 @@
 :root {
   --font-cairo: 'Cairo', sans-serif;
   --font-inter: 'Inter', sans-serif;
-  --medix-purple: #130026;
+  --medix-purple: #0f031b;
   --medix-lime: #8ed000;
 }
 
 html, body {
   font-family: var(--font-cairo), var(--font-inter);
-  background-color: #120024 !important;
+  background-color: #0b0214 !important;
   color: #f8fafc !important;
   min-height: 100vh;
 }
 
 /* Glassmorphism Styles for The Medix Identity */
 .glass-card {
-  background: rgba(28, 8, 48, 0.75);
+  background: rgba(22, 6, 38, 0.75);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(142, 208, 0, 0.15);
+  border: 1px solid rgba(142, 208, 0, 0.18);
 }
 
 .glass-modal {
-  background: rgba(18, 4, 34, 0.95);
+  background: rgba(14, 3, 26, 0.96);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(142, 208, 0, 0.2);
+  border: 1px solid rgba(142, 208, 0, 0.25);
 }
 
 .gradient-gold-text, .gradient-medix-text {
-  background: linear-gradient(135deg, #a3e635 0%, #84cc16 50%, #ffffff 100%);
+  background: linear-gradient(135deg, #bef264 0%, #84cc16 60%, #ffffff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .gradient-lime-btn, .gradient-purple-btn {
-  background: linear-gradient(135deg, #84cc16 0%, #65a30d 100%);
-  color: #020617;
+  background: linear-gradient(135deg, #a3e635 0%, #84cc16 100%);
+  color: #090212;
   font-weight: 800;
   transition: all 0.2s ease-in-out;
 }
 
 .gradient-lime-btn:hover, .gradient-purple-btn:hover {
-  background: linear-gradient(135deg, #a3e635 0%, #84cc16 100%);
+  background: linear-gradient(135deg, #bef264 0%, #a3e635 100%);
   transform: translateY(-1px);
-  box-shadow: 0 10px 25px -5px rgba(132, 204, 22, 0.4);
+  box-shadow: 0 10px 25px -5px rgba(132, 204, 22, 0.45);
 }
 
 /* Custom Scrollbars */
