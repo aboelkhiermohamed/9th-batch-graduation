@@ -20,7 +20,8 @@ import {
   Trash2,
   Plus,
   Minus,
-  Lock
+  Lock,
+  Wrench
 } from 'lucide-react';
 import { CartItem, Order, PaymentMethod, StoreSettings, ProductAddon } from '@/types';
 import { DEFAULT_SETTINGS, cleanDisplayNotes } from '@/lib/supabaseClient';
@@ -224,6 +225,15 @@ export default function CheckoutPage() {
   // Submit Order
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (settings.maintenance_mode) {
+      const isAdmin = typeof window !== 'undefined' && sessionStorage.getItem('admin_authenticated') === 'true';
+      if (!isAdmin) {
+        alert('عفواً، المتجر في وضع الصيانة والتحديث حالياً، تم تعليق استقبال الطلبات الجديدة مؤقتاً.');
+        return;
+      }
+    }
+
     if (cart.length === 0) {
       alert('السلة فارغة، يرجى إضافة منتجات أولاً');
       return;
@@ -306,6 +316,32 @@ export default function CheckoutPage() {
         </div>
       </div>
     );
+  }
+
+  // --- MAINTENANCE MODE PROTECTION ---
+  if (settings.maintenance_mode) {
+    const isAdmin = typeof window !== 'undefined' && sessionStorage.getItem('admin_authenticated') === 'true';
+    if (!isAdmin) {
+      return (
+        <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-slate-900 border border-amber-500/30 rounded-3xl p-6 sm:p-8 text-center space-y-6 shadow-2xl">
+            <div className="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto animate-pulse">
+              <Wrench className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-white">المتجر في وضع التحديث والصيانة حالياً 🚧</h2>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              نقوم حالياً بإجراء صيانة مجدولة وتحديثات للمتجر وحصر الطلبات. تم تعليق استقبال الطلبات الجديدة مؤقتاً، سنعود للعمل بكامل طاقتنا قريباً جداً!
+            </p>
+            <button
+              onClick={() => router.push('/')}
+              className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-xl transition"
+            >
+              العودة للصفحة الرئيسية
+            </button>
+          </div>
+        </div>
+      );
+    }
   }
 
   // --- ORDER SUCCESS CONFIRMATION VIEW ---

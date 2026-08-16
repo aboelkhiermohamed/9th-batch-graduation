@@ -1675,94 +1675,140 @@ export default function AdminDashboardPage() {
 
   const isSuperAdmin = currentAdmin?.role === 'superadmin';
 
-  const navTabs = [
-    { id: 'orders', label: 'إدارة الطلبات', badge: `${orders.length}`, icon: ShoppingBag },
-    { id: 'products', label: 'المنتجات والمعرض', badge: `${products.length}`, icon: Package },
-    { id: 'analytics', label: 'إحصائيات ومبيعات 📊', badge: null, icon: BarChart3 },
-    ...(isSuperAdmin ? [{ id: 'admins', label: 'إدارة الأدمنز والمشرفين 🔑', badge: `${adminsList.length}`, icon: ShieldCheck }] : []),
-    { id: 'gateway', label: 'بوابة SMS والأجهزة', badge: `${devices.filter(d => d.status === 'online').length} أونلاين`, icon: Smartphone },
-    { id: 'settings', label: 'إعدادات الدفع والمحفظة', badge: null, icon: Settings },
-    { id: 'maintenance', label: 'الصيانة والباك أب ⚙️', badge: settings.maintenance_mode ? '🚧 مفعّل' : null, icon: Wrench },
-    { id: 'sms', label: 'سجل الـ SMS', badge: `${transactions.length}`, icon: MessageSquare }
+  const navSections = [
+    {
+      groupTitle: 'العمليات والمبيعات',
+      items: [
+        { id: 'analytics', label: 'إحصائيات ومبيعات 📊', badge: 'حي', badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', icon: BarChart3 },
+        { id: 'orders', label: 'إدارة الطلبات', badge: `${orders.length}`, badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30', icon: ShoppingBag },
+        { id: 'products', label: 'المنتجات والمعرض', badge: `${products.length}`, badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', icon: Package }
+      ]
+    },
+    {
+      groupTitle: 'النظام والبوابات',
+      items: [
+        { 
+          id: 'gateway', 
+          label: 'بوابة SMS والأجهزة', 
+          badge: `${devices.filter(d => d.status === 'online').length} أونلاين`, 
+          badgeColor: devices.some(d => d.status === 'online') ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-slate-800 text-slate-400 border-slate-700', 
+          icon: Smartphone 
+        },
+        { id: 'sms', label: 'سجل رسائل SMS', badge: `${transactions.length}`, badgeColor: 'bg-slate-800 text-slate-300 border-slate-700', icon: MessageSquare },
+        { id: 'settings', label: 'إعدادات الدفع والمحفظة', badge: null, badgeColor: '', icon: Settings }
+      ]
+    },
+    {
+      groupTitle: 'الإدارة والأمان',
+      items: [
+        ...(isSuperAdmin ? [{ id: 'admins', label: 'إدارة الأدمن والمشرفين 🔑', badge: `${adminsList.length}`, badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30', icon: ShieldCheck }] : []),
+        { id: 'maintenance', label: 'الصيانة والباك أب ⚙️', badge: settings.maintenance_mode ? '🚧 مفعّل' : null, badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30', icon: Wrench }
+      ]
+    }
   ];
+
+  const navTabs = navSections.flatMap(sec => sec.items);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans dir-rtl">
       
-      {/* --- DESKTOP VERTICAL SIDEBAR MENU (قائمة جانبية عمودية) --- */}
-      <aside className="hidden md:flex flex-col w-64 flex-shrink-0 bg-slate-900 border-l border-slate-800 h-screen sticky top-0 p-5 space-y-6 overflow-y-auto">
+      {/* --- DESKTOP VERTICAL SIDEBAR MENU (قائمة جانبية عمودية مجمعة) --- */}
+      <aside className="hidden md:flex flex-col w-64 flex-shrink-0 bg-slate-900 border-l border-slate-800/80 h-screen sticky top-0 p-4 space-y-5 overflow-y-auto selection:bg-indigo-500 selection:text-white shadow-2xl">
         
         {/* Header & Logo */}
-        <div className="space-y-3 pb-4 border-b border-slate-800">
+        <div className="space-y-3 pb-3.5 border-b border-slate-800/80">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 flex-shrink-0 shadow-lg shadow-amber-500/10">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/30 flex items-center justify-center text-amber-400 flex-shrink-0 shadow-lg shadow-amber-500/10">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm font-extrabold text-white truncate">لوحة الإدارة</h1>
+              <h1 className="text-sm font-extrabold text-white truncate flex items-center gap-1.5">
+                <span>لوحة الإدارة</span>
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded-md font-mono border border-amber-500/30">v2.0</span>
+              </h1>
               <p className="text-[11px] text-amber-400 font-semibold truncate">{settings.store_name}</p>
             </div>
           </div>
 
           <a
             href="/"
-            className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 flex items-center justify-center gap-1.5 transition border border-slate-700/80"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-2 px-3 rounded-xl bg-slate-950/80 hover:bg-slate-800 text-xs font-bold text-slate-300 flex items-center justify-center gap-1.5 transition border border-slate-800 hover:border-slate-700 shadow-sm"
           >
             <span>عرض المتجر الرئيسي ↗</span>
           </a>
         </div>
 
-        {/* Vertical Navigation Tabs List */}
-        <nav className="flex-1 space-y-1.5">
-          {navTabs.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
+        {/* Grouped Vertical Navigation Menu */}
+        <nav className="flex-1 space-y-5">
+          {navSections.map((section, sIdx) => {
+            if (section.items.length === 0) return null;
+
             return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl font-bold text-xs transition-all ${
-                  isActive
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 translate-x-1'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-amber-300' : 'text-slate-400'}`} />
-                  <span className="truncate">{tab.label}</span>
+              <div key={sIdx} className="space-y-1.5">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-1">
+                  {section.groupTitle}
+                </p>
+                <div className="space-y-1">
+                  {section.items.map(tab => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as any)}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl font-bold text-xs transition-all duration-200 ${
+                          isActive
+                            ? 'bg-gradient-to-r from-indigo-600 via-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/25 ring-1 ring-indigo-500/50 translate-x-1'
+                            : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-amber-300' : 'text-slate-400'}`} />
+                          <span className="truncate">{tab.label}</span>
+                        </div>
+
+                        {tab.badge && (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold flex-shrink-0 border ${
+                            isActive 
+                              ? 'bg-white/20 text-white border-white/30' 
+                              : tab.badgeColor || 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}>
+                            {tab.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-                {tab.badge && (
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-extrabold flex-shrink-0 ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300 border border-slate-700'
-                  }`}>
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
+              </div>
             );
           })}
         </nav>
 
-        {/* Footer Admin Info & Actions */}
-        <div className="pt-4 border-t border-slate-800 space-y-3">
+        {/* Footer Admin Profile & Controls */}
+        <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
           {currentAdmin && (
-            <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+            <div className="p-2.5 rounded-2xl bg-slate-950/90 border border-slate-800/80 flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                  <ShieldCheck className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs flex-shrink-0 border border-amber-500/30">
+                  <User className="w-3.5 h-3.5" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-white truncate">{currentAdmin.display_name || currentAdmin.username}</p>
-                  <p className="text-[10px] text-amber-400 font-mono">@{currentAdmin.username} • {currentAdmin.role === 'superadmin' ? 'مدير عام' : 'مشرف'}</p>
+                  <p className="text-[10px] text-amber-400 font-mono truncate">@{currentAdmin.username} • {currentAdmin.role === 'superadmin' ? 'مدير عام' : 'مشرف'}</p>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={fetchAllData}
-              className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 flex items-center justify-center gap-1.5 transition border border-slate-700"
+              className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 transition border border-slate-700/80"
               title="تحديث البيانات"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isLoading ? 'animate-spin' : ''}`} />
@@ -1770,16 +1816,18 @@ export default function AdminDashboardPage() {
             </button>
 
             <button
+              type="button"
               onClick={() => {
                 sessionStorage.removeItem('admin_authenticated');
                 sessionStorage.removeItem('admin_profile');
                 setIsAuthenticated(false);
                 setCurrentAdmin(null);
               }}
-              className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition border border-rose-500/20 mr-2"
+              className="py-2 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition border border-rose-500/20 flex items-center justify-center gap-1 text-xs font-bold"
               title="تسجيل الخروج"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5" />
+              <span>خروج</span>
             </button>
           </div>
         </div>

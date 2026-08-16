@@ -5,7 +5,8 @@ import {
   setMemoryOrders, 
   saveOrderToSupabase, 
   fetchOrdersFromSupabase, 
-  updateOrderStatusInSupabase 
+  updateOrderStatusInSupabase,
+  fetchSettingsFromSupabase
 } from '@/lib/supabaseClient';
 import { matchOrderWithUnmatchedTransactions } from '@/lib/matchingEngine';
 
@@ -18,6 +19,14 @@ function generateUUID() {
 
 export async function POST(req: NextRequest) {
   try {
+    const settings = await fetchSettingsFromSupabase();
+    if (settings && settings.maintenance_mode) {
+      return NextResponse.json(
+        { error: 'عفواً، المتجر في وضع الصيانة والتحديث حالياً، تم تعليق استقبال الطلبات الجديدة مؤقتاً' },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const { customerName, customerPhone, senderPhone, transactionRef, paymentMethod, items, notes, receiptUrl, receipt_url, totalAmount: customTotal, total_amount } = body;
 

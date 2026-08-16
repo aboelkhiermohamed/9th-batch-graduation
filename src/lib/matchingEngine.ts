@@ -64,7 +64,8 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
     for (const order of pendingOrders) {
       const targetAmount = getExpectedAmount(order);
       const amountDiff = Math.abs(Number(targetAmount) - Number(tx.amount));
-      const isAmountMatch = amountDiff < 0.01 || tx.amount === 0;
+      // Allow exact match OR fee tolerance (where tx.amount is targetAmount + cash fee up to 25 EGP)
+      const isAmountMatch = amountDiff < 0.01 || tx.amount === 0 || (tx.amount >= targetAmount && (tx.amount - targetAmount) <= 25) || amountDiff <= 5;
 
       const cleanCustomerPhone = normalizePhoneNumber(order.customer_phone);
       const cleanSenderPhone = order.sender_phone ? normalizePhoneNumber(order.sender_phone) : '';
@@ -99,9 +100,11 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
 
   // 4. Fallback: If amount matches only 1 single pending order
   if (!matchedOrder) {
-    const amountMatches = pendingOrders.filter(
-      o => Math.abs(Number(getExpectedAmount(o)) - Number(tx.amount)) < 0.01
-    );
+    const amountMatches = pendingOrders.filter(o => {
+      const targetAmount = getExpectedAmount(o);
+      const diff = Math.abs(Number(targetAmount) - Number(tx.amount));
+      return diff < 0.01 || (tx.amount >= targetAmount && (tx.amount - targetAmount) <= 25);
+    });
     if (amountMatches.length === 1) {
       matchedOrder = amountMatches[0];
     }
@@ -111,7 +114,7 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
     const confirmedLine = tx.recipient_phone || tx.device_name || undefined;
     const isPartialSettlement = Boolean(matchedOrder.is_difference_pending || matchedOrder.status === 'pending_difference');
     const newPaidAmount = isPartialSettlement 
-      ? ((matchedOrder.paid_amount || 0) + tx.amount) 
+      ? Math.max(matchedOrder.total_amount || 0, (matchedOrder.paid_amount || 0) + tx.amount) 
       : (matchedOrder.total_amount || tx.amount);
 
     // Update order status in memory & Supabase
