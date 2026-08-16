@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { X, Lock, User, Phone, Mail, GraduationCap, ArrowRight, CheckCircle2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { isValidEgyptianPhone } from '@/lib/smsParser';
 
 export interface CustomerSession {
   id?: string;
@@ -106,6 +107,12 @@ export default function AuthModal({
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthErrorMessage('');
+
+    if (!isValidEgyptianPhone(registerPhone.trim())) {
+      setAuthErrorMessage('يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {

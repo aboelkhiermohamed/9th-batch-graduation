@@ -9,6 +9,7 @@ import {
   fetchSettingsFromSupabase
 } from '@/lib/supabaseClient';
 import { matchOrderWithUnmatchedTransactions } from '@/lib/matchingEngine';
+import { isValidEgyptianPhone } from '@/lib/smsParser';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -33,6 +34,13 @@ export async function POST(req: NextRequest) {
     if (!customerName?.trim() || !customerPhone?.trim() || !transactionRef?.trim() || !items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
         { error: 'جميع البيانات مطلوبة: الاسم بالكامل، رقم الموبايل، والرقم المرجعي للمعاملة/العملية' },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidEgyptianPhone(customerPhone.trim())) {
+      return NextResponse.json(
+        { error: 'رقم الموبايل غير صحيح. ينبغي إدخال رقم موبايل مصري مكون من 11 رقماً يبدأ بـ (010, 011, 012, 015)' },
         { status: 400 }
       );
     }

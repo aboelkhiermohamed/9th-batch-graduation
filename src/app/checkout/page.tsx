@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthModal from '@/components/AuthModal';
+import { isValidEgyptianPhone } from '@/lib/smsParser';
 import { 
   ShoppingBag, 
   Copy, 
@@ -243,6 +244,11 @@ export default function CheckoutPage() {
 
     if (!customerName.trim() || !finalPhone || !transactionRef.trim()) {
       alert('يرجى إدخال اسم العميل ورقم الموبايل والرقم المرجعي للعملية');
+      return;
+    }
+
+    if (!isValidEgyptianPhone(finalPhone)) {
+      alert('عفواً، رقم الموبايل غير صحيح! يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
       return;
     }
 

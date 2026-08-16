@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { isValidEgyptianPhone } from '@/lib/smsParser';
 
 export async function POST(req: Request) {
   try {
@@ -13,6 +14,10 @@ export async function POST(req: Request) {
     const cleanPhone = phone_number.trim();
     const cleanEmail = email ? email.trim().toLowerCase() : undefined;
     const cleanPassword = password.trim();
+
+    if (!isValidEgyptianPhone(cleanPhone)) {
+      return NextResponse.json({ error: 'رقم الموبايل غير صحيح! يجب إدخال رقم موبايل مصري يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً' }, { status: 400 });
+    }
 
     if (cleanPassword.length < 4) {
       return NextResponse.json({ error: 'كلمة المرور يجب أن لا تقل عن 4 أرقام أو حروف' }, { status: 400 });

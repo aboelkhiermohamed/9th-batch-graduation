@@ -26,6 +26,17 @@ export function normalizePhoneNumber(phone: string): string {
 }
 
 /**
+ * Validates Egyptian mobile phone numbers (must be 11 digits starting with 010, 011, 012, or 015)
+ */
+export function isValidEgyptianPhone(phone: string): boolean {
+  if (!phone) return false;
+  const clean = phone.trim().replace(/[\s\-\(\)]/g, '');
+  if (/[^\d\+]/.test(clean)) return false;
+  const egRegex = /^(\+?20)?(10|11|12|15)\d{8}$/;
+  return egRegex.test(clean);
+}
+
+/**
  * Parses raw incoming SMS from Vodafone Cash or InstaPay
  */
 export function parsePaymentSMS(sender: string, message: string): ParsedSMS {

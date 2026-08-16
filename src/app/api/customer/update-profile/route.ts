@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { isValidEgyptianPhone } from '@/lib/smsParser';
 
 export async function PUT(req: Request) {
   try {
@@ -11,6 +12,10 @@ export async function PUT(req: Request) {
 
     if (!cleanName) {
       return NextResponse.json({ error: 'يرجى إدخال الاسم بالكامل' }, { status: 400 });
+    }
+
+    if (targetPhone && !isValidEgyptianPhone(targetPhone)) {
+      return NextResponse.json({ error: 'رقم الموبايل غير صحيح! يجب أن يكون رقم موبايل مصري مكون من 11 رقماً يبدأ بـ (010, 011, 012, 015)' }, { status: 400 });
     }
 
     if (supabase) {
