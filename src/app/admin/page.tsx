@@ -1717,16 +1717,16 @@ export default function AdminDashboardPage() {
         
         {/* Header & Logo */}
         <div className="space-y-3 pb-3.5 border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/30 flex items-center justify-center text-amber-400 flex-shrink-0 shadow-lg shadow-amber-500/10">
-              <ShieldCheck className="w-6 h-6" />
+          <div className="flex items-center gap-2.5">
+            <div className="h-10 px-2 rounded-2xl bg-purple-950/80 border border-lime-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-lime-500/10">
+              <img src="/logo-removebg-preview.png" alt="The Medix Logo" className="h-6 w-auto object-contain" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm font-extrabold text-white truncate flex items-center gap-1.5">
-                <span>لوحة الإدارة</span>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded-md font-mono border border-amber-500/30">v2.0</span>
+              <h1 className="text-sm font-black text-white truncate flex items-center gap-1.5">
+                <span>The Medix</span>
+                <span className="text-[10px] bg-lime-500/20 text-lime-300 px-1.5 py-0.2 rounded-md font-mono border border-lime-500/30">Admin</span>
               </h1>
-              <p className="text-[11px] text-amber-400 font-semibold truncate">{settings.store_name}</p>
+              <p className="text-[11px] text-lime-400 font-semibold truncate">{settings.store_name}</p>
             </div>
           </div>
 

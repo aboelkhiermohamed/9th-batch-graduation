@@ -552,21 +552,26 @@ export default function StoreFrontPage() {
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2">
           
           {/* Logo & Title */}
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-indigo-800 p-0.5 shadow-lg shadow-indigo-500/20 flex-shrink-0">
-              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                <Award className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 animate-pulse" />
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <a href="/" className="flex items-center gap-3 group">
+              <div className="h-10 sm:h-12 px-2 rounded-2xl bg-purple-950/70 border border-lime-500/30 shadow-lg shadow-lime-500/10 group-hover:border-lime-400 transition flex items-center justify-center">
+                <img 
+                  src="/logo-removebg-preview.png" 
+                  alt="The Medix Logo" 
+                  className="h-7 sm:h-9 w-auto object-contain filter drop-shadow-[0_0_8px_rgba(142,208,0,0.35)]" 
+                />
               </div>
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-sm sm:text-xl font-black tracking-tight gradient-gold-text truncate">
-                متجر الدفعة التاسعة
-              </h1>
-              <p className="text-[10px] sm:text-xs text-slate-400 hidden xs:flex items-center gap-1 truncate">
-                <span>🎓 مستلزمات وحجوزات التخرج الرسمية</span>
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
-              </p>
-            </div>
+              <div className="min-w-0">
+                <h1 className="text-sm sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5 truncate">
+                  <span className="gradient-medix-text font-black">The Medix</span>
+                  <span className="text-[10px] text-lime-300 font-mono bg-lime-500/15 border border-lime-500/30 px-1.5 py-0.5 rounded-md hidden xs:inline-block">الدفعة التاسعة</span>
+                </h1>
+                <p className="text-[10px] sm:text-xs text-slate-400 hidden xs:flex items-center gap-1 truncate">
+                  <span>🎓 المتجر الرسمي لمستلزمات وتطريز التخرج</span>
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-lime-400 flex-shrink-0 animate-ping"></span>
+                </p>
+              </div>
+            </a>
           </div>
 
           {/* Action Buttons */}
@@ -643,20 +648,30 @@ export default function StoreFrontPage() {
       ) : (
         <>
       {/* --- HERO SECTION --- */}
-      <section className="relative overflow-hidden border-b border-slate-800/60 bg-gradient-to-b from-indigo-950/40 via-slate-950 to-slate-950 py-12 sm:py-16">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent_50%)]"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+      <section className="relative overflow-hidden border-b border-purple-900/40 bg-gradient-to-b from-purple-950/60 via-slate-950 to-slate-950 py-12 sm:py-16">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_center,rgba(142,208,0,0.12),transparent_60%)]"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-5">
           
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-6">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>منتجات ومستلزمات تخرج الدفعة التاسعة الحصرية</span>
+          <div className="flex justify-center">
+            <div className="p-3 sm:p-4 rounded-3xl bg-purple-950/80 border border-lime-500/30 shadow-2xl shadow-lime-500/10 backdrop-blur-md transition hover:scale-105 duration-300">
+              <img 
+                src="/logo-removebg-preview.png" 
+                alt="The Medix Logo" 
+                className="h-14 sm:h-20 w-auto object-contain mx-auto filter drop-shadow-[0_0_15px_rgba(142,208,0,0.4)]"
+              />
+            </div>
           </div>
 
-          <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white mb-4 leading-tight">
-            احجز منتجات <span className="gradient-gold-text">الدفعة التاسعة</span> الآن
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-lime-500/10 border border-lime-500/30 text-lime-300 text-xs font-semibold">
+            <Sparkles className="w-3.5 h-3.5 text-lime-400" />
+            <span>The Medix • المتجر الرسمي لمستلزمات تخرج الدفعة التاسعة</span>
+          </div>
+
+          <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
+            احجز منتجات <span className="gradient-gold-text">The Medix</span> الآن 🎓
           </h2>
-          <p className="max-w-2xl mx-auto text-slate-400 text-sm sm:text-base mb-2 leading-relaxed">
-            تصفح صور المنتج بالكامل، اختر المقاس والتطريز المطلوب، وادفع فوراً عبر فودافون كاش أو إنستا باي مع التأكيد المباشر للطلب.
+          <p className="max-w-2xl mx-auto text-slate-300 text-sm sm:text-base leading-relaxed">
+            اختر المنتجات والمقاسات والتطريز المخصص بالاسم، وادفع فوراً عبر فودافون كاش أو إنستا باي مع التوثيق المباشر للطلب.
           </p>
         </div>
       </section>

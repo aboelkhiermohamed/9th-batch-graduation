@@ -649,12 +649,12 @@ export default function CustomerProfilePage() {
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-700 p-0.5 shadow-lg shadow-amber-500/20 flex items-center justify-center">
-              <Award className="w-5 h-5 text-slate-950" />
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 sm:h-10 px-2 rounded-xl bg-purple-950/70 border border-lime-500/30 flex items-center justify-center flex-shrink-0">
+              <img src="/logo-removebg-preview.png" alt="The Medix Logo" className="h-6 sm:h-7 w-auto object-contain" />
             </div>
-            <span className="text-sm sm:text-base font-bold gradient-gold-text hidden xs:inline">
-              بروفايل عميل الدفعة التاسعة
+            <span className="text-sm sm:text-base font-bold gradient-medix-text hidden xs:inline">
+              The Medix • بروفايل حسابي
             </span>
           </div>
         </div>

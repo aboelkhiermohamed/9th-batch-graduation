@@ -9,7 +9,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // --- INITIAL FALLBACK / SEED DATA ---
 export const DEFAULT_SETTINGS: StoreSettings = {
   id: 'default',
-  store_name: '9th batch graduation',
+  store_name: 'The Medix - الدفعة التاسعة',
   vodafone_cash_enabled: true,
   instapay_enabled: false,
   vodafone_cash_fee_percent: 1,

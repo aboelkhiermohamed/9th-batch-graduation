@@ -222,13 +222,18 @@ export default function StandaloneProductPage() {
       {/* --- TOP NAVBAR --- */}
       <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
-          <button 
-            onClick={() => router.push('/')}
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 transition flex items-center gap-1.5 text-xs sm:text-sm font-semibold border border-slate-700/60"
-          >
-            <ChevronRight className="w-4 h-4 text-amber-400" />
-            <span>العودة للمتجر الرئيسي</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => router.push('/')}
+              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 transition flex items-center gap-1.5 text-xs sm:text-sm font-semibold border border-slate-700/60"
+            >
+              <ChevronRight className="w-4 h-4 text-lime-400" />
+              <span>العودة للمتجر</span>
+            </button>
+            <div className="hidden xs:flex items-center gap-2 h-9 px-2 rounded-xl bg-purple-950/70 border border-lime-500/30">
+              <img src="/logo-removebg-preview.png" alt="The Medix Logo" className="h-6 w-auto object-contain" />
+            </div>
+          </div>
 
           <div className="flex items-center gap-3">
             <button

@@ -204,9 +204,14 @@ export default function PayDifferencePage() {
             <ArrowRight className="w-4 h-4 text-amber-400" />
             <span>العودة لطلباتي</span>
           </button>
-          <div className="text-center">
-            <h1 className="text-sm sm:text-base font-bold text-amber-400">فاتورة سداد فرق السعر</h1>
-            <p className="text-[10px] text-slate-400 font-mono">الطلب #{order.order_code}</p>
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 px-2 rounded-xl bg-purple-950/70 border border-lime-500/30 flex items-center justify-center flex-shrink-0">
+              <img src="/logo-removebg-preview.png" alt="The Medix Logo" className="h-6 w-auto object-contain" />
+            </div>
+            <div className="text-right">
+              <h1 className="text-xs sm:text-base font-bold text-lime-400">فاتورة سداد فرق السعر</h1>
+              <p className="text-[10px] text-slate-300 font-mono">الطلب #{order.order_code}</p>
+            </div>
           </div>
         </div>
       </header>
