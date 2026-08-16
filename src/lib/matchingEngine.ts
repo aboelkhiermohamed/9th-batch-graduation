@@ -50,13 +50,25 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
   };
 
   // 1. Highest Priority: Match by Transaction Reference Number (الرقم المرجعي)
-  if (txRefClean) {
-    matchedOrder = pendingOrders.find(o => {
-      if (!o.transaction_ref) return false;
-      const oRef = o.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const o of pendingOrders) {
+    if (!o.transaction_ref) continue;
+    const oRef = o.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!oRef || oRef.length < 4) continue;
+
+    if (txRefClean) {
       const tRef = txRefClean.replace(/[^a-z0-9]/g, '');
-      return oRef === tRef || (oRef.length > 5 && (tRef.includes(oRef) || oRef.includes(tRef)));
-    });
+      if (oRef === tRef || (oRef.length > 5 && (tRef.includes(oRef) || oRef.includes(tRef)))) {
+        matchedOrder = o;
+        break;
+      }
+    }
+    if (tx.raw_sms) {
+      const rawClean = tx.raw_sms.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (rawClean.includes(oRef)) {
+        matchedOrder = o;
+        break;
+      }
+    }
   }
 
   // 2. Second Priority: Amount + Phone Match
