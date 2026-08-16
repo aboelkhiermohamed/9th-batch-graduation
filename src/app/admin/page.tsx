@@ -49,7 +49,9 @@ import {
   RotateCcw,
   ShieldAlert,
   Image as ImageIcon,
-  Ruler
+  Ruler,
+  DollarSign,
+  TrendingUp
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
 import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase } from '@/lib/supabaseClient';
@@ -123,13 +125,22 @@ export default function AdminDashboardPage() {
     setEditingOrder(order);
     setEditOrderItems(JSON.parse(JSON.stringify(order.items || [])));
 
+    // Calculate net subtotal of existing items in the order
+    const existingItemsNetSubtotal = (order.items || []).reduce(
+      (sum, item) => sum + (Number(item.unit_price || 0) * Number(item.quantity || 1)),
+      0
+    );
+
     let initialPaid = 0;
-    if (order.paid_amount !== undefined && order.paid_amount > 0) {
-      initialPaid = order.paid_amount;
+    // If order is paid/verified, use net items subtotal to exclude previous payment fees (e.g. Vodafone Cash fee)
+    if (order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered') {
+      initialPaid = existingItemsNetSubtotal > 0 ? existingItemsNetSubtotal : (order.total_amount || 0);
+    } else if (order.paid_amount !== undefined && order.paid_amount > 0) {
+      initialPaid = existingItemsNetSubtotal > 0 ? Math.min(order.paid_amount, existingItemsNetSubtotal) : order.paid_amount;
     } else if (order.difference_amount && order.difference_amount > 0) {
-      initialPaid = Math.max(0, order.total_amount - order.difference_amount);
+      initialPaid = Math.max(0, (order.total_amount || 0) - order.difference_amount);
     } else {
-      initialPaid = order.total_amount || 0;
+      initialPaid = existingItemsNetSubtotal > 0 ? existingItemsNetSubtotal : (order.total_amount || 0);
     }
 
     setEditPaidAmount(String(initialPaid));
@@ -2712,128 +2723,403 @@ export default function AdminDashboardPage() {
         {activeTab === 'analytics' && (
           <div className="space-y-6">
             
-            {/* Header / Overview Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-5 rounded-3xl glass-card border border-emerald-500/30 bg-slate-900/90 space-y-2">
-                <div className="flex items-center justify-between text-emerald-400">
-                  <span className="text-xs font-bold text-slate-400">إجمالي المبيعات الإجمالية</span>
-                  <ShoppingBag className="w-5 h-5" />
-                </div>
-                <p className="text-3xl font-black text-white">{totalGrossRevenue} <span className="text-sm font-bold text-emerald-400">ج.م</span></p>
-                <p className="text-[11px] text-slate-400">من إجمالي {orders.length} طلب بالمتجر</p>
-              </div>
-
-              <div className="p-5 rounded-3xl glass-card border border-amber-500/30 bg-slate-900/90 space-y-2">
-                <div className="flex items-center justify-between text-amber-400">
-                  <span className="text-xs font-bold text-slate-400">الطلبات المؤكدة والجاهزة</span>
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <p className="text-3xl font-black text-amber-400">{totalVerifiedOrders} <span className="text-sm font-bold text-slate-400">طلب</span></p>
-                <p className="text-[11px] text-slate-400">مؤكد تلقائياً عبر بوابة الموبايل أو يدوياً</p>
-              </div>
-
-              <div className="p-5 rounded-3xl glass-card border border-indigo-500/30 bg-slate-900/90 space-y-2">
-                <div className="flex items-center justify-between text-indigo-400">
-                  <span className="text-xs font-bold text-slate-400">متوسط قيمة الطلب (AOV)</span>
-                  <BarChart3 className="w-5 h-5" />
-                </div>
-                <p className="text-3xl font-black text-indigo-300">
-                  {orders.length > 0 ? Math.round(totalGrossRevenue / orders.length) : 0} <span className="text-sm font-bold text-slate-400">ج.م</span>
+            {/* Header & Report Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl">
+              <div>
+                <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                  <BarChart3 className="w-6 h-6 text-amber-400" />
+                  <span>مركز التحليلات والذكاء التجاري 📊</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  نظرة شمولية وحية على مؤشرات الأداء الرئيسية (KPIs)، توزيع المقاسات، وإيرادات المتجر للدفعة التاسعة.
                 </p>
-                <p className="text-[11px] text-slate-400">متوسط سلة العميل الواحدة</p>
               </div>
 
-              <div className="p-5 rounded-3xl glass-card border border-purple-500/30 bg-slate-900/90 space-y-2">
-                <div className="flex items-center justify-between text-purple-400">
-                  <span className="text-xs font-bold text-slate-400">أصناف الكتالوج الحالية</span>
-                  <Package className="w-5 h-5" />
-                </div>
-                <p className="text-3xl font-black text-purple-300">{products.length} <span className="text-sm font-bold text-slate-400">منتجات</span></p>
-                <p className="text-[11px] text-slate-400">منتجات نشطة بالمتجر</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={printStandalonePdfReport}
+                  className="px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>توليد تقرير الـ PDF المصنع 🖨️</span>
+                </button>
               </div>
             </div>
 
-            {/* Charts Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Executive KPI Cards (8 Core Indicators) */}
+            {(() => {
+              const totalOrdersCount = orders.length || 0;
               
-              {/* Size Distribution Breakdown Chart */}
-              <div className="p-6 rounded-3xl glass-card border border-slate-800 bg-slate-900 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <h4 className="text-base font-bold text-white flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-amber-400" />
-                    <span>توزيع المقاسات الأكثر طلباً (Size Demand)</span>
-                  </h4>
-                </div>
+              // Revenue Calculations
+              let totalCollectedCash = 0;
+              let totalPendingBalance = 0;
+              let totalUnitsSold = 0;
+              let embroideredItemsCount = 0;
 
-                <div className="space-y-3 pt-2">
-                  {['S', 'M', 'L', 'XL', 'XXL'].map(size => {
-                    const totalUnitsAll = productSizeStats.reduce((s, p) => s + p.totalUnits, 0) || 1;
-                    const sizeUnits = productSizeStats.reduce((s, p) => s + (p.sizeCounts[size] || 0), 0);
-                    const percentage = Math.round((sizeUnits / totalUnitsAll) * 100);
+              orders.forEach(order => {
+                const items = getOrderEffectiveItems(order);
+                items.forEach(item => {
+                  totalUnitsSold += (item.quantity || 1);
+                  if (item.custom_text || (item as any).customText) {
+                    embroideredItemsCount += (item.quantity || 1);
+                  }
+                });
 
-                    return (
-                      <div key={size} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs font-bold">
-                          <span className="text-amber-300 font-mono">مقاس {size}</span>
-                          <span className="text-slate-300 font-mono">{sizeUnits} قطعة ({percentage}%)</span>
-                        </div>
-                        <div className="w-full h-3 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-500"
-                            style={{ width: `${Math.max(percentage, sizeUnits > 0 ? 5 : 0)}%` }}
-                          ></div>
-                        </div>
+                if (order.paid_amount) {
+                  totalCollectedCash += Number(order.paid_amount);
+                } else if (order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered') {
+                  totalCollectedCash += Number(order.total_amount || 0);
+                }
+
+                if (order.difference_amount && order.difference_amount > 0) {
+                  totalPendingBalance += Number(order.difference_amount);
+                } else if (order.status === 'pending' || order.status === 'pending_difference') {
+                  const unpaid = Math.max(0, (order.total_amount || 0) - (order.paid_amount || 0));
+                  totalPendingBalance += unpaid;
+                }
+              });
+
+              const autoVerifiedCount = orders.filter(o => o.status === 'auto_verified').length;
+              const manualVerifiedCount = orders.filter(o => o.status === 'manual_verified').length;
+              const pendingDiffCount = orders.filter(o => o.status === 'pending_difference' || (o.difference_amount || 0) > 0).length;
+              const pendingCount = orders.filter(o => o.status === 'pending').length;
+              const readyPickupCount = orders.filter(o => o.status === 'ready_for_pickup' || o.status === 'delivered').length;
+              const cancelledCount = orders.filter(o => o.status === 'cancelled').length;
+
+              const autoVerifyPct = totalVerifiedOrders > 0 ? Math.round((autoVerifiedCount / totalVerifiedOrders) * 100) : 0;
+              const embroideredPct = totalUnitsSold > 0 ? Math.round((embroideredItemsCount / totalUnitsSold) * 100) : 0;
+              const avgOrderValue = totalOrdersCount > 0 ? Math.round(totalGrossRevenue / totalOrdersCount) : 0;
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* KPI 1: Gross Sales */}
+                    <div className="p-5 rounded-3xl glass-card border border-emerald-500/30 bg-slate-900/90 space-y-2 relative overflow-hidden">
+                      <div className="flex items-center justify-between text-emerald-400">
+                        <span className="text-xs font-bold text-slate-400">إجمالي قيمة المبيعات</span>
+                        <ShoppingBag className="w-5 h-5" />
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Payment Methods Ratio Chart */}
-              <div className="p-6 rounded-3xl glass-card border border-slate-800 bg-slate-900 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <h4 className="text-base font-bold text-white flex items-center gap-2">
-                    <PieChart className="w-5 h-5 text-indigo-400" />
-                    <span>نسبة طرق الدفع المستخدمة</span>
-                  </h4>
-                </div>
-
-                {(() => {
-                  const vodaCount = orders.filter(o => o.payment_method === 'vodafone_cash').length;
-                  const instaCount = orders.filter(o => o.payment_method === 'instapay').length;
-                  const total = orders.length || 1;
-                  const vodaPct = Math.round((vodaCount / total) * 100);
-                  const instaPct = Math.round((instaCount / total) * 100);
-
-                  return (
-                    <div className="space-y-6 pt-2">
-                      <div className="flex h-6 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-1">
-                        <div className="bg-rose-500 h-full rounded-xl transition-all duration-500" style={{ width: `${vodaPct}%` }}></div>
-                        <div className="bg-purple-500 h-full rounded-xl transition-all duration-500" style={{ width: `${instaPct}%` }}></div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-center space-y-1">
-                          <p className="text-xs font-bold text-rose-300 flex items-center justify-center gap-1.5">
-                            <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-4 h-4 object-contain" />
-                            <span>فودافون كاش</span>
-                          </p>
-                          <p className="text-2xl font-black text-white">{vodaCount} <span className="text-xs text-slate-400">طلب</span></p>
-                          <p className="text-xs font-mono font-bold text-rose-400">{vodaPct}% من الإجمالي</p>
-                        </div>
-
-                        <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 text-center space-y-1">
-                          <p className="text-xs font-bold text-purple-300">🟣 InstaPay</p>
-                          <p className="text-2xl font-black text-white">{instaCount} <span className="text-xs text-slate-400">طلب</span></p>
-                          <p className="text-xs font-mono font-bold text-purple-400">{instaPct}% من الإجمالي</p>
-                        </div>
+                      <p className="text-3xl font-black text-white">{totalGrossRevenue.toLocaleString()} <span className="text-sm font-bold text-emerald-400">ج.م</span></p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                        <span>إجمالي {totalOrdersCount} طلب بالمتجر</span>
+                        <span className="text-emerald-400 font-bold">100% المبيعات</span>
                       </div>
                     </div>
-                  );
-                })()}
-              </div>
 
-            </div>
+                    {/* KPI 2: Verified & Ready Orders */}
+                    <div className="p-5 rounded-3xl glass-card border border-amber-500/30 bg-slate-900/90 space-y-2">
+                      <div className="flex items-center justify-between text-amber-400">
+                        <span className="text-xs font-bold text-slate-400">الطلبات المؤكدة والجاهزة</span>
+                        <CheckCircle2 className="w-5 h-5" />
+                      </div>
+                      <p className="text-3xl font-black text-amber-400">{totalVerifiedOrders} <span className="text-sm font-bold text-slate-400">طلب</span></p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                        <span>معدل التحقق التلقائي:</span>
+                        <span className="text-amber-300 font-bold font-mono">{autoVerifyPct}% عبر الموبايل 📱</span>
+                      </div>
+                    </div>
+
+                    {/* KPI 3: Actual Cash Collected */}
+                    <div className="p-5 rounded-3xl glass-card border border-teal-500/30 bg-slate-900/90 space-y-2">
+                      <div className="flex items-center justify-between text-teal-400">
+                        <span className="text-xs font-bold text-slate-400">المبالغ المحصّلة فعلياً</span>
+                        <DollarSign className="w-5 h-5" />
+                      </div>
+                      <p className="text-3xl font-black text-teal-300">{totalCollectedCash.toLocaleString()} <span className="text-sm font-bold text-slate-400">ج.م</span></p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                        <span>مبالغ مؤكدة بالمحفظة</span>
+                        <span className="text-teal-400 font-bold">متحصلات فعليّة</span>
+                      </div>
+                    </div>
+
+                    {/* KPI 4: Pending Balances & Differences */}
+                    <div className="p-5 rounded-3xl glass-card border border-rose-500/30 bg-slate-900/90 space-y-2">
+                      <div className="flex items-center justify-between text-rose-400">
+                        <span className="text-xs font-bold text-slate-400">المبالغ والفواتير المعلقة</span>
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <p className="text-3xl font-black text-rose-400">{totalPendingBalance.toLocaleString()} <span className="text-sm font-bold text-slate-400">ج.م</span></p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                        <span>فوارق أسعار & غير مؤكد</span>
+                        <span className="text-rose-300 font-bold">{pendingDiffCount + pendingCount} طلب</span>
+                      </div>
+                    </div>
+
+                    {/* KPI 5: Average Order Value (AOV) */}
+                    <div className="p-5 rounded-3xl glass-card border border-indigo-500/30 bg-slate-900/90 space-y-2">
+                      <div className="flex items-center justify-between text-indigo-400">
+                        <span className="text-xs font-bold text-slate-400">متوسط قيمة الطلب (AOV)</span>
+                        <BarChart3 className="w-5 h-5" />
+                      </div>
+                      <p className="text-3xl font-black text-indigo-300">{avgOrderValue.toLocaleString()} <span className="text-sm font-bold text-slate-400">ج.م</span></p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                        <span>متوسط سلة العميل</span>
+                        <span className="text-indigo-400 font-bold">لكل أوردر</span>
+                      </div>
+                    </div>
+
+                    {/* KPI 6: Total Units Sold */}
+                    <div className="p-5 rounded-3xl glass-card border border-purple-500/30 bg-slate-900/90 space-y-2">
+                      <div className="flex items-center justify-between text-purple-400">
+                        <span className="text-xs font-bold text-slate-400">إجمالي القطع المباعة</span>
+                        <Package className="w-5 h-5" />
+                      </div>
+                      <p className="text-3xl font-black text-purple-300">{totalUnitsSold} <span className="text-sm font-bold text-slate-400">قطعة</span></p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                        <span>إجمالي المنتجات المباعة</span>
+                        <span className="text-purple-400 font-bold">للتصنيع</span>
+                      </div>
+                    </div>
+
+                    {/* KPI 7: Personalization & Custom Embroidery */}
+                    <div className="p-5 rounded-3xl glass-card border border-pink-500/30 bg-slate-900/90 space-y-2">
+                      <div className="flex items-center justify-between text-pink-400">
+                        <span className="text-xs font-bold text-slate-400">طلبات التطريز المخصص</span>
+                        <Edit3 className="w-5 h-5" />
+                      </div>
+                      <p className="text-3xl font-black text-pink-300">{embroideredItemsCount} <span className="text-sm font-bold text-slate-400">اسم مخصص</span></p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                        <span>نسبة الطلب على التطريز:</span>
+                        <span className="text-pink-400 font-bold font-mono">{embroideredPct}%</span>
+                      </div>
+                    </div>
+
+                    {/* KPI 8: Active Catalog Products */}
+                    <div className="p-5 rounded-3xl glass-card border border-cyan-500/30 bg-slate-900/90 space-y-2">
+                      <div className="flex items-center justify-between text-cyan-400">
+                        <span className="text-xs font-bold text-slate-400">أصناف الكتالوج النشطة</span>
+                        <Layers className="w-5 h-5" />
+                      </div>
+                      <p className="text-3xl font-black text-cyan-300">{products.length} <span className="text-sm font-bold text-slate-400">صنف</span></p>
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                        <span>معروضة على المتجر</span>
+                        <span className="text-cyan-400 font-bold">منتجات متاحة</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section 2: Size Demand & Payment Gateways Row */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {/* Size Distribution Breakdown Chart */}
+                    <div className="p-6 rounded-3xl glass-card border border-slate-800 bg-slate-900 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h4 className="text-base font-bold text-white flex items-center gap-2">
+                          <BarChart3 className="w-5 h-5 text-amber-400" />
+                          <span>توزيع المقاسات الأكثر طلباً (Size Demand Analysis)</span>
+                        </h4>
+                      </div>
+
+                      {(() => {
+                        const sizesList = ['S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'];
+                        const totalUnitsAll = productSizeStats.reduce((s, p) => s + p.totalUnits, 0) || 1;
+                        
+                        let topSize = 'XL';
+                        let maxSizeUnits = -1;
+
+                        sizesList.forEach(sz => {
+                          const units = productSizeStats.reduce((s, p) => s + (p.sizeCounts[sz] || 0), 0);
+                          if (units > maxSizeUnits) {
+                            maxSizeUnits = units;
+                            topSize = sz;
+                          }
+                        });
+
+                        const topSizePct = Math.round((maxSizeUnits / totalUnitsAll) * 100);
+
+                        return (
+                          <div className="space-y-4 pt-2">
+                            {/* Top Size Recommendation Alert */}
+                            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs">
+                              <span className="text-amber-300 font-bold flex items-center gap-1.5">
+                                🔥 المقاس الأكثر طلباً في الدفعة: <strong className="text-white text-sm font-mono dir-ltr">{topSize}</strong>
+                              </span>
+                              <span className="text-slate-300 font-mono font-bold">{maxSizeUnits} قطعة ({topSizePct}%)</span>
+                            </div>
+
+                            <div className="space-y-3">
+                              {sizesList.map(size => {
+                                const sizeUnits = productSizeStats.reduce((s, p) => s + (p.sizeCounts[size] || 0), 0);
+                                const percentage = Math.round((sizeUnits / totalUnitsAll) * 100);
+
+                                return (
+                                  <div key={size} className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs font-bold">
+                                      <span className="text-amber-300 font-mono">مقاس {size}</span>
+                                      <span className="text-slate-300 font-mono">{sizeUnits} قطعة ({percentage}%)</span>
+                                    </div>
+                                    <div className="w-full h-3 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full transition-all duration-500 ${size === topSize ? 'bg-gradient-to-r from-amber-500 to-amber-300' : 'bg-gradient-to-r from-indigo-500 to-indigo-400'}`}
+                                        style={{ width: `${Math.max(percentage, sizeUnits > 0 ? 5 : 0)}%` }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Payment Methods Ratio & Volume Chart */}
+                    <div className="p-6 rounded-3xl glass-card border border-slate-800 bg-slate-900 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h4 className="text-base font-bold text-white flex items-center gap-2">
+                          <PieChart className="w-5 h-5 text-indigo-400" />
+                          <span>تحليل طرق الدفع المحصلة (Payment Gateways)</span>
+                        </h4>
+                      </div>
+
+                      {(() => {
+                        const vodaOrders = orders.filter(o => o.payment_method === 'vodafone_cash');
+                        const instaOrders = orders.filter(o => o.payment_method === 'instapay');
+
+                        const vodaCount = vodaOrders.length;
+                        const instaCount = instaOrders.length;
+                        const total = orders.length || 1;
+
+                        const vodaVol = vodaOrders.reduce((s, o) => s + (o.paid_amount || o.total_amount || 0), 0);
+                        const instaVol = instaOrders.reduce((s, o) => s + (o.paid_amount || o.total_amount || 0), 0);
+
+                        const vodaPct = Math.round((vodaCount / total) * 100);
+                        const instaPct = Math.round((instaCount / total) * 100);
+
+                        return (
+                          <div className="space-y-6 pt-2">
+                            <div className="flex h-6 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-1">
+                              <div className="bg-rose-500 h-full rounded-xl transition-all duration-500" style={{ width: `${vodaPct}%` }}></div>
+                              <div className="bg-purple-500 h-full rounded-xl transition-all duration-500" style={{ width: `${instaPct}%` }}></div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-center space-y-2">
+                                <p className="text-xs font-bold text-rose-300 flex items-center justify-center gap-1.5">
+                                  <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-4 h-4 object-contain" />
+                                  <span>فودافون كاش</span>
+                                </p>
+                                <p className="text-2xl font-black text-white">{vodaCount} <span className="text-xs text-slate-400">طلب</span></p>
+                                <div className="pt-2 border-t border-rose-500/20 text-xs">
+                                  <span className="text-slate-400 block text-[10px]">إجمالي الحجم المحول:</span>
+                                  <span className="font-mono font-bold text-rose-300 text-sm">{vodaVol.toLocaleString()} ج.م</span>
+                                  <span className="block text-[10px] text-rose-400 font-mono mt-0.5">({vodaPct}% من الطلبات)</span>
+                                </div>
+                              </div>
+
+                              <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 text-center space-y-2">
+                                <p className="text-xs font-bold text-purple-300">🟣 InstaPay (إنستا باي)</p>
+                                <p className="text-2xl font-black text-white">{instaCount} <span className="text-xs text-slate-400">طلب</span></p>
+                                <div className="pt-2 border-t border-purple-500/20 text-xs">
+                                  <span className="text-slate-400 block text-[10px]">إجمالي الحجم المحول:</span>
+                                  <span className="font-mono font-bold text-purple-300 text-sm">{instaVol.toLocaleString()} ج.م</span>
+                                  <span className="block text-[10px] text-purple-400 font-mono mt-0.5">({instaPct}% من الطلبات)</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                  </div>
+
+                  {/* Section 3: Product Performance & Order Status Breakdown */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                    {/* Top Best-Selling Products */}
+                    <div className="p-6 rounded-3xl glass-card border border-slate-800 bg-slate-900 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h4 className="text-base font-bold text-white flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5 text-emerald-400" />
+                          <span>الأصناف الأعلى مبيعاً وتحقيقاً للإيرادات (Top Products)</span>
+                        </h4>
+                      </div>
+
+                      <div className="space-y-3 pt-1">
+                        {(() => {
+                          const sortedProducts = [...productSizeStats].sort((a, b) => b.totalRevenue - a.totalRevenue);
+                          const maxRev = sortedProducts[0]?.totalRevenue || 1;
+
+                          if (sortedProducts.length === 0) {
+                            return <p className="text-xs text-slate-400 text-center py-4">لا توجد بيانات مبيعات كافية حتى الآن.</p>;
+                          }
+
+                          return sortedProducts.map((p, idx) => {
+                            const revPct = Math.round((p.totalRevenue / (totalGrossRevenue || 1)) * 100);
+
+                            return (
+                              <div key={idx} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                                <div className="flex items-center justify-between text-xs font-bold">
+                                  <span className="text-white font-semibold flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-[10px] flex items-center justify-center font-mono">#{idx + 1}</span>
+                                    <span>{p.productTitle}</span>
+                                  </span>
+                                  <span className="text-emerald-400 font-mono">{p.totalRevenue.toLocaleString()} ج.م</span>
+                                </div>
+
+                                <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                                    style={{ width: `${Math.max(revPct, 4)}%` }}
+                                  ></div>
+                                </div>
+
+                                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                                  <span>عدد القطع المباعة: <strong className="text-amber-400">{p.totalUnits} قطعة</strong></span>
+                                  <span>مساهمة الإيراد: <strong className="text-emerald-400">{revPct}%</strong></span>
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Order Status Breakdown */}
+                    <div className="p-6 rounded-3xl glass-card border border-slate-800 bg-slate-900 space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h4 className="text-base font-bold text-white flex items-center gap-2">
+                          <Layers className="w-5 h-5 text-indigo-400" />
+                          <span>توزيع حالات الطلبات (Order Status Funnel)</span>
+                        </h4>
+                      </div>
+
+                      <div className="space-y-3 pt-2">
+                        {[
+                          { label: 'مؤكد تلقائياً عبر البوابة (Auto Verified)', count: autoVerifiedCount, color: 'bg-emerald-500', textColor: 'text-emerald-400' },
+                          { label: 'مؤكد يدوياً بواسطة الأدمن (Manual Verified)', count: manualVerifiedCount, color: 'bg-teal-500', textColor: 'text-teal-400' },
+                          { label: 'فاتورة جزئية / فارق سعر (Pending Difference)', count: pendingDiffCount, color: 'bg-amber-500', textColor: 'text-amber-400' },
+                          { label: 'جاهز للتسليم / تم التسليم (Ready / Delivered)', count: readyPickupCount, color: 'bg-indigo-500', textColor: 'text-indigo-400' },
+                          { label: 'معلق / قيد المراجعة (Pending Review)', count: pendingCount, color: 'bg-slate-500', textColor: 'text-slate-400' },
+                          { label: 'طلبات ملغية (Cancelled)', count: cancelledCount, color: 'bg-rose-500', textColor: 'text-rose-400' },
+                        ].map((st, idx) => {
+                          const pct = totalOrdersCount > 0 ? Math.round((st.count / totalOrdersCount) * 100) : 0;
+
+                          return (
+                            <div key={idx} className="space-y-1">
+                              <div className="flex items-center justify-between text-xs font-bold">
+                                <span className={`text-xs ${st.textColor}`}>{st.label}</span>
+                                <span className="text-slate-300 font-mono">{st.count} طلب ({pct}%)</span>
+                              </div>
+                              <div className="w-full h-2.5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${st.color} transition-all duration-500`}
+                                  style={{ width: `${Math.max(pct, st.count > 0 ? 5 : 0)}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                  </div>
+                </>
+              );
+            })()}
+
           </div>
         )}
 
