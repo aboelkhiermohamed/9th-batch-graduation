@@ -259,8 +259,7 @@ export default function StoreFrontPage() {
         }
         if (setRes.ok) {
           const setData = await setRes.json();
-          const isMaintCached = typeof window !== 'undefined' && localStorage.getItem('graduation_store_maintenance') === 'true';
-          setSettings({ ...setData, maintenance_mode: Boolean(setData.maintenance_mode || isMaintCached) });
+          if (setData) setSettings(setData);
         }
       } catch (err) {
         console.error('Failed to load store data:', err);
@@ -1168,20 +1167,27 @@ export default function StoreFrontPage() {
                   <span className="text-2xl font-black gradient-gold-text">{cartTotal} ج.م</span>
                 </div>
 
-                <button
-                  onClick={() => {
-                    setIsCartOpen(false);
-                    if (!customerSession) {
-                      setIsCustomerAuthOpen(true);
-                    } else {
-                      router.push('/checkout');
-                    }
-                  }}
-                  className="w-full py-4 px-6 rounded-2xl gradient-purple-btn text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30"
-                >
-                  <span>متابعة الدفع والتأكيد (ادفع الآن)</span>
-                  <Send className="w-5 h-5 rotate-180" />
-                </button>
+                {settings.maintenance_mode ? (
+                  <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold text-center space-y-1">
+                    <p>🚧 المتجر في وضع التحديث والصيانة حالياً</p>
+                    <p className="text-[11px] text-slate-400 font-normal">تم تعليق استقبال الطلبات والـ Checkout مؤقتاً</p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setIsCartOpen(false);
+                      if (!customerSession) {
+                        setIsCustomerAuthOpen(true);
+                      } else {
+                        router.push('/checkout');
+                      }
+                    }}
+                    className="w-full py-4 px-6 rounded-2xl gradient-purple-btn text-white font-extrabold text-base flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30"
+                  >
+                    <span>متابعة الدفع والتأكيد (ادفع الآن)</span>
+                    <Send className="w-5 h-5 rotate-180" />
+                  </button>
+                )}
               </div>
             )}
           </div>

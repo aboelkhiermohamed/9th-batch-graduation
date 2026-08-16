@@ -469,10 +469,12 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
     let isMaintenance = false;
     if (meta && meta.m !== undefined) {
       isMaintenance = meta.m === 1;
+    } else if (data.maintenance_mode !== undefined) {
+      isMaintenance = Boolean(data.maintenance_mode);
+    } else if (currentMem.maintenance_mode !== undefined) {
+      isMaintenance = Boolean(currentMem.maintenance_mode);
     } else if (typeof window !== 'undefined' && window.localStorage) {
       isMaintenance = localStorage.getItem('graduation_store_maintenance') === 'true';
-    } else {
-      isMaintenance = Boolean(currentMem.maintenance_mode);
     }
 
     const cleanNote = cleanDisplayNotes(rawNote) || 'تابع جروب التليجرام';
@@ -536,6 +538,7 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       vodafone_cash_enabled: Boolean(settings.vodafone_cash_enabled),
       instapay_enabled: Boolean(settings.instapay_enabled),
       vodafone_cash_fee_percent: Number(settings.vodafone_cash_fee_percent || 0),
+      maintenance_mode: Boolean(settings.maintenance_mode),
       vodafone_cash_numbers: settings.vodafone_cash_numbers.join(', '),
       instapay_ipa: (settings.instapay_ipas && settings.instapay_ipas[0]) || settings.instapay_ipa || '9thbatch@instapay',
       instapay_ipas: (settings.instapay_ipas || [settings.instapay_ipa]).join(', '),

@@ -20,7 +20,7 @@ import {
   ExternalLink,
   ShieldCheck
 } from 'lucide-react';
-import { Product, ProductAddon, CartItem } from '@/types';
+import { Product, ProductAddon, CartItem, StoreSettings } from '@/types';
 import { DEFAULT_PRODUCTS, fetchProductsFromSupabase, cleanProductDescription } from '@/lib/supabaseClient';
 
 export default function StandaloneProductPage() {
@@ -107,8 +107,31 @@ export default function StandaloneProductPage() {
     });
   };
 
+  const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
+
+  useEffect(() => {
+    async function loadSettingsData() {
+      try {
+        const res = await fetch('/api/admin/settings');
+        if (res.ok) {
+          const s = await res.json();
+          setStoreSettings(s);
+        }
+      } catch (e) {}
+    }
+    loadSettingsData();
+  }, []);
+
   const handleAddToCart = (redirectAfter: boolean = false) => {
     if (!product) return;
+
+    if (storeSettings?.maintenance_mode) {
+      const isAdmin = typeof window !== 'undefined' && sessionStorage.getItem('admin_authenticated') === 'true';
+      if (!isAdmin) {
+        alert('عفواً، المتجر في وضع الصيانة والتحديث حالياً، تم تعليق استقبال الطلبات والـ Checkout مؤقتاً.');
+        return;
+      }
+    }
 
     if (product.sizes && product.sizes.length > 0 && !selectedSize) {
       alert('يرجى اختيار المقاس أولاً');
@@ -209,7 +232,16 @@ export default function StandaloneProductPage() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => router.push('/checkout')}
+              onClick={() => {
+                if (storeSettings?.maintenance_mode) {
+                  const isAdmin = typeof window !== 'undefined' && sessionStorage.getItem('admin_authenticated') === 'true';
+                  if (!isAdmin) {
+                    alert('عفواً، المتجر في وضع الصيانة والتحديث حالياً، تم تعليق استقبال الطلبات والـ Checkout مؤقتاً.');
+                    return;
+                  }
+                }
+                router.push('/checkout');
+              }}
               className="relative flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-amber-500/20"
             >
               <ShoppingBag className="w-4 h-4" />
