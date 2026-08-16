@@ -1717,16 +1717,11 @@ export default function AdminDashboardPage() {
         
         {/* Header & Logo */}
         <div className="space-y-3 pb-3.5 border-b border-slate-800/80">
-          <div className="flex items-center gap-2.5">
-            <div className="h-10 px-2 rounded-2xl bg-purple-950/80 border border-lime-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-lime-500/10">
-              <img src="/logo-removebg-preview.png" alt="The Medix Logo" className="h-6 w-auto object-contain" />
-            </div>
+          <div className="flex items-center gap-3">
+            <img src="/logo-removebg-preview.png" alt="themedix" className="h-8 w-auto object-contain flex-shrink-0 filter drop-shadow-[0_0_8px_rgba(142,208,0,0.3)]" />
             <div className="min-w-0">
-              <h1 className="text-sm font-black text-white truncate flex items-center gap-1.5">
-                <span>The Medix</span>
-                <span className="text-[10px] bg-lime-500/20 text-lime-300 px-1.5 py-0.2 rounded-md font-mono border border-lime-500/30">Admin</span>
-              </h1>
-              <p className="text-[11px] text-lime-400 font-semibold truncate">{settings.store_name}</p>
+              <span className="text-[10px] bg-lime-500/20 text-lime-300 px-2 py-0.5 rounded-full font-mono border border-lime-500/30 font-bold">Admin Panel</span>
+              <p className="text-[11px] text-slate-400 font-semibold truncate mt-0.5">{settings.store_name}</p>
             </div>
           </div>
 

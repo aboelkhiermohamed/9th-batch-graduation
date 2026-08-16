@@ -554,23 +554,14 @@ export default function StoreFrontPage() {
           {/* Logo & Title */}
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <a href="/" className="flex items-center gap-3 group">
-              <div className="h-10 sm:h-12 px-2 rounded-2xl bg-purple-950/70 border border-lime-500/30 shadow-lg shadow-lime-500/10 group-hover:border-lime-400 transition flex items-center justify-center">
-                <img 
-                  src="/logo-removebg-preview.png" 
-                  alt="The Medix Logo" 
-                  className="h-7 sm:h-9 w-auto object-contain filter drop-shadow-[0_0_8px_rgba(142,208,0,0.35)]" 
-                />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-sm sm:text-lg font-black tracking-tight text-white flex items-center gap-1.5 truncate">
-                  <span className="gradient-medix-text font-black">The Medix</span>
-                  <span className="text-[10px] text-lime-300 font-mono bg-lime-500/15 border border-lime-500/30 px-1.5 py-0.5 rounded-md hidden xs:inline-block">الدفعة التاسعة</span>
-                </h1>
-                <p className="text-[10px] sm:text-xs text-slate-400 hidden xs:flex items-center gap-1 truncate">
-                  <span>🎓 المتجر الرسمي لمستلزمات وتطريز التخرج</span>
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-lime-400 flex-shrink-0 animate-ping"></span>
-                </p>
-              </div>
+              <img 
+                src="/logo-removebg-preview.png" 
+                alt="themedix" 
+                className="h-8 sm:h-11 w-auto object-contain filter drop-shadow-[0_0_12px_rgba(142,208,0,0.35)] transition group-hover:scale-105" 
+              />
+              <span className="text-[10px] sm:text-xs text-lime-300 font-bold bg-lime-500/10 border border-lime-500/30 px-2.5 py-1 rounded-full hidden sm:inline-block">
+                🎓 الدفعة التاسعة
+              </span>
             </a>
           </div>
 
@@ -592,12 +583,12 @@ export default function StoreFrontPage() {
             {/* Cart Button */}
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative flex items-center gap-1.5 sm:gap-2.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl gradient-purple-btn text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/30"
+              className="relative flex items-center gap-1.5 sm:gap-2.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl gradient-purple-btn text-slate-950 text-xs sm:text-sm font-extrabold shadow-lg shadow-lime-500/20"
             >
               <ShoppingBag className="w-4 h-4" />
               <span>السلة</span>
               {totalCartCount > 0 && (
-                <span className="absolute -top-2 -left-2 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-amber-500 text-slate-950 font-extrabold text-[10px] sm:text-xs flex items-center justify-center border-2 border-slate-950 animate-bounce">
+                <span className="absolute -top-2 -left-2 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-slate-950 text-lime-400 font-extrabold text-[10px] sm:text-xs flex items-center justify-center border-2 border-lime-400 animate-bounce">
                   {totalCartCount}
                 </span>
               )}
@@ -650,25 +641,25 @@ export default function StoreFrontPage() {
       {/* --- HERO SECTION --- */}
       <section className="relative overflow-hidden border-b border-purple-900/40 bg-gradient-to-b from-purple-950/60 via-slate-950 to-slate-950 py-12 sm:py-16">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_center,rgba(142,208,0,0.12),transparent_60%)]"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-6">
           
           <div className="flex justify-center">
-            <div className="p-3 sm:p-4 rounded-3xl bg-purple-950/80 border border-lime-500/30 shadow-2xl shadow-lime-500/10 backdrop-blur-md transition hover:scale-105 duration-300">
-              <img 
-                src="/logo-removebg-preview.png" 
-                alt="The Medix Logo" 
-                className="h-14 sm:h-20 w-auto object-contain mx-auto filter drop-shadow-[0_0_15px_rgba(142,208,0,0.4)]"
-              />
-            </div>
+            <img 
+              src="/logo-removebg-preview.png" 
+              alt="themedix" 
+              className="h-16 sm:h-24 w-auto object-contain filter drop-shadow-[0_0_25px_rgba(142,208,0,0.4)] transition hover:scale-105 duration-300"
+            />
           </div>
 
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-lime-500/10 border border-lime-500/30 text-lime-300 text-xs font-semibold">
             <Sparkles className="w-3.5 h-3.5 text-lime-400" />
-            <span>The Medix • المتجر الرسمي لمستلزمات تخرج الدفعة التاسعة</span>
+            <span>
+              <span className="inline-flex items-baseline font-sans dir-ltr font-bold text-xs"><span className="italic text-[#8ed000] font-serif">the</span><span className="text-white font-normal">medix</span></span> • المتجر الرسمي لمستلزمات تخرج الدفعة التاسعة
+            </span>
           </div>
 
           <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
-            احجز منتجات <span className="gradient-gold-text">The Medix</span> الآن 🎓
+            احجز منتجات <span className="inline-flex items-baseline font-sans dir-ltr mx-1.5"><span className="italic text-[#8ed000] font-serif font-bold">the</span><span className="text-white font-light lowercase">medix</span></span> الآن 🎓
           </h2>
           <p className="max-w-2xl mx-auto text-slate-300 text-sm sm:text-base leading-relaxed">
             اختر المنتجات والمقاسات والتطريز المخصص بالاسم، وادفع فوراً عبر فودافون كاش أو إنستا باي مع التوثيق المباشر للطلب.

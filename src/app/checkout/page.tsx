@@ -475,16 +475,14 @@ export default function CheckoutPage() {
             <span>العودة للمتجر</span>
           </button>
 
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 sm:h-10 px-2 rounded-xl bg-purple-950/70 border border-lime-500/30 flex items-center justify-center flex-shrink-0">
-              <img src="/logo-removebg-preview.png" alt="The Medix Logo" className="h-6 sm:h-7 w-auto object-contain" />
-            </div>
+          <div className="flex items-center gap-3">
+            <img src="/logo-removebg-preview.png" alt="themedix" className="h-7 sm:h-9 w-auto object-contain flex-shrink-0 filter drop-shadow-[0_0_8px_rgba(142,208,0,0.3)]" />
             <div className="text-right">
               <h1 className="text-xs sm:text-base font-black text-white">
                 تأكيد الدفع وإرسال الطلب
               </h1>
-              <p className="text-[10px] text-lime-400 font-mono hidden xs:block">
-                The Medix • الدفعة التاسعة 🎓
+              <p className="text-[10px] text-lime-300 font-mono hidden xs:block">
+                الدفعة التاسعة 🎓
               </p>
             </div>
           </div>

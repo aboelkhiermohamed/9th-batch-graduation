@@ -230,9 +230,7 @@ export default function StandaloneProductPage() {
               <ChevronRight className="w-4 h-4 text-lime-400" />
               <span>العودة للمتجر</span>
             </button>
-            <div className="hidden xs:flex items-center gap-2 h-9 px-2 rounded-xl bg-purple-950/70 border border-lime-500/30">
-              <img src="/logo-removebg-preview.png" alt="The Medix Logo" className="h-6 w-auto object-contain" />
-            </div>
+            <img src="/logo-removebg-preview.png" alt="themedix" className="h-7 w-auto object-contain hidden xs:block filter drop-shadow-[0_0_8px_rgba(142,208,0,0.3)]" />
           </div>
 
           <div className="flex items-center gap-3">
