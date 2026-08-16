@@ -218,6 +218,13 @@ export default function OrdersHistory({
             <span>ملغي</span>
           </span>
         );
+      case 'pending_difference':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold animate-pulse">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+            <span>مطلوب سداد فرق السعر 💳</span>
+          </span>
+        );
       default:
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold animate-pulse">
@@ -543,7 +550,7 @@ export default function OrdersHistory({
                   <div className="p-5 sm:p-6 border-t border-slate-800/80 bg-slate-900/40 space-y-6">
                     
                     {/* PARTIAL INVOICE / PRICE DIFFERENCE PENDING BANNER */}
-                    {(order.is_difference_pending || order.status === 'pending_difference' || (order.difference_amount && order.difference_amount > 0)) && (() => {
+                    {(order.status === 'pending_difference' || (order.is_difference_pending && order.status !== 'auto_verified' && order.status !== 'manual_verified' && order.status !== 'ready_for_pickup' && order.status !== 'delivered' && (order.difference_amount || 0) > 0)) && (() => {
                       const diffToPay = (order.difference_amount !== undefined && order.difference_amount > 0)
                         ? order.difference_amount
                         : Math.max(0, order.total_amount - (order.paid_amount || 0));

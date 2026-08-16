@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Order, StoreSettings } from '@/types';
 import { fetchOrdersFromSupabase, fetchSettingsFromSupabase, updateOrderInSupabase } from '@/lib/supabaseClient';
+import { matchOrderWithUnmatchedTransactions } from '@/lib/matchingEngine';
 import { 
   ArrowRight, 
   CreditCard, 
@@ -116,6 +117,9 @@ export default function PayDifferencePage() {
         receipt_url: receiptUrl,
         updated_at: new Date().toISOString()
       };
+
+      // Trigger automatic matching engine for the newly submitted difference payment
+      await matchOrderWithUnmatchedTransactions(updatedOrder);
 
       await updateOrderInSupabase(updatedOrder);
       setIsSubmitted(true);
