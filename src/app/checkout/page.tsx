@@ -464,34 +464,37 @@ export default function CheckoutPage() {
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
       
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80">
+      <header className="sticky top-0 z-40 bg-purple-950/90 backdrop-blur-xl border-b border-purple-900/60 shadow-lg">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-2">
           
+          {/* Back Button */}
           <button
             onClick={() => router.push('/')}
-            className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700/60 text-xs sm:text-sm font-semibold text-slate-200 transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-900/60 hover:bg-purple-900 border border-purple-700/60 text-xs sm:text-sm font-bold text-slate-200 transition-all flex-shrink-0"
           >
-            <ArrowRight className="w-4 h-4 text-amber-400" />
-            <span>العودة للمتجر</span>
+            <ArrowRight className="w-4 h-4 text-lime-400" />
+            <span className="hidden xs:inline">العودة للمتجر</span>
+            <span className="xs:hidden">عودة</span>
           </button>
 
-          <div className="flex items-center gap-3">
-            <img src="/logo-removebg-preview.png" alt="themedix" className="h-7 sm:h-9 w-auto object-contain flex-shrink-0 filter drop-shadow-[0_0_8px_rgba(142,208,0,0.3)]" />
-            <div className="text-right">
-              <h1 className="text-xs sm:text-base font-black text-white">
-                تأكيد الدفع وإرسال الطلب
-              </h1>
-              <p className="text-[10px] text-lime-300 font-mono hidden xs:block">
-                الدفعة التاسعة 🎓
-              </p>
+          {/* Logo & Title */}
+          <div className="flex items-center gap-2.5 min-w-0 flex-1 justify-center sm:justify-start">
+            <img 
+              src="/logo-removebg-preview.png" 
+              alt="themedix" 
+              className="h-8 sm:h-11 w-auto object-contain flex-shrink-0 filter drop-shadow-[0_0_12px_rgba(142,208,0,0.35)]" 
+            />
+            <div className="hidden md:block text-right">
+              <h1 className="text-sm font-black text-white">تأكيد الدفع وإرسال الطلب</h1>
+              <p className="text-[11px] text-lime-300 font-semibold">الدفعة التاسعة 🎓</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-300 hidden sm:inline">إجمالي العناصر:</span>
-            <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-extrabold text-xs border border-amber-500/30">
-              {totalCartCount} منتجات
-            </span>
+          {/* Cart Items Count Badge */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-lime-500/15 border border-lime-500/30 text-lime-300 text-xs font-bold flex-shrink-0">
+            <ShoppingBag className="w-3.5 h-3.5 text-lime-400" />
+            <span>{totalCartCount}</span>
+            <span className="hidden sm:inline">منتجات</span>
           </div>
         </div>
       </header>
@@ -940,25 +943,25 @@ export default function CheckoutPage() {
                   </div>
 
                   {paymentMethod === 'vodafone_cash' && vodaFee > 0 && (
-                    <div className="flex justify-between items-center text-xs font-bold text-amber-300 bg-slate-950 p-2.5 rounded-xl border border-amber-500/30">
-                      <span className="flex items-center gap-2">
+                    <div className="flex justify-between items-center text-xs font-bold text-lime-300 bg-purple-950/60 p-2.5 rounded-xl border border-lime-500/30 gap-2">
+                      <span className="flex items-center gap-2 min-w-0">
                         <div className="w-5 h-5 rounded-full bg-white p-0.5 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
                           <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-full h-full object-contain" />
                         </div>
-                        <span>رسوم تحويل فودافون كاش ({vodaFeePercent}%):</span>
+                        <span className="truncate">رسوم تحويل فودافون كاش ({vodaFeePercent}%):</span>
                       </span>
-                      <span className="font-mono text-sm text-amber-400">+{vodaFee} ج.م</span>
+                      <span className="font-mono text-sm text-lime-400 whitespace-nowrap flex-shrink-0">+{vodaFee} ج.م</span>
                     </div>
                   )}
 
                   <div className="flex justify-between text-xs text-slate-400">
                     <span>مكان الاستلام والتسليم:</span>
-                    <span className="text-amber-400 font-semibold">{cleanDisplayNotes(settings.pickup_note)}</span>
+                    <span className="text-lime-300 font-semibold">{cleanDisplayNotes(settings.pickup_note)}</span>
                   </div>
 
-                  <div className="flex justify-between items-center text-sm sm:text-base font-black pt-3 border-t border-slate-800">
-                    <span className="text-white">المبلغ الكلي المطلوب تحويله:</span>
-                    <span className="gradient-gold-text text-2xl font-mono">{finalPayableTotal} ج.م</span>
+                  <div className="flex justify-between items-center text-sm sm:text-base font-black pt-3 border-t border-slate-800 gap-2">
+                    <span className="text-white whitespace-nowrap">المبلغ الكلي المطلوب تحويله:</span>
+                    <span className="gradient-gold-text text-xl sm:text-2xl font-mono whitespace-nowrap flex-shrink-0">{finalPayableTotal} ج.م</span>
                   </div>
                 </div>
 
