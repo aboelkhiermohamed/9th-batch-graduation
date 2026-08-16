@@ -30,9 +30,23 @@ export function normalizePhoneNumber(phone: string): string {
  */
 export function isValidEgyptianPhone(phone: string): boolean {
   if (!phone) return false;
-  const clean = phone.trim().replace(/[\s\-\(\)]/g, '');
+  // Convert Eastern Arabic numerals (٠١٢٣٤٥٦٧٨٩) to Western (0123456789)
+  const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+  let clean = phone.trim();
+  for (let i = 0; i < arabicDigits.length; i++) {
+    clean = clean.replaceAll(arabicDigits[i], String(i));
+  }
+  clean = clean.replace(/[\s\-\(\)]/g, '');
+
   if (/[^\d\+]/.test(clean)) return false;
-  const egRegex = /^(\+?20)?(10|11|12|15)\d{8}$/;
+
+  // Clean international prefixes: +20, 0020, 20
+  if (clean.startsWith('+20')) clean = '0' + clean.slice(3);
+  else if (clean.startsWith('0020')) clean = '0' + clean.slice(4);
+  else if (clean.startsWith('20') && clean.length === 12) clean = '0' + clean.slice(2);
+
+  // Local Egyptian mobile regex: 010xxxxxxxx, 011xxxxxxxx, 012xxxxxxxx, 015xxxxxxxx (exactly 11 digits)
+  const egRegex = /^0(10|11|12|15)\d{8}$/;
   return egRegex.test(clean);
 }
 
