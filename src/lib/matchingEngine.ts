@@ -82,11 +82,15 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
     }
   }
 
-  // 3. Third Priority: Phone match alone if only 1 pending order for that phone
+  // 3. Third Priority: Phone match alone if only 1 pending order for that phone (with amount tolerance)
   if (!matchedOrder) {
     for (const order of pendingOrders) {
       const cleanCustomerPhone = normalizePhoneNumber(order.customer_phone);
-      if (cleanCustomerPhone && cleanCustomerPhone.length >= 7) {
+      const targetAmount = getExpectedAmount(order);
+      const amountDiff = Math.abs(Number(targetAmount) - Number(tx.amount));
+      const isAmountMatch = amountDiff < 0.01 || tx.amount === 0 || (tx.amount >= targetAmount && (tx.amount - targetAmount) <= 25) || amountDiff <= 5;
+
+      if (cleanCustomerPhone && cleanCustomerPhone.length >= 7 && isAmountMatch) {
         if (
           (cleanTxPhone && (cleanTxPhone === cleanCustomerPhone || cleanTxPhone.endsWith(cleanCustomerPhone.slice(-7)))) ||
           (tx.raw_sms && tx.raw_sms.includes(cleanCustomerPhone.slice(-8)))
@@ -95,18 +99,6 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
           break;
         }
       }
-    }
-  }
-
-  // 4. Fallback: If amount matches only 1 single pending order
-  if (!matchedOrder) {
-    const amountMatches = pendingOrders.filter(o => {
-      const targetAmount = getExpectedAmount(o);
-      const diff = Math.abs(Number(targetAmount) - Number(tx.amount));
-      return diff < 0.01 || (tx.amount >= targetAmount && (tx.amount - targetAmount) <= 25);
-    });
-    if (amountMatches.length === 1) {
-      matchedOrder = amountMatches[0];
     }
   }
 
@@ -189,7 +181,13 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
 export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Promise<{ matched: boolean; matchedTx?: IncomingTransaction }> {
   try {
     const transactions = await fetchTransactionsFromSupabase();
-    const unmatchedTxs = transactions.filter(t => t.status === 'unmatched' || !t.matched_order_id);
+    const now = Date.now();
+    const MAX_AGE_MS = 48 * 60 * 60 * 1000; // 48 hours max age for SMS matching without ref
+
+    const unmatchedTxs = transactions.filter(t => {
+      if (t.status === 'matched' || t.matched_order_id) return false;
+      return true;
+    });
 
     if (unmatchedTxs.length === 0) {
       return { matched: false };
@@ -202,7 +200,7 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
     let matchedTx: IncomingTransaction | undefined = undefined;
 
     // 1. Priority 1: Match by Transaction Reference Number (الرقم المرجعي)
-    if (cleanRef) {
+    if (cleanRef && cleanRef.length >= 4) {
       matchedTx = unmatchedTxs.find(tx => {
         if (tx.transaction_ref) {
           const tRef = tx.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -216,11 +214,15 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
       });
     }
 
-    // 2. Priority 2: Amount + Phone Match
+    // 2. Priority 2: Amount + Phone Match (Requires fresh SMS < 48h AND phone match)
     if (!matchedTx) {
       for (const tx of unmatchedTxs) {
-        const amountDiff = Math.abs(Number(newOrder.total_amount) - Number(tx.amount));
-        const isAmountMatch = amountDiff < 0.01 || tx.amount === 0;
+        const txAge = tx.created_at ? (now - new Date(tx.created_at).getTime()) : 0;
+        if (txAge > MAX_AGE_MS) continue; // Ignore old SMS for general phone/amount matching
+
+        const targetAmount = Number(newOrder.total_amount);
+        const amountDiff = Math.abs(targetAmount - Number(tx.amount));
+        const isAmountMatch = amountDiff < 0.01 || tx.amount === 0 || (tx.amount >= targetAmount && (tx.amount - targetAmount) <= 25) || amountDiff <= 5;
 
         const cleanTxPhone = tx.sender_phone ? normalizePhoneNumber(tx.sender_phone) : '';
 
@@ -234,16 +236,6 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
           matchedTx = tx;
           break;
         }
-      }
-    }
-
-    // 3. Priority 3: Amount match if only 1 unmatched transaction has that exact amount
-    if (!matchedTx) {
-      const amountMatches = unmatchedTxs.filter(
-        tx => Math.abs(Number(tx.amount) - Number(newOrder.total_amount)) < 0.01
-      );
-      if (amountMatches.length === 1) {
-        matchedTx = amountMatches[0];
       }
     }
 
