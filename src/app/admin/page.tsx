@@ -1716,12 +1716,15 @@ export default function AdminDashboardPage() {
       <aside className="hidden md:flex flex-col w-64 flex-shrink-0 bg-slate-900 border-l border-slate-800/80 h-screen sticky top-0 p-4 space-y-5 overflow-y-auto selection:bg-indigo-500 selection:text-white shadow-2xl">
         
         {/* Header & Logo */}
-        <div className="space-y-3 pb-3.5 border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <img src="/logo-removebg-preview.png" alt="themedix" className="h-8 w-auto object-contain flex-shrink-0 filter drop-shadow-[0_0_8px_rgba(142,208,0,0.3)]" />
-            <div className="min-w-0">
-              <span className="text-[10px] bg-lime-500/20 text-lime-300 px-2 py-0.5 rounded-full font-mono border border-lime-500/30 font-bold">Admin Panel</span>
-              <p className="text-[11px] text-slate-400 font-semibold truncate mt-0.5">{settings.store_name}</p>
+        <div className="space-y-3 pb-4 border-b border-slate-800/80">
+          <div className="flex flex-col items-start gap-2.5">
+            <img 
+              src="/logo-removebg-preview.png" 
+              alt="the medix" 
+              className="h-10 w-auto object-contain filter drop-shadow-[0_0_15px_rgba(142,208,0,0.45)]" 
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] bg-lime-500/20 text-lime-300 px-2.5 py-0.5 rounded-full font-mono border border-lime-500/30 font-bold">Admin Panel v2.0</span>
             </div>
           </div>
 
@@ -1729,7 +1732,7 @@ export default function AdminDashboardPage() {
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full py-2 px-3 rounded-xl bg-slate-950/80 hover:bg-slate-800 text-xs font-bold text-slate-300 flex items-center justify-center gap-1.5 transition border border-slate-800 hover:border-slate-700 shadow-sm"
+            className="w-full py-2 px-3 rounded-xl bg-purple-950/60 hover:bg-purple-900 text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 transition border border-purple-800/60 hover:border-lime-500/40 shadow-sm"
           >
             <span>عرض المتجر الرئيسي ↗</span>
           </a>
@@ -4259,18 +4262,19 @@ export default function AdminDashboardPage() {
             <div className="space-y-6 text-right dir-rtl font-sans" id="printable-report">
               
               {/* Header */}
-              <div className="flex items-center justify-between border-b-2 border-lime-600 pb-4">
-                <div className="flex items-center gap-3">
-                  <img src="/logo-removebg-preview.png" alt="themedix" className="h-10 w-auto object-contain filter invert" />
+              <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
+                <div className="flex items-center gap-4">
+                  <img src="/logo-removebg-preview.png" alt="the medix" className="h-12 w-auto object-contain" />
                   <div>
-                    <h1 className="text-2xl font-black text-slate-900 flex items-center gap-1 dir-ltr font-sans">
+                    <h1 className="text-2xl font-black text-slate-900 flex items-center gap-1.5 font-sans">
                       <span className="italic text-[#65a30d] font-serif font-bold">the</span>
                       <span className="font-bold text-slate-900 lowercase">medix</span>
+                      <span className="text-xs text-slate-600 font-bold bg-slate-100 border border-slate-300 px-2.5 py-0.5 rounded-full mr-2">الدفعة التاسعة 🎓</span>
                     </h1>
-                    <p className="text-xs text-slate-600 mt-0.5">تقرير حصر الكميات والمقاسات للمصانع والطلبات المؤكدة • الدفعة التاسعة 🎓</p>
+                    <p className="text-xs text-slate-600 font-semibold mt-1">تقرير حصر الكميات والمقاسات والكشوفات التكليفية الرسمية</p>
                   </div>
                 </div>
-                <div className="text-left font-mono text-xs text-slate-600 space-y-1">
+                <div className="text-left font-mono text-xs text-slate-700 space-y-1">
                   <p>تاريخ التقرير: <strong>{new Date().toLocaleDateString('ar-EG')}</strong></p>
                   <p>إجمالي الطلبات: <strong>{orders.length}</strong></p>
                 </div>
