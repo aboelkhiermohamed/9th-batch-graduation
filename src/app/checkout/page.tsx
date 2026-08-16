@@ -944,13 +944,13 @@ export default function CheckoutPage() {
 
                   {paymentMethod === 'vodafone_cash' && vodaFee > 0 && (
                     <div className="flex justify-between items-center text-xs font-bold text-lime-300 bg-purple-950/60 p-2.5 rounded-xl border border-lime-500/30 gap-2">
-                      <span className="flex items-center gap-2 min-w-0">
-                        <div className="w-5 h-5 rounded-full bg-white p-0.5 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
+                      <span className="flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs">
+                        <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-white p-0.5 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
                           <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-full h-full object-contain" />
                         </div>
-                        <span className="truncate">رسوم تحويل فودافون كاش ({vodaFeePercent}%):</span>
+                        <span>رسوم تحويل فودافون كاش ({vodaFeePercent}%):</span>
                       </span>
-                      <span className="font-mono text-sm text-lime-400 whitespace-nowrap flex-shrink-0">+{vodaFee} ج.م</span>
+                      <span className="font-mono text-xs sm:text-sm text-lime-400 whitespace-nowrap flex-shrink-0">+{vodaFee} ج.م</span>
                     </div>
                   )}
 
