@@ -1703,8 +1703,10 @@ export default function AdminDashboardPage() {
     {
       groupTitle: 'الإدارة والأمان',
       items: [
-        ...(isSuperAdmin ? [{ id: 'admins', label: 'إدارة الأدمن والمشرفين 🔑', badge: `${adminsList.length}`, badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30', icon: ShieldCheck }] : []),
-        { id: 'maintenance', label: 'الصيانة والباك أب ⚙️', badge: settings.maintenance_mode ? '🚧 مفعّل' : null, badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30', icon: Wrench }
+        ...(isSuperAdmin ? [
+          { id: 'admins', label: 'إدارة الأدمن والمشرفين 🔑', badge: `${adminsList.length}`, badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30', icon: ShieldCheck },
+          { id: 'maintenance', label: 'الصيانة والباك أب ⚙️', badge: settings.maintenance_mode ? '🚧 مفعّل' : null, badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30', icon: Wrench }
+        ] : [])
       ]
     }
   ];
@@ -3172,7 +3174,7 @@ export default function AdminDashboardPage() {
         )}
 
         {/* --- MAINTENANCE & BACKUP TAB --- */}
-        {activeTab === 'maintenance' && (
+        {activeTab === 'maintenance' && isSuperAdmin && (
           <div className="max-w-3xl mx-auto space-y-6">
             
             {/* Maintenance Mode Toggle Box */}
