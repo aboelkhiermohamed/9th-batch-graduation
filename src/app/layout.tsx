@@ -5,9 +5,12 @@ export const metadata: Metadata = {
   title: 'The Medix | متجر الدفعة التاسعة',
   description: 'The Medix - المتجر الرسمي لمستلزمات وملابس تخرج الدفعة التاسعة مع نظام الدفع الفوري والمطابقة الآلية',
   icons: {
-    icon: '/logo-removebg-preview.png',
-    shortcut: '/logo-removebg-preview.png',
-    apple: '/logo-removebg-preview.png',
+    icon: [
+      { url: '/favicon.png', type: 'image/png', sizes: '512x512' },
+      { url: '/favicon.ico', sizes: 'any' }
+    ],
+    shortcut: '/favicon.png',
+    apple: '/apple-touch-icon.png',
   }
 };
 
