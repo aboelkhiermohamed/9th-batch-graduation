@@ -1401,11 +1401,13 @@ export default function AdminDashboardPage() {
             padding: 8px 10px;
             text-align: right;
             border: 1px solid #334155;
+            vertical-align: middle;
           }
           td {
             padding: 8px 10px;
             border: 1px solid #cbd5e1;
             color: #1e293b;
+            vertical-align: middle;
           }
           tr {
             page-break-inside: avoid;
@@ -1445,8 +1447,11 @@ export default function AdminDashboardPage() {
 
           @media print {
             body { padding: 0; }
-            @page { size: A4 portrait; margin: 1.2cm; }
-            tr { page-break-inside: avoid; }
+            @page { size: A4 landscape; margin: 0.8cm; }
+            tr { page-break-inside: avoid; break-inside: avoid; }
+            .footer-signatures { page-break-inside: avoid; break-inside: avoid; }
+            .section-header { page-break-after: avoid; break-after: avoid; }
+            .kpi-grid { page-break-inside: avoid; break-inside: avoid; }
           }
         </style>
       </head>
