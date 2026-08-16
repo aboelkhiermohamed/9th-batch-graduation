@@ -265,12 +265,18 @@ export default function OrdersHistory({
       </head>
       <body>
         <div class="header">
-          <div>
-            <h1 style="margin:0; font-size: 24px;">🎓 متجر دفعة التخرج التاسعة</h1>
-            <p style="margin:4px 0 0; color: #64748b; font-size: 14px;">فاتورة شراء رسمية</p>
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <img src="/logo-removebg-preview.png" alt="themedix" style="height: 44px; width: auto; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));" />
+            <div>
+              <h1 style="margin:0; font-size: 22px; font-family: sans-serif; display: flex; align-items: baseline; gap: 2px;">
+                <span style="font-style: italic; font-family: serif; font-weight: bold; color: #65a30d;">the</span>
+                <span style="font-weight: bold; color: #0f172a; text-transform: lowercase;">medix</span>
+              </h1>
+              <p style="margin:2px 0 0; color: #64748b; font-size: 13px; font-weight: 600;">فاتورة شراء وتأكيد طلب رسمية - الدفعة التاسعة 🎓</p>
+            </div>
           </div>
-          <div>
-            <h2 style="margin:0; color: #d97706; font-family: monospace;">#${order.order_code}</h2>
+          <div style="text-align: left;">
+            <h2 style="margin:0; color: #65a30d; font-family: monospace; font-size: 20px;">#${order.order_code}</h2>
             <p style="margin:4px 0 0; color: #64748b; font-size: 12px;">${formatDate(order.created_at)}</p>
           </div>
         </div>

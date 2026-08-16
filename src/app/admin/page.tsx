@@ -4259,10 +4259,16 @@ export default function AdminDashboardPage() {
             <div className="space-y-6 text-right dir-rtl font-sans" id="printable-report">
               
               {/* Header */}
-              <div className="flex items-center justify-between border-b-2 border-amber-500 pb-4">
-                <div>
-                  <h1 className="text-2xl font-black text-slate-900">{settings.store_name}</h1>
-                  <p className="text-xs text-slate-600 mt-1">تقرير حصر الكميات والمقاسات للمصانع والطلبات المؤكدة</p>
+              <div className="flex items-center justify-between border-b-2 border-lime-600 pb-4">
+                <div className="flex items-center gap-3">
+                  <img src="/logo-removebg-preview.png" alt="themedix" className="h-10 w-auto object-contain filter invert" />
+                  <div>
+                    <h1 className="text-2xl font-black text-slate-900 flex items-center gap-1 dir-ltr font-sans">
+                      <span className="italic text-[#65a30d] font-serif font-bold">the</span>
+                      <span className="font-bold text-slate-900 lowercase">medix</span>
+                    </h1>
+                    <p className="text-xs text-slate-600 mt-0.5">تقرير حصر الكميات والمقاسات للمصانع والطلبات المؤكدة • الدفعة التاسعة 🎓</p>
+                  </div>
                 </div>
                 <div className="text-left font-mono text-xs text-slate-600 space-y-1">
                   <p>تاريخ التقرير: <strong>{new Date().toLocaleDateString('ar-EG')}</strong></p>
