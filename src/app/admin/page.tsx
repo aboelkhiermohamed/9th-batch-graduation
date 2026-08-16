@@ -1327,12 +1327,9 @@ export default function AdminDashboardPage() {
 
   const printStandalonePdfReport = () => {
     const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('يرجى السماح للنوافذ المنبثقة (Popups) في المتصفح لتصغير وتوليد تقرير الـ PDF');
-      return;
-    }
+    if (!printWindow) return;
 
-    const reportDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+    const reportDate = new Date().toLocaleDateString('ar-EG');
     const reportTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
     const productSizeStats = calculateProductSizeStats();
     const addonStats = calculateAddonStats();
@@ -1343,56 +1340,51 @@ export default function AdminDashboardPage() {
       <html dir="rtl" lang="ar">
       <head>
         <meta charset="utf-8">
-        <title>تقرير حصر الدفعة التاسعة - ${settings.store_name}</title>
-        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+        <title>تقرير حصر الكميات والمقاسات - The Medix</title>
         <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body {
-            font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
-            background: #ffffff;
-            color: #0f172a;
-            padding: 30px;
-            font-size: 11px;
-            line-height: 1.5;
-          }
+          body { font-family: 'Cairo', system-ui, -apple-system, sans-serif; padding: 25px; color: #0f172a; line-height: 1.4; background: #ffffff; }
           .header-container {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 3px solid #d97706;
+            border-bottom: 3px solid #84cc16;
             padding-bottom: 15px;
             margin-bottom: 20px;
           }
-          .brand-title { font-size: 22px; font-weight: 900; color: #1e1b4b; }
-          .brand-subtitle { font-size: 11px; color: #475569; font-weight: 700; }
+          .brand-title { font-size: 22px; font-weight: 900; color: #0f172a; }
+          .brand-subtitle { font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px; }
           .meta-box { text-align: left; font-size: 10px; color: #334155; font-family: monospace; }
-          .meta-box strong { color: #d97706; }
+          .meta-box strong { color: #65a30d; }
           
           .kpi-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 12px;
             margin-bottom: 25px;
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
           .kpi-card {
             background: #f8fafc;
             border: 1px solid #cbd5e1;
             border-radius: 12px;
-            padding: 12px;
+            padding: 10px;
             text-align: center;
           }
           .kpi-title { font-size: 10px; font-weight: 700; color: #64748b; margin-bottom: 4px; }
           .kpi-value { font-size: 18px; font-weight: 900; color: #0f172a; }
-          .kpi-unit { font-size: 10px; font-weight: 700; color: #d97706; }
+          .kpi-unit { font-size: 10px; font-weight: 700; color: #65a30d; }
           
           .section-header {
             font-size: 13px;
             font-weight: 800;
-            color: #1e1b4b;
-            border-right: 4px solid #d97706;
+            color: #0f172a;
+            border-right: 4px solid #84cc16;
             padding-right: 8px;
             margin-top: 25px;
             margin-bottom: 12px;
+            page-break-after: avoid;
+            break-after: avoid;
           }
 
           table {
@@ -1400,6 +1392,7 @@ export default function AdminDashboardPage() {
             border-collapse: collapse;
             margin-bottom: 20px;
             font-size: 11px;
+            page-break-inside: auto;
           }
           th {
             background: #1e293b;
@@ -1414,13 +1407,17 @@ export default function AdminDashboardPage() {
             border: 1px solid #cbd5e1;
             color: #1e293b;
           }
+          tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
           tr:nth-child(even) { background: #f8fafc; }
           .font-mono { font-family: monospace; font-weight: 700; }
           .text-center { text-align: center; }
-          .text-amber { color: #b45309; font-weight: 800; }
+          .text-amber { color: #65a30d; font-weight: 800; }
 
           .footer-signatures {
-            margin-top: 50px;
+            margin-top: 40px;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
