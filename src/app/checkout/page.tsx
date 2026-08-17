@@ -22,7 +22,8 @@ import {
   Plus,
   Minus,
   Lock,
-  Wrench
+  Wrench,
+  MessageSquare
 } from 'lucide-react';
 import { CartItem, Order, PaymentMethod, StoreSettings, ProductAddon } from '@/types';
 import { DEFAULT_SETTINGS, cleanDisplayNotes } from '@/lib/supabaseClient';
@@ -447,18 +448,28 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          <div className="pt-2 flex flex-col sm:flex-row gap-3">
+          {/* WHATSAPP SUPPORT DIRECT ACTION */}
+          <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
             <button
               onClick={() => router.push('/profile?tab=orders')}
-              className="flex-1 py-3.5 px-6 rounded-2xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2"
+              className="flex-1 py-3.5 px-5 rounded-2xl gradient-purple-btn text-white font-bold text-xs sm:text-sm shadow-xl shadow-indigo-600/30 flex items-center justify-center gap-2"
             >
               <span>متابعة وتتبع حالة الطلب 🔍</span>
             </button>
+            <a
+              href={`https://wa.me/201555583154?text=${encodeURIComponent(`مرحباً إدارة المتجر، قمت بإنشاء الطلب رقم #${createdOrder.order_code} (${createdOrder.customer_name}) وأريد الاستفسار/التواصل بخصوص الطلب`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-5 py-3.5 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-xs sm:text-sm border border-emerald-500/40 flex items-center justify-center gap-2 transition"
+            >
+              <MessageSquare className="w-4 h-4 text-emerald-400" />
+              <span>تواصل مع الإدارة (واتساب) 💬</span>
+            </a>
             <button
               onClick={() => router.push('/')}
-              className="px-6 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm border border-slate-700"
+              className="px-5 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs sm:text-sm border border-slate-700"
             >
-              العودة للمتجر الرئيسي
+              العودة للمتجر
             </button>
           </div>
         </div>

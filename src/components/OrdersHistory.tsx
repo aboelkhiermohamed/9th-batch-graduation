@@ -530,14 +530,36 @@ export default function OrdersHistory({
                     </div>
                   </div>
 
-                  {/* Right info (Price & Accordion button) */}
-                  <div className="flex items-center justify-between md:justify-end gap-5 w-full md:w-auto pt-3 md:pt-0 border-t md:border-t-0 border-slate-800/70">
+                  {/* Right info (Price & Support & Accordion button) */}
+                  <div className="flex items-center justify-between md:justify-end gap-3 sm:gap-5 w-full md:w-auto pt-3 md:pt-0 border-t md:border-t-0 border-slate-800/70">
                     <div className="text-right">
                       <span className="text-[11px] text-slate-400 block font-medium">إجمالي الطلب</span>
                       <span className="text-lg font-black text-emerald-400 font-mono">
                         {order.total_amount} ج.م
                       </span>
                     </div>
+
+                    {/* Direct Contact Support for this Order */}
+                    {(() => {
+                      const targetPhone = (supportPhone || '01555583154').replace(/[^0-9]/g, '');
+                      const cleanPhone = targetPhone.startsWith('20') ? targetPhone : `20${targetPhone.replace(/^0+/, '')}`;
+                      const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(`مرحباً إدارة المتجر، لدي استفسار/مشكلة بخصوص الطلب رقم #${order.order_code} (اسم العميل: ${order.customer_name})`)}`;
+
+                      return (
+                        <a
+                          href={waUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                          title="الإبلاغ عن مشكلة أو التواصل مع الدعم بخصوص هذا الطلب"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="hidden sm:inline">تواصل مع الدعم 💬</span>
+                          <span className="sm:hidden">دعم 💬</span>
+                        </a>
+                      );
+                    })()}
 
                     <button className="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
                       <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
