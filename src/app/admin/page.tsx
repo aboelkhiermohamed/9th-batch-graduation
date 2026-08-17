@@ -2126,8 +2126,13 @@ export default function AdminDashboardPage() {
                             ))
                           )}
                         </td>
-                        <td className="p-4 font-mono font-bold text-sm text-white whitespace-nowrap">
-                          {order.total_amount} ج.م
+                        <td className="p-4 font-mono font-bold text-sm text-white whitespace-nowrap space-y-1">
+                          <p>{order.total_amount} ج.م</p>
+                          {order.paid_amount && order.paid_amount > order.total_amount && (
+                            <p className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-md font-sans font-medium">
+                              مدفوع: {order.paid_amount} ج.م (فائض: +{order.paid_amount - order.total_amount} ج.م)
+                            </p>
+                          )}
                         </td>
                         <td className="p-4 whitespace-nowrap">
                           {order.payment_method === 'vodafone_cash' ? (
