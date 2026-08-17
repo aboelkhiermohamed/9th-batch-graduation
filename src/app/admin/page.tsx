@@ -2128,11 +2128,43 @@ export default function AdminDashboardPage() {
                         </td>
                         <td className="p-4 font-mono font-bold text-sm text-white whitespace-nowrap space-y-1">
                           <p>{order.total_amount} ج.م</p>
-                          {order.paid_amount && order.paid_amount > order.total_amount && (
-                            <p className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-md font-sans font-medium">
-                              مدفوع: {order.paid_amount} ج.م (فائض: +{order.paid_amount - order.total_amount} ج.م)
-                            </p>
-                          )}
+                          {(() => {
+                            const paid = Number(order.paid_amount || 0);
+                            const total = Number(order.total_amount || 0);
+                            const diff = Number(order.difference_amount || 0);
+                            const isPartial = order.status === 'pending_difference' || (diff > 0 && paid < total);
+
+                            if (isPartial) {
+                              const remaining = diff > 0 ? diff : Math.max(0, total - paid);
+                              return (
+                                <div className="text-[10px] font-sans font-medium space-y-0.5">
+                                  <p className="text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-md">
+                                    ⚠️ مدفوع جزئياً: {paid} ج.م
+                                  </p>
+                                  <p className="text-amber-300 font-mono">
+                                    متبقي: {remaining} ج.م
+                                  </p>
+                                </div>
+                              );
+                            }
+
+                            const excess = paid - total;
+                            if (excess > 25) {
+                              return (
+                                <p className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-md font-sans font-medium">
+                                  مدفوع: {paid} ج.م (فائض للعميل: +{excess} ج.م)
+                                </p>
+                              );
+                            } else if (excess > 0 && excess <= 25) {
+                              return (
+                                <p className="text-[10px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded-md font-sans font-normal">
+                                  مدفوع: {paid} ج.م (شامل رسوم التحويل)
+                                </p>
+                              );
+                            }
+
+                            return null;
+                          })()}
                         </td>
                         <td className="p-4 whitespace-nowrap">
                           {order.payment_method === 'vodafone_cash' ? (
