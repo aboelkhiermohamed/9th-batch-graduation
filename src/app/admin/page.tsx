@@ -2137,7 +2137,8 @@ export default function AdminDashboardPage() {
                         <td className="p-4 text-center align-middle whitespace-nowrap space-y-1">
                           <p className="font-mono font-bold text-sm text-white">{order.total_amount} ج.م</p>
                           {(() => {
-                            const paid = Number(order.paid_amount || 0);
+                            const matchedTx = findMatchedTransaction(order);
+                            const paid = Number(order.paid_amount || matchedTx?.amount || 0);
                             const total = Number(order.total_amount || 0);
                             const diff = Number(order.difference_amount || 0);
                             const isPartial = order.status === 'pending_difference' || (diff > 0 && paid < total);
@@ -4719,10 +4720,37 @@ export default function AdminDashboardPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-emerald-400 font-black text-sm">
-                    إجمالي المبلغ: {selectedOrderModal.total_amount} ج.م
+                  <p className="text-white font-black text-sm">
+                    إجمالي الطلب المطلوب: {selectedOrderModal.total_amount} ج.م
                   </p>
-                  <p className="text-slate-300 font-mono text-[11px] flex items-center gap-1">
+                  {(() => {
+                    const matchedTx = findMatchedTransaction(selectedOrderModal);
+                    const paid = Number(selectedOrderModal.paid_amount || matchedTx?.amount || 0);
+                    const total = Number(selectedOrderModal.total_amount || 0);
+                    const excess = paid - total;
+
+                    if (excess > 25) {
+                      return (
+                        <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs space-y-1">
+                          <p className="flex items-center gap-1.5 text-emerald-400 font-extrabold">
+                            <span>💵 المبلغ المسدد بالـ SMS:</span>
+                            <span className="font-mono text-sm font-black">{paid} ج.م</span>
+                          </p>
+                          <p className="text-[11px] text-emerald-300/90 font-medium">
+                            ⚠️ يوجد فائض مستحق للعميل بقيمة: <strong className="text-white font-mono bg-emerald-500/20 px-2 py-0.5 rounded text-xs">+{excess} ج.م</strong>
+                          </p>
+                        </div>
+                      );
+                    } else if (excess > 0 && excess <= 25) {
+                      return (
+                        <p className="text-[11px] text-slate-400 bg-slate-800/80 px-2 py-1 rounded-lg border border-slate-700/60 font-mono">
+                          المبلغ المسدد بالـ SMS: <strong className="text-slate-200">{paid} ج.م</strong> (شامل رسوم التحويل)
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
+                  <p className="text-slate-300 font-mono text-[11px] flex items-center gap-1 pt-1">
                     <Hash className="w-3.5 h-3.5 text-slate-400" />
                     <span>الرقم المرجعي بالطلب: <strong className="text-amber-300">{selectedOrderModal.transaction_ref || 'لم يدخل رقم مرجعي'}</strong></span>
                   </p>
