@@ -2053,7 +2053,7 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Orders Table */}
-            <div className="overflow-x-auto rounded-2xl sm:rounded-3xl border border-slate-800 bg-slate-900 shadow-xl">
+            <div className="overflow-x-auto rounded-2xl sm:rounded-3xl border border-slate-800 bg-slate-900 shadow-xl relative">
               <table className="w-full text-right text-xs min-w-[950px] border-collapse">
                 <thead className="bg-slate-950/90 text-slate-400 font-bold border-b border-slate-800 text-xs">
                   <tr>
@@ -2064,7 +2064,7 @@ export default function AdminDashboardPage() {
                     <th className="p-4 text-center whitespace-nowrap">إجمالي المبلغ</th>
                     <th className="p-4 text-center whitespace-nowrap">طريقة الدفع</th>
                     <th className="p-4 text-center whitespace-nowrap">الحالة والخط المؤكِّد</th>
-                    <th className="p-4 text-center whitespace-nowrap min-w-[120px]">إجراءات الإدارة</th>
+                    <th className="p-4 text-center whitespace-nowrap min-w-[130px] sticky left-0 bg-slate-950 z-20 border-r border-slate-800 shadow-md">إجراءات الإدارة</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -2076,12 +2076,20 @@ export default function AdminDashboardPage() {
                     </tr>
                   ) : (
                     filteredOrders.map(order => (
-                      <tr key={order.id} className="hover:bg-slate-800/40 transition">
+                      <tr 
+                        key={order.id} 
+                        onClick={() => setSelectedOrderModal(order)}
+                        className="hover:bg-slate-800/60 transition cursor-pointer group"
+                        title="اضغط على الطلب لعرض التفاصيل بالكامل"
+                      >
                         <td className="p-4 font-mono font-extrabold text-amber-400 align-middle whitespace-nowrap">
-                          #{order.order_code}
+                          <span className="inline-flex items-center gap-1 bg-amber-500/10 group-hover:bg-amber-500/20 px-2 py-1 rounded-lg border border-amber-500/20 transition">
+                            <Eye className="w-3 h-3 text-amber-400 opacity-60 group-hover:opacity-100" />
+                            <span>#{order.order_code}</span>
+                          </span>
                         </td>
                         <td className="p-4 space-y-0.5 align-middle">
-                          <p className="font-bold text-white text-sm">{order.customer_name}</p>
+                          <p className="font-bold text-white text-sm group-hover:text-amber-300 transition">{order.customer_name}</p>
                           <p className="font-mono text-slate-400 text-xs">{order.customer_phone}</p>
                         </td>
                         <td className="p-4 space-y-1 align-middle whitespace-nowrap">
@@ -2245,13 +2253,17 @@ export default function AdminDashboardPage() {
                             ) : null;
                           })()}
                         </td>
-                        <td className="p-4 text-center align-middle whitespace-nowrap">
+                        <td className="p-4 text-center align-middle whitespace-nowrap sticky left-0 bg-slate-900 group-hover:bg-slate-800 transition z-10 border-r border-slate-800/80 shadow-md">
                           <button
-                            onClick={() => setSelectedOrderModal(order)}
-                            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition flex items-center justify-center gap-1.5 mx-auto shadow-sm"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedOrderModal(order);
+                            }}
+                            className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition flex items-center justify-center gap-1.5 mx-auto shadow-md shadow-amber-500/10"
                             title="عرض تفاصيل الطلب والرسالة والتأكيد بالكامل"
                           >
-                            <Eye className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+                            <Eye className="w-3.5 h-3.5 text-slate-950 flex-shrink-0" />
                             <span>عرض التفاصيل</span>
                           </button>
                         </td>
