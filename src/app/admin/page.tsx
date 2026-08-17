@@ -51,7 +51,8 @@ import {
   Image as ImageIcon,
   Ruler,
   DollarSign,
-  TrendingUp
+  TrendingUp,
+  Filter
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
 import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase } from '@/lib/supabaseClient';
@@ -292,6 +293,7 @@ export default function AdminDashboardPage() {
   const [orderSearch, setOrderSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [lineFilter, setLineFilter] = useState<string>('all');
+  const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedBaseUrl, setCopiedBaseUrl] = useState(false);
   const [originUrl, setOriginUrl] = useState('https://graduation-store.com');
@@ -359,18 +361,33 @@ export default function AdminDashboardPage() {
 
   // Filtered orders list
   const filteredOrders = orders.filter(o => {
-    const matchSearch = 
-      o.order_code.toLowerCase().includes(orderSearch.toLowerCase()) ||
-      o.customer_name.includes(orderSearch) ||
-      o.customer_phone.includes(orderSearch);
+    const searchLower = orderSearch.trim().toLowerCase();
+    const matchSearch = !searchLower || 
+      (o.order_code && o.order_code.toLowerCase().includes(searchLower)) ||
+      (o.customer_name && o.customer_name.toLowerCase().includes(searchLower)) ||
+      (o.customer_phone && o.customer_phone.includes(searchLower)) ||
+      (o.transaction_ref && o.transaction_ref.toLowerCase().includes(searchLower)) ||
+      (o.sender_phone && o.sender_phone.includes(searchLower)) ||
+      (o.notes && o.notes.toLowerCase().includes(searchLower)) ||
+      (o.items && o.items.some(item => 
+        (item.product_title && item.product_title.toLowerCase().includes(searchLower)) ||
+        (item.custom_text && item.custom_text.toLowerCase().includes(searchLower)) ||
+        (item.selected_size && item.selected_size.toLowerCase().includes(searchLower))
+      ));
 
-    const matchStatus = statusFilter === 'all' || o.status === statusFilter;
+    const matchStatus = statusFilter === 'all' || 
+      (statusFilter === 'all_pending' ? (o.status === 'pending' || o.status === 'pending_difference') :
+      statusFilter === 'all_verified' ? (o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered') :
+      o.status === statusFilter);
+
     const effectiveLine = getEffectiveConfirmedLine(o);
     const matchLine = lineFilter === 'all' ||
       (lineFilter === 'manual' ? Boolean(!effectiveLine && o.verified_by) :
       (effectiveLine && effectiveLine.includes(lineFilter)));
 
-    return matchSearch && matchStatus && matchLine;
+    const matchPayment = paymentFilter === 'all' || o.payment_method === paymentFilter;
+
+    return matchSearch && matchStatus && matchLine && matchPayment;
   });
 
   // Periodic poll for devices when gateway tab is active (Every 10 seconds)
@@ -1899,59 +1916,140 @@ export default function AdminDashboardPage() {
           <div className="space-y-4 sm:space-y-6">
             
             {/* Filters Bar & PDF Export Button */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800">
-              <div className="w-full sm:flex-1 flex items-center gap-2 bg-slate-950 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-slate-800">
-                <Search className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                <input
-                  type="text"
-                  placeholder="ابحث بكود الطلب أو اسم العميل أو الموبايل..."
-                  value={orderSearch}
-                  onChange={(e) => setOrderSearch(e.target.value)}
-                  className="bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none w-full"
-                />
-              </div>
+            <div className="space-y-2">
+              <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
+                {/* Search Bar */}
+                <div className="w-full xl:w-80 flex items-center gap-2 bg-slate-950 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-slate-800 focus-within:border-amber-500/50 transition">
+                  <Search className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="ابحث بكود الطلب، الاسم، الموبايل، Ref#..."
+                    value={orderSearch}
+                    onChange={(e) => setOrderSearch(e.target.value)}
+                    className="bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none w-full"
+                  />
+                  {orderSearch && (
+                    <button
+                      onClick={() => setOrderSearch('')}
+                      className="text-slate-500 hover:text-slate-300 text-xs px-1"
+                      title="مسح البحث"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
 
-              {/* Status & Line Filter Dropdown & Export PDF */}
-              <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 w-full sm:w-auto">
-                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 sm:flex-none">
-                  <span className="text-xs text-slate-400 font-semibold flex-shrink-0">تصفية:</span>
+                {/* Filters Group */}
+                <div className="flex flex-wrap items-center gap-2 flex-1 justify-start xl:justify-end">
+                  <span className="text-xs text-slate-400 font-semibold flex-shrink-0 flex items-center gap-1">
+                    <Filter className="w-3.5 h-3.5 text-amber-400" />
+                    <span>تصفية:</span>
+                  </span>
+
+                  {/* Status Dropdown */}
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="bg-slate-950 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-slate-800 focus:outline-none"
+                    className={`bg-slate-950 text-xs font-semibold px-3 py-2 rounded-xl border focus:outline-none transition cursor-pointer ${
+                      statusFilter !== 'all' 
+                        ? 'text-amber-400 border-amber-500/60 bg-amber-500/10 shadow-sm shadow-amber-500/10' 
+                        : 'text-slate-200 border-slate-800 hover:border-slate-700'
+                    }`}
                   >
-                    <option value="all">كل الحالات</option>
-                    <option value="pending">معلق (Pending)</option>
-                    <option value="auto_verified">مؤكد تلقائياً (Auto Verified)</option>
-                    <option value="manual_verified">مؤكد يدوي (Manual Verified)</option>
-                    <option value="ready_for_pickup">جاهز للاستلام بالمقر</option>
-                    <option value="delivered">تم التسليم</option>
-                    <option value="cancelled">ملغي</option>
+                    <option value="all" className="bg-slate-900 text-slate-100">📋 كل الحالات ({orders.length})</option>
+                    <option value="all_pending" className="bg-slate-900 text-amber-300">⏳ كل المعلق ({orders.filter(o => o.status === 'pending' || o.status === 'pending_difference').length})</option>
+                    <option value="pending" className="bg-slate-900 text-amber-400">⏳ معلق (بانتظار التأكيد) ({orders.filter(o => o.status === 'pending').length})</option>
+                    <option value="pending_difference" className="bg-slate-900 text-amber-500">⚠️ معلق (دفع جزئي / فارق) ({orders.filter(o => o.status === 'pending_difference').length})</option>
+                    <option value="all_verified" className="bg-slate-900 text-emerald-400">✅ كل المؤكد ({orders.filter(o => o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered').length})</option>
+                    <option value="auto_verified" className="bg-slate-900 text-emerald-300">🤖 مؤكد تلقائياً ({orders.filter(o => o.status === 'auto_verified').length})</option>
+                    <option value="manual_verified" className="bg-slate-900 text-cyan-300">👤 مؤكد يدوي ({orders.filter(o => o.status === 'manual_verified').length})</option>
+                    <option value="ready_for_pickup" className="bg-slate-900 text-indigo-300">🎓 جاهز للاستلام بالمقر ({orders.filter(o => o.status === 'ready_for_pickup').length})</option>
+                    <option value="delivered" className="bg-slate-900 text-blue-300">📦 تم التسليم ({orders.filter(o => o.status === 'delivered').length})</option>
+                    <option value="cancelled" className="bg-slate-900 text-rose-400">❌ ملغي ({orders.filter(o => o.status === 'cancelled').length})</option>
                   </select>
 
+                  {/* Line Dropdown */}
                   <select
                     value={lineFilter}
                     onChange={(e) => setLineFilter(e.target.value)}
-                    className="bg-slate-950 text-amber-300 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-800 focus:outline-none"
+                    className={`bg-slate-950 text-xs font-semibold px-3 py-2 rounded-xl border focus:outline-none transition cursor-pointer ${
+                      lineFilter !== 'all' 
+                        ? 'text-amber-400 border-amber-500/60 bg-amber-500/10 shadow-sm shadow-amber-500/10' 
+                        : 'text-slate-200 border-slate-800 hover:border-slate-700'
+                    }`}
                   >
-                    <option value="all">📱 كافة الخطوط</option>
-                    {settings.vodafone_cash_numbers.map((num, idx) => (
-                      <option key={idx} value={num}>
-                        {settings.line_labels?.[num] || `خط ${idx + 1}`} ({num})
-                      </option>
-                    ))}
-                    <option value="manual">👤 تأكيد يدوي (أدمن)</option>
+                    <option value="all" className="bg-slate-900 text-slate-100">📱 كافة الخطوط ({orders.length})</option>
+                    {settings.vodafone_cash_numbers.map((num, idx) => {
+                      const count = orders.filter(o => {
+                        const line = getEffectiveConfirmedLine(o);
+                        return line && line.includes(num);
+                      }).length;
+                      return (
+                        <option key={idx} value={num} className="bg-slate-900 text-amber-300">
+                          {settings.line_labels?.[num] || `خط ${idx + 1}`} ({num}) [{count}]
+                        </option>
+                      );
+                    })}
+                    <option value="manual" className="bg-slate-900 text-cyan-300">
+                      👤 تأكيد يدوي بدون خط ({orders.filter(o => !getEffectiveConfirmedLine(o) && Boolean(o.verified_by)).length})
+                    </option>
                   </select>
-                </div>
 
-                <button
-                  onClick={() => setIsPdfModalOpen(true)}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition flex-shrink-0"
-                >
-                  <Printer className="w-4 h-4" />
-                  <span>تصدير تقرير PDF احترافي 🖨️</span>
-                </button>
+                  {/* Payment Method Dropdown */}
+                  <select
+                    value={paymentFilter}
+                    onChange={(e) => setPaymentFilter(e.target.value)}
+                    className={`bg-slate-950 text-xs font-semibold px-3 py-2 rounded-xl border focus:outline-none transition cursor-pointer ${
+                      paymentFilter !== 'all' 
+                        ? 'text-amber-400 border-amber-500/60 bg-amber-500/10 shadow-sm shadow-amber-500/10' 
+                        : 'text-slate-200 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <option value="all" className="bg-slate-900 text-slate-100">💳 كافة طرق الدفع</option>
+                    <option value="vodafone_cash" className="bg-slate-900 text-rose-300">🔴 فودافون كاش ({orders.filter(o => o.payment_method === 'vodafone_cash').length})</option>
+                    <option value="instapay" className="bg-slate-900 text-purple-300">🟣 InstaPay ({orders.filter(o => o.payment_method === 'instapay').length})</option>
+                  </select>
+
+                  {/* Reset Filters Button */}
+                  {(statusFilter !== 'all' || lineFilter !== 'all' || paymentFilter !== 'all' || orderSearch !== '') && (
+                    <button
+                      onClick={() => {
+                        setStatusFilter('all');
+                        setLineFilter('all');
+                        setPaymentFilter('all');
+                        setOrderSearch('');
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition text-xs font-semibold"
+                      title="إعادة ضبط الفلاتر"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>إلغاء الفلاتر</span>
+                    </button>
+                  )}
+
+                  {/* Export PDF Button */}
+                  <button
+                    onClick={() => setIsPdfModalOpen(true)}
+                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition flex-shrink-0 mr-auto xl:mr-0"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>تصدير تقرير PDF احترافي 🖨️</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Active Filter Summary Banner */}
+              {(statusFilter !== 'all' || lineFilter !== 'all' || paymentFilter !== 'all' || orderSearch !== '') && (
+                <div className="flex items-center justify-between px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold">نتائج التصفية الحالية:</span>
+                    <span className="font-bold text-white bg-amber-500/20 px-2 py-0.5 rounded-md font-mono">
+                      {filteredOrders.length} من أصل {orders.length} طلب
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-amber-400/80">تطبيق الفلاتر نشط الآن</span>
+                </div>
+              )}
             </div>
 
             {/* Orders Table */}
