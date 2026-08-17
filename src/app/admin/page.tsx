@@ -2053,18 +2053,18 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Orders Table */}
-            <div className="overflow-x-auto rounded-2xl sm:rounded-3xl border border-slate-800 bg-slate-900">
-              <table className="w-full text-right text-xs min-w-[850px]">
-                <thead className="bg-slate-950/80 text-slate-400 font-bold border-b border-slate-800">
+            <div className="overflow-x-auto rounded-2xl sm:rounded-3xl border border-slate-800 bg-slate-900 shadow-xl">
+              <table className="w-full text-right text-xs min-w-[950px] border-collapse">
+                <thead className="bg-slate-950/90 text-slate-400 font-bold border-b border-slate-800 text-xs">
                   <tr>
-                    <th className="p-4">كود الطلب</th>
-                    <th className="p-4">اسم العميل ورقم الموبايل</th>
-                    <th className="p-4">الرقم المرجعي / الإيصال</th>
-                    <th className="p-4">المنتجات والمقاس والتطريز</th>
-                    <th className="p-4">إجمالي المبلغ</th>
-                    <th className="p-4">طريقة الدفع</th>
-                    <th className="p-4">الحالة والخط المؤكِّد</th>
-                    <th className="p-4 text-center">إجراءات الإدارة</th>
+                    <th className="p-4 text-right whitespace-nowrap">كود الطلب</th>
+                    <th className="p-4 text-right whitespace-nowrap">اسم العميل ورقم الموبايل</th>
+                    <th className="p-4 text-right whitespace-nowrap">الرقم المرجعي / الإيصال</th>
+                    <th className="p-4 text-right min-w-[220px]">المنتجات والمقاس والتطريز</th>
+                    <th className="p-4 text-center whitespace-nowrap">إجمالي المبلغ</th>
+                    <th className="p-4 text-center whitespace-nowrap">طريقة الدفع</th>
+                    <th className="p-4 text-center whitespace-nowrap">الحالة والخط المؤكِّد</th>
+                    <th className="p-4 text-center whitespace-nowrap min-w-[120px]">إجراءات الإدارة</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -2077,19 +2077,19 @@ export default function AdminDashboardPage() {
                   ) : (
                     filteredOrders.map(order => (
                       <tr key={order.id} className="hover:bg-slate-800/40 transition">
-                        <td className="p-4 font-mono font-extrabold text-amber-400">
+                        <td className="p-4 font-mono font-extrabold text-amber-400 align-middle whitespace-nowrap">
                           #{order.order_code}
                         </td>
-                        <td className="p-4 space-y-0.5">
+                        <td className="p-4 space-y-0.5 align-middle">
                           <p className="font-bold text-white text-sm">{order.customer_name}</p>
                           <p className="font-mono text-slate-400 text-xs">{order.customer_phone}</p>
                         </td>
-                        <td className="p-4 space-y-1">
+                        <td className="p-4 space-y-1 align-middle whitespace-nowrap">
                           <p className="font-mono font-bold text-emerald-400 text-xs">
                             {order.transaction_ref ? `Ref# ${order.transaction_ref}` : '—'}
                           </p>
                         </td>
-                        <td className="p-4 space-y-1.5 min-w-[220px]">
+                        <td className="p-4 space-y-1.5 min-w-[220px] align-middle">
                           {(!order.items || order.items.length === 0) ? (
                             <div className="text-amber-300 bg-amber-500/10 p-2 rounded-xl border border-amber-500/20 text-xs font-semibold space-y-1">
                               <p className="flex items-center gap-1 text-white">
@@ -2126,8 +2126,8 @@ export default function AdminDashboardPage() {
                             ))
                           )}
                         </td>
-                        <td className="p-4 font-mono font-bold text-sm text-white whitespace-nowrap space-y-1">
-                          <p>{order.total_amount} ج.م</p>
+                        <td className="p-4 text-center align-middle whitespace-nowrap space-y-1">
+                          <p className="font-mono font-bold text-sm text-white">{order.total_amount} ج.م</p>
                           {(() => {
                             const paid = Number(order.paid_amount || 0);
                             const total = Number(order.total_amount || 0);
@@ -2137,8 +2137,8 @@ export default function AdminDashboardPage() {
                             if (isPartial) {
                               const remaining = diff > 0 ? diff : Math.max(0, total - paid);
                               return (
-                                <div className="text-[10px] font-sans font-medium space-y-0.5">
-                                  <p className="text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-md">
+                                <div className="text-[10px] font-sans font-medium space-y-0.5 flex flex-col items-center">
+                                  <p className="text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">
                                     ⚠️ مدفوع جزئياً: {paid} ج.م
                                   </p>
                                   <p className="text-amber-300 font-mono">
@@ -2151,13 +2151,13 @@ export default function AdminDashboardPage() {
                             const excess = paid - total;
                             if (excess > 25) {
                               return (
-                                <p className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-md font-sans font-medium">
+                                <p className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md font-sans font-medium inline-block whitespace-nowrap">
                                   مدفوع: {paid} ج.م (فائض للعميل: +{excess} ج.م)
                                 </p>
                               );
                             } else if (excess > 0 && excess <= 25) {
                               return (
-                                <p className="text-[10px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded-md font-sans font-normal">
+                                <p className="text-[10px] text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md font-sans font-normal inline-block whitespace-nowrap">
                                   مدفوع: {paid} ج.م (شامل رسوم التحويل)
                                 </p>
                               );
@@ -2166,16 +2166,16 @@ export default function AdminDashboardPage() {
                             return null;
                           })()}
                         </td>
-                        <td className="p-4 whitespace-nowrap">
+                        <td className="p-4 text-center align-middle whitespace-nowrap">
                           {order.payment_method === 'vodafone_cash' ? (
-                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-slate-200 text-xs font-semibold shadow-sm">
+                            <div className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-slate-200 text-xs font-semibold shadow-sm">
                               <div className="w-5 h-5 rounded-full bg-white p-0.5 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
                                 <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-full h-full object-contain" />
                               </div>
                               <span>فودافون كاش</span>
                             </div>
                           ) : (
-                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-slate-200 text-xs font-semibold shadow-sm">
+                            <div className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-full bg-slate-950 border border-slate-800 text-slate-200 text-xs font-semibold shadow-sm">
                               <div className="w-5 h-5 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center flex-shrink-0">
                                 <span className="w-2 h-2 rounded-full bg-purple-400"></span>
                               </div>
@@ -2183,7 +2183,7 @@ export default function AdminDashboardPage() {
                             </div>
                           )}
                         </td>
-                        <td className="p-4 space-y-1.5 whitespace-nowrap">
+                        <td className="p-4 text-center align-middle space-y-1.5 whitespace-nowrap">
                           {order.status === 'auto_verified' && (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium text-[11px]">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
@@ -2191,7 +2191,7 @@ export default function AdminDashboardPage() {
                             </span>
                           )}
                           {order.status === 'manual_verified' && (
-                            <div className="space-y-1">
+                            <div className="space-y-1 flex flex-col items-center">
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium text-[11px]">
                                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
                                 <span>مؤكد يدوياً</span>
@@ -2236,7 +2236,7 @@ export default function AdminDashboardPage() {
                           {(() => {
                             const lineToDisplay = getEffectiveConfirmedLine(order);
                             return lineToDisplay ? (
-                              <div className="mt-1 flex items-center gap-1 text-[11px] text-emerald-400 font-mono font-medium">
+                              <div className="mt-1 flex items-center justify-center gap-1 text-[11px] text-emerald-400 font-mono font-medium">
                                 <span className="text-slate-500">الخط:</span>
                                 <span className="bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-emerald-300">
                                   {settings.line_labels?.[lineToDisplay] || lineToDisplay}
@@ -2245,13 +2245,13 @@ export default function AdminDashboardPage() {
                             ) : null;
                           })()}
                         </td>
-                        <td className="p-4 text-center whitespace-nowrap">
+                        <td className="p-4 text-center align-middle whitespace-nowrap">
                           <button
                             onClick={() => setSelectedOrderModal(order)}
-                            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition flex items-center gap-1.5 mx-auto shadow-sm"
+                            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-xs transition flex items-center justify-center gap-1.5 mx-auto shadow-sm"
                             title="عرض تفاصيل الطلب والرسالة والتأكيد بالكامل"
                           >
-                            <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                            <Eye className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
                             <span>عرض التفاصيل</span>
                           </button>
                         </td>
