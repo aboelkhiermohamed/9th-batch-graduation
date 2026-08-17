@@ -63,6 +63,13 @@ function generateUUID() {
   return 'f' + Date.now().toString(16).padStart(11, '0') + '-4000-8000-' + Math.random().toString(36).substring(2, 10);
 }
 
+function formatUsername(userStr?: string): string {
+  if (!userStr) return '';
+  const clean = userStr.trim();
+  if (clean.includes('@')) return clean;
+  return clean.startsWith('@') ? clean : `@${clean}`;
+}
+
 export default function AdminDashboardPage() {
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -1800,7 +1807,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-white truncate">{currentAdmin.display_name || currentAdmin.username}</p>
-                  <p className="text-[10px] text-amber-400 font-mono truncate">@{currentAdmin.username} • {currentAdmin.role === 'superadmin' ? 'مدير عام' : 'مشرف'}</p>
+                  <p className="text-[10px] text-amber-400 font-mono truncate" dir="ltr">{formatUsername(currentAdmin.username)} <span dir="rtl">• {currentAdmin.role === 'superadmin' ? 'مدير عام' : 'مشرف'}</span></p>
                 </div>
               </div>
             </div>
@@ -2471,8 +2478,8 @@ export default function AdminDashboardPage() {
                           <td className="p-4 font-bold text-white font-sans">
                             {adm.display_name}
                           </td>
-                          <td className="p-4 text-amber-400 font-bold">
-                            @{adm.username}
+                          <td className="p-4 text-amber-400 font-mono font-bold text-xs" dir="ltr">
+                            {formatUsername(adm.username)}
                           </td>
                           <td className="p-4 font-sans">
                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${

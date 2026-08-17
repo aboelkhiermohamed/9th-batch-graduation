@@ -1,5 +1,5 @@
 import { normalizePhoneNumber } from './smsParser';
-import { Order, IncomingTransaction } from '@/types';
+import { Order, IncomingTransaction, OrderStatus } from '@/types';
 import { 
   getMemoryOrders, 
   setMemoryOrders, 
@@ -116,25 +116,32 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
 
   if (matchedOrder) {
     const confirmedLine = tx.recipient_phone || tx.device_name || undefined;
-    const isPartialSettlement = Boolean(matchedOrder.is_difference_pending || matchedOrder.status === 'pending_difference');
-    const newPaidAmount = isPartialSettlement 
-      ? Math.max(matchedOrder.total_amount || 0, (matchedOrder.paid_amount || 0) + tx.amount) 
-      : (matchedOrder.total_amount || tx.amount);
+    
+    // Accumulate total paid amount for this order
+    const prevPaid = Number(matchedOrder.paid_amount || 0);
+    const newPaidAmount = prevPaid + Number(tx.amount || 0);
+    const totalOrderAmount = Number(matchedOrder.total_amount || 0);
+
+    // Determine if payment is complete (allow up to 5 EGP tolerance below total_amount for minor cash fees/rounding)
+    const isFullyPaid = newPaidAmount >= (totalOrderAmount - 5);
+    const newStatus: OrderStatus = isFullyPaid ? 'auto_verified' : 'pending_difference';
+    const remainingDiff = isFullyPaid ? 0 : Math.max(0, totalOrderAmount - newPaidAmount);
+    const isDiffPending = !isFullyPaid;
 
     // Update order status in memory & Supabase
     const updatedOrders = orders.map(o => {
       if (o.id === matchedOrder!.id) {
         return {
           ...o,
-          status: 'auto_verified' as const,
+          status: newStatus,
           paid_amount: newPaidAmount,
-          difference_amount: 0,
-          is_difference_pending: false,
+          difference_amount: remainingDiff,
+          is_difference_pending: isDiffPending,
           matched_transaction_id: tx.id,
           confirmed_line: confirmedLine || o.confirmed_line,
           matched_device_name: tx.device_name || o.matched_device_name,
           matched_device_id: tx.device_id || o.matched_device_id,
-          verified_at: new Date().toISOString(),
+          verified_at: isFullyPaid ? (o.verified_at || new Date().toISOString()) : o.verified_at,
           updated_at: new Date().toISOString()
         };
       }
@@ -146,7 +153,7 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
     if (updatedMatchedOrder) {
       await updateOrderInSupabase(updatedMatchedOrder);
     }
-    await updateOrderStatusInSupabase(matchedOrder.id, 'auto_verified', tx.id, undefined, confirmedLine, tx.device_name, tx.device_id);
+    await updateOrderStatusInSupabase(matchedOrder.id, newStatus, tx.id, undefined, confirmedLine, tx.device_name, tx.device_id);
     await updateTransactionStatusInSupabase(tx.id, 'matched', matchedOrder.id);
 
     // Update transaction status
@@ -176,7 +183,9 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
       orderId: matchedOrder.id,
       orderCode: matchedOrder.order_code,
       customerName: matchedOrder.customer_name,
-      message: `Successfully auto-verified payment via Supabase for order #${matchedOrder.order_code}`
+      message: isFullyPaid 
+        ? `Successfully auto-verified full payment via Supabase for order #${matchedOrder.order_code}`
+        : `Partial payment recorded (${newPaidAmount}/${totalOrderAmount} EGP). Order set to pending difference for #${matchedOrder.order_code}`
     };
   }
 
@@ -254,12 +263,23 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
     if (matchedTx) {
       const confirmedLine = matchedTx.recipient_phone || matchedTx.device_name || undefined;
 
-      newOrder.status = 'auto_verified';
+      const orderTotal = Number(newOrder.total_amount || 0);
+      const paidAmount = Number(matchedTx.amount || 0);
+      const isFullyPaid = paidAmount >= (orderTotal - 5);
+      const newStatus: OrderStatus = isFullyPaid ? 'auto_verified' : 'pending_difference';
+      const remainingDiff = isFullyPaid ? 0 : Math.max(0, orderTotal - paidAmount);
+
+      newOrder.status = newStatus;
+      newOrder.paid_amount = paidAmount;
+      newOrder.difference_amount = remainingDiff;
+      newOrder.is_difference_pending = !isFullyPaid;
       newOrder.matched_transaction_id = matchedTx.id;
       newOrder.confirmed_line = confirmedLine;
       newOrder.matched_device_name = matchedTx.device_name;
       newOrder.matched_device_id = matchedTx.device_id;
-      newOrder.verified_at = new Date().toISOString();
+      if (isFullyPaid) {
+        newOrder.verified_at = new Date().toISOString();
+      }
       newOrder.updated_at = new Date().toISOString();
 
       // Mark transaction as matched
