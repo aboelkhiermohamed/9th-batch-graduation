@@ -268,7 +268,14 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
       const confirmedLine = matchedTx.recipient_phone || matchedTx.device_name || undefined;
 
       const orderTotal = Number(newOrder.total_amount || 0);
-      const paidAmount = Number(matchedTx.amount || 0);
+      const prevPaid = Number(newOrder.paid_amount || 0);
+
+      // Sum all transactions matched to this order plus newly matchedTx
+      const allTxs = await fetchTransactionsFromSupabase();
+      const orderMatchedTxs = allTxs.filter(t => t.matched_order_id === newOrder.id || t.id === matchedTx!.id);
+      const sumTxsAmount = orderMatchedTxs.reduce((acc, t) => acc + Number(t.amount || 0), 0);
+
+      const paidAmount = Math.max(prevPaid + Number(matchedTx.amount || 0), sumTxsAmount);
       const isFullyPaid = paidAmount >= (orderTotal - 5);
       const newStatus: OrderStatus = isFullyPaid ? 'auto_verified' : 'pending_difference';
       const remainingDiff = isFullyPaid ? 0 : Math.max(0, orderTotal - paidAmount);

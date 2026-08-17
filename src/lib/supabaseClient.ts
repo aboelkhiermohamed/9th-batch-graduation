@@ -728,14 +728,32 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
 
 export async function fetchOrdersFromSupabase(): Promise<Order[]> {
   try {
-    const { data: dbOrders, error } = await supabase
-      .from('store_orders')
-      .select('*, store_order_items(*)')
-      .order('created_at', { ascending: false });
+    const [{ data: dbOrders, error }, { data: dbTxs }] = await Promise.all([
+      supabase.from('store_orders').select('*, store_order_items(*)').order('created_at', { ascending: false }),
+      supabase.from('store_transactions').select('matched_order_id, amount').not('matched_order_id', 'is', null)
+    ]);
 
     if (error || !dbOrders || dbOrders.length === 0) {
       return getMemoryOrders();
     }
+
+    // Build map of sum of matched transaction amounts per order ID & order_code
+    const txSumMap: Record<string, number> = {};
+    if (dbTxs && Array.isArray(dbTxs)) {
+      dbTxs.forEach((t: any) => {
+        if (t.matched_order_id && t.amount) {
+          txSumMap[t.matched_order_id] = (txSumMap[t.matched_order_id] || 0) + Number(t.amount);
+        }
+      });
+    }
+
+    // Combine with memory transactions
+    const memTxs = getMemoryTransactions();
+    memTxs.forEach(t => {
+      if (t.matched_order_id && t.amount) {
+        txSumMap[t.matched_order_id] = Math.max(txSumMap[t.matched_order_id] || 0, Number(t.amount));
+      }
+    });
 
     const fetchedOrders: Order[] = dbOrders.map((o: any) => {
       let rawNotes = o.notes || '';
@@ -840,10 +858,11 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
       });
 
       const orderTotal = Number(o.total_amount || 0);
-      let effectivePaid = paidAmount !== undefined ? paidAmount : 0;
+      const matchedTxSum = txSumMap[o.id] || txSumMap[o.order_code] || 0;
+      let effectivePaid = Math.max(paidAmount !== undefined ? paidAmount : 0, matchedTxSum);
       let finalStatus = o.status;
 
-      // Auto-reconcile: If paidAmount covers total_amount (allowing 5 EGP tolerance), clear pending difference
+      // Auto-reconcile: If paidAmount or matchedTxSum covers total_amount (allowing 5 EGP tolerance), clear pending difference
       if (effectivePaid >= (orderTotal - 5) && orderTotal > 0) {
         isDiffPending = false;
         differenceAmount = 0;
