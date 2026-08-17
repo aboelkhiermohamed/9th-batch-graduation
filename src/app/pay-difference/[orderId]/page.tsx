@@ -263,35 +263,46 @@ export default function PayDifferencePage() {
           </div>
 
           {/* Payment Method Selector */}
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setPaymentMethod('vodafone_cash')}
-              className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 border transition-all ${
-                paymentMethod === 'vodafone_cash'
-                  ? 'bg-red-500/10 border-red-500/80 text-red-300 shadow-md shadow-red-500/10 ring-1 ring-red-500/30'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
-              }`}
-            >
-              <div className="w-5 h-5 rounded-full bg-white p-0.5 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
-                <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-full h-full object-contain" />
-              </div>
-              <span>فودافون كاش (Vodafone Cash)</span>
-            </button>
+          {(() => {
+            const isInstaEnabled = Boolean(settings?.instapay_enabled);
+            const isVodaEnabled = settings?.vodafone_cash_enabled !== false;
 
-            <button
-              type="button"
-              onClick={() => setPaymentMethod('instapay')}
-              className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 border transition-all ${
-                paymentMethod === 'instapay'
-                  ? 'bg-purple-600/20 border-purple-500 text-purple-300 shadow-md shadow-purple-600/10 ring-1 ring-purple-500/30'
-                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
-              }`}
-            >
-              <span className="w-2.5 h-2.5 rounded-full bg-purple-400 flex-shrink-0"></span>
-              <span>إنستا باي (InstaPay)</span>
-            </button>
-          </div>
+            return (
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
+                {isVodaEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('vodafone_cash')}
+                    className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 border transition-all ${
+                      paymentMethod === 'vodafone_cash'
+                        ? 'bg-red-500/10 border-red-500/80 text-red-300 shadow-md shadow-red-500/10 ring-1 ring-red-500/30'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="w-5 h-5 rounded-full bg-white p-0.5 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
+                      <img src="/vf_Logo.png" alt="Vodafone Cash" className="w-full h-full object-contain" />
+                    </div>
+                    <span>فودافون كاش (Vodafone Cash)</span>
+                  </button>
+                )}
+
+                {isInstaEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('instapay')}
+                    className={`p-3.5 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 border transition-all ${
+                      paymentMethod === 'instapay'
+                        ? 'bg-purple-600/20 border-purple-500 text-purple-300 shadow-md shadow-purple-600/10 ring-1 ring-purple-500/30'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-400 flex-shrink-0"></span>
+                    <span>إنستا باي (InstaPay)</span>
+                  </button>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Vodafone Cash Lines */}
           {paymentMethod === 'vodafone_cash' && (

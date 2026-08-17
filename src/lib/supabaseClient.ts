@@ -839,6 +839,21 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         };
       });
 
+      const orderTotal = Number(o.total_amount || 0);
+      let effectivePaid = paidAmount !== undefined ? paidAmount : 0;
+      let finalStatus = o.status;
+
+      // Auto-reconcile: If paidAmount covers total_amount (allowing 5 EGP tolerance), clear pending difference
+      if (effectivePaid >= (orderTotal - 5) && orderTotal > 0) {
+        isDiffPending = false;
+        differenceAmount = 0;
+        effectivePaid = Math.max(orderTotal, effectivePaid);
+        paidAmount = effectivePaid;
+        if (finalStatus === 'pending_difference' || finalStatus === 'pending') {
+          finalStatus = 'auto_verified';
+        }
+      }
+
       return {
         id: o.id,
         order_code: o.order_code,
@@ -846,8 +861,8 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         customer_phone: o.customer_phone,
         sender_phone: o.sender_phone || o.customer_phone,
         payment_method: o.payment_method,
-        status: o.status,
-        total_amount: Number(o.total_amount || 0),
+        status: finalStatus,
+        total_amount: orderTotal,
         paid_amount: paidAmount,
         difference_amount: differenceAmount,
         is_difference_pending: isDiffPending,

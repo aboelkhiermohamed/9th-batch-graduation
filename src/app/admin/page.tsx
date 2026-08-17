@@ -2072,6 +2072,12 @@ export default function AdminDashboardPage() {
                               <span>قيد الانتظار</span>
                             </span>
                           )}
+                          {order.status === 'pending_difference' && (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium text-[11px]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                              <span>⏳ معلق (دفع جزئي / فارق)</span>
+                            </span>
+                          )}
                           {order.status === 'ready_for_pickup' && (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-medium text-[11px]">
                               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
@@ -4487,6 +4493,12 @@ export default function AdminDashboardPage() {
                   <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30 flex items-center gap-1.5 animate-pulse">
                     <Clock className="w-4 h-4" />
                     <span>⏳ معلق (بانتظار الـ SMS)</span>
+                  </span>
+                )}
+                {selectedOrderModal.status === 'pending_difference' && (
+                  <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30 flex items-center gap-1.5 animate-pulse">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span>⏳ معلق (بانتظار سداد فارق السعر)</span>
                   </span>
                 )}
                 {selectedOrderModal.status === 'ready_for_pickup' && (

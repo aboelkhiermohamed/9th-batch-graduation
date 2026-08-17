@@ -117,9 +117,13 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
   if (matchedOrder) {
     const confirmedLine = tx.recipient_phone || tx.device_name || undefined;
     
-    // Accumulate total paid amount for this order
+    // Accumulate total paid amount for this order from all matched transactions
+    const allTxs = await fetchTransactionsFromSupabase();
+    const orderMatchedTxs = allTxs.filter(t => t.matched_order_id === matchedOrder!.id || t.id === tx.id);
+    const sumTxsAmount = orderMatchedTxs.reduce((acc, t) => acc + Number(t.amount || 0), 0);
+
     const prevPaid = Number(matchedOrder.paid_amount || 0);
-    const newPaidAmount = prevPaid + Number(tx.amount || 0);
+    const newPaidAmount = Math.max(prevPaid + Number(tx.amount || 0), sumTxsAmount);
     const totalOrderAmount = Number(matchedOrder.total_amount || 0);
 
     // Determine if payment is complete (allow up to 5 EGP tolerance below total_amount for minor cash fees/rounding)
