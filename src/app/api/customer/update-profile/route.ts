@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
-import { isValidEgyptianPhone } from '@/lib/smsParser';
+import { isValidEgyptianPhone, normalizePhoneNumber } from '@/lib/smsParser';
 
 export async function PUT(req: Request) {
   try {
     const { id, phone_number, full_name, email, new_phone } = await req.json();
 
-    const targetPhone = (new_phone || phone_number || '').trim();
+    const rawTarget = new_phone || phone_number || '';
+    const targetPhone = rawTarget ? normalizePhoneNumber(rawTarget) : '';
     const cleanName = full_name ? full_name.trim() : '';
     const cleanEmail = email ? email.trim().toLowerCase() : '';
 

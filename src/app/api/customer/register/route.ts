@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
-import { isValidEgyptianPhone } from '@/lib/smsParser';
+import { isValidEgyptianPhone, normalizePhoneNumber } from '@/lib/smsParser';
 
 export async function POST(req: Request) {
   try {
@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     }
 
     const cleanName = full_name.trim();
-    const cleanPhone = phone_number.trim();
+    const cleanPhone = normalizePhoneNumber(phone_number);
     const cleanEmail = email ? email.trim().toLowerCase() : undefined;
     const cleanPassword = password.trim();
 

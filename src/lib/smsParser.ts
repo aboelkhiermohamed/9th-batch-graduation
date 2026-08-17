@@ -13,15 +13,29 @@ export interface ParsedSMS {
 
 /**
  * Normalizes phone numbers to standard 11-digit format e.g., 01012345678
+ * Handles Eastern Arabic numerals, spaces, dashes, international prefixes (+20, 0020, 20),
+ * and hidden Unicode control/directionality marks (\u200e, \u200f, etc.).
  */
 export function normalizePhoneNumber(phone: string): string {
   if (!phone) return '';
-  let cleaned = phone.replace(/[^0-9]/g, '');
-  if (cleaned.startsWith('201') && cleaned.length === 12) {
-    cleaned = '0' + cleaned.slice(3);
-  } else if (cleaned.startsWith('20') && cleaned.length === 12) {
-    cleaned = cleaned.slice(2);
+  
+  // Convert Eastern Arabic numerals (٠١٢٣٤٥٦٧٨٩) to Western (0123456789)
+  const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+  let cleaned = String(phone).trim();
+  for (let i = 0; i < arabicDigits.length; i++) {
+    cleaned = cleaned.replaceAll(arabicDigits[i], String(i));
   }
+
+  // Strip all non-digit characters (including spaces, dashes, dots, hidden RTL/LTR marks, BOM, etc.)
+  cleaned = cleaned.replace(/\D/g, '');
+
+  // Clean international prefixes: +20, 0020, 20
+  if (cleaned.startsWith('0020') && cleaned.length === 14) {
+    cleaned = '0' + cleaned.slice(4);
+  } else if (cleaned.startsWith('20') && cleaned.length === 12) {
+    cleaned = '0' + cleaned.slice(2);
+  }
+
   return cleaned;
 }
 
@@ -30,22 +44,7 @@ export function normalizePhoneNumber(phone: string): string {
  */
 export function isValidEgyptianPhone(phone: string): boolean {
   if (!phone) return false;
-  // Convert Eastern Arabic numerals (٠١٢٣٤٥٦٧٨٩) to Western (0123456789)
-  const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
-  let clean = phone.trim();
-  for (let i = 0; i < arabicDigits.length; i++) {
-    clean = clean.replaceAll(arabicDigits[i], String(i));
-  }
-  clean = clean.replace(/[\s\-\(\)]/g, '');
-
-  if (/[^\d\+]/.test(clean)) return false;
-
-  // Clean international prefixes: +20, 0020, 20
-  if (clean.startsWith('+20')) clean = '0' + clean.slice(3);
-  else if (clean.startsWith('0020')) clean = '0' + clean.slice(4);
-  else if (clean.startsWith('20') && clean.length === 12) clean = '0' + clean.slice(2);
-
-  // Local Egyptian mobile regex: 010xxxxxxxx, 011xxxxxxxx, 012xxxxxxxx, 015xxxxxxxx (exactly 11 digits)
+  const clean = normalizePhoneNumber(phone);
   const egRegex = /^0(10|11|12|15)\d{8}$/;
   return egRegex.test(clean);
 }

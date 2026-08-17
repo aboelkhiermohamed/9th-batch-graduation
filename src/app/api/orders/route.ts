@@ -9,7 +9,7 @@ import {
   fetchSettingsFromSupabase
 } from '@/lib/supabaseClient';
 import { matchOrderWithUnmatchedTransactions } from '@/lib/matchingEngine';
-import { isValidEgyptianPhone } from '@/lib/smsParser';
+import { isValidEgyptianPhone, normalizePhoneNumber } from '@/lib/smsParser';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -38,12 +38,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!isValidEgyptianPhone(customerPhone.trim())) {
+    const cleanCustomerPhone = normalizePhoneNumber(customerPhone);
+
+    if (!isValidEgyptianPhone(cleanCustomerPhone)) {
       return NextResponse.json(
         { error: 'رقم الموبايل غير صحيح. ينبغي إدخال رقم موبايل مصري مكون من 11 رقماً يبدأ بـ (010, 011, 012, 015)' },
         { status: 400 }
       );
     }
+
+    const cleanSenderPhone = senderPhone && senderPhone.trim() ? normalizePhoneNumber(senderPhone) : cleanCustomerPhone;
 
     const orderId = generateUUID();
     const orderCode = 'GRAD-' + Math.floor(10000 + Math.random() * 90000);
@@ -78,8 +82,8 @@ export async function POST(req: NextRequest) {
       id: orderId,
       order_code: orderCode,
       customer_name: customerName.trim(),
-      customer_phone: customerPhone.trim(),
-      sender_phone: senderPhone?.trim() || customerPhone.trim(),
+      customer_phone: cleanCustomerPhone,
+      sender_phone: cleanSenderPhone,
       transaction_ref: transactionRef.trim(),
       payment_method: paymentMethod || 'vodafone_cash',
       receipt_url: receiptUrl || receipt_url || undefined,

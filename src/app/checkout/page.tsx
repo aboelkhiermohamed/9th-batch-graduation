@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthModal from '@/components/AuthModal';
-import { isValidEgyptianPhone } from '@/lib/smsParser';
+import { isValidEgyptianPhone, normalizePhoneNumber } from '@/lib/smsParser';
 import { 
   ShoppingBag, 
   Copy, 
@@ -241,7 +241,8 @@ export default function CheckoutPage() {
       return;
     }
 
-    const finalPhone = (customerSession?.phone_number || customerPhone).trim();
+    const rawPhone = (customerPhone.trim() || customerSession?.phone_number || '').trim();
+    const finalPhone = normalizePhoneNumber(rawPhone);
 
     if (!customerName.trim() || !finalPhone || !transactionRef.trim()) {
       alert('يرجى إدخال اسم العميل ورقم الموبايل والرقم المرجعي للعملية');
@@ -250,6 +251,12 @@ export default function CheckoutPage() {
 
     if (!isValidEgyptianPhone(finalPhone)) {
       alert('عفواً، رقم الموبايل غير صحيح! يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
+      return;
+    }
+
+    const cleanSenderPhone = senderPhone.trim() ? normalizePhoneNumber(senderPhone) : finalPhone;
+    if (senderPhone.trim() && !isValidEgyptianPhone(senderPhone)) {
+      alert('عفواً، رقم محفظة الراسل غير صحيح! يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
       return;
     }
 
@@ -281,7 +288,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           customerName: customerName.trim(),
           customerPhone: finalPhone,
-          senderPhone: senderPhone.trim() || finalPhone,
+          senderPhone: cleanSenderPhone,
           transactionRef: transactionRef.trim(),
           paymentMethod,
           receiptUrl: receiptUrl || undefined,

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { X, Lock, User, Phone, Mail, GraduationCap, ArrowRight, CheckCircle2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import { isValidEgyptianPhone } from '@/lib/smsParser';
+import { isValidEgyptianPhone, normalizePhoneNumber } from '@/lib/smsParser';
 
 export interface CustomerSession {
   id?: string;
@@ -108,7 +108,8 @@ export default function AuthModal({
     e.preventDefault();
     setAuthErrorMessage('');
 
-    if (!isValidEgyptianPhone(registerPhone.trim())) {
+    const cleanPhone = normalizePhoneNumber(registerPhone);
+    if (!isValidEgyptianPhone(cleanPhone)) {
       setAuthErrorMessage('يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
       return;
     }
@@ -121,7 +122,7 @@ export default function AuthModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: registerFullName.trim(),
-          phone_number: registerPhone.trim(),
+          phone_number: cleanPhone,
           email: registerEmail.trim() || undefined,
           password: registerPassword.trim()
         })
