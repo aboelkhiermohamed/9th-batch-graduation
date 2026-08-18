@@ -531,12 +531,16 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
       : (data.instapay_enabled !== undefined ? Boolean(data.instapay_enabled) : Boolean(currentMem.instapay_enabled));
 
     const defaultIpa = meta?.ia?.[0] || meta?.instapay_ipa || data.instapay_ipa || currentMem.instapay_ipa || '9thbatch@instapay';
-    const vodaNums = (meta?.vn && Array.isArray(meta.vn) && meta.vn.length > 0) 
-      ? meta.vn 
-      : parseArrayOrCommaString(data.vodafone_cash_numbers, currentMem.vodafone_cash_numbers || ['01015339426']);
-    const instaAccounts = (meta?.ia && Array.isArray(meta.ia) && meta.ia.length > 0) 
-      ? meta.ia 
-      : parseArrayOrCommaString(data.instapay_ipas, currentMem.instapay_ipas || [defaultIpa]);
+
+    const parsedVodaCol = parseArrayOrCommaString(data.vodafone_cash_numbers, []);
+    const vodaNums = parsedVodaCol.length > 0 
+      ? parsedVodaCol 
+      : ((meta?.vn && Array.isArray(meta.vn) && meta.vn.length > 0) ? meta.vn : (currentMem.vodafone_cash_numbers || ['01015339426']));
+
+    const parsedInstaCol = parseArrayOrCommaString(data.instapay_ipas, []);
+    const instaAccounts = parsedInstaCol.length > 0 
+      ? parsedInstaCol 
+      : ((meta?.ia && Array.isArray(meta.ia) && meta.ia.length > 0) ? meta.ia : (currentMem.instapay_ipas || [defaultIpa]));
 
     let isMaintenance = false;
     if (meta && meta.m !== undefined) {
@@ -553,6 +557,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
 
     const vodaFeePct = meta?.vf !== undefined ? Number(meta.vf) : (data.vodafone_cash_fee_percent !== undefined ? Number(data.vodafone_cash_fee_percent) : (currentMem.vodafone_cash_fee_percent ?? 1));
     const supportPhone = data.support_phone || meta?.sp || meta?.support_phone || currentMem.support_phone || '01555583154';
+    const lineLabels = meta?.lbl || currentMem.line_labels || {};
 
     const settings: StoreSettings = {
       id: data.id,
@@ -561,6 +566,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
       instapay_enabled: instaEnabled,
       vodafone_cash_fee_percent: vodaFeePct,
       vodafone_cash_numbers: vodaNums,
+      line_labels: lineLabels,
       instapay_ipa: defaultIpa,
       instapay_ipas: instaAccounts,
       pickup_note: cleanNote,
@@ -592,15 +598,14 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
   setMemorySettings(memoryPayload);
 
   try {
-    // Ultra-compact metadata object (fits under 120 chars to avoid VARCHAR(255) overflow)
+    // Ultra-compact metadata object (<80 chars to strictly prevent VARCHAR(255) overflow)
     const compactMeta = {
       v: settings.vodafone_cash_enabled ? 1 : 0,
       i: settings.instapay_enabled ? 1 : 0,
       vf: Number(settings.vodafone_cash_fee_percent || 0),
       m: settings.maintenance_mode ? 1 : 0,
-      vn: settings.vodafone_cash_numbers,
-      ia: settings.instapay_ipas || [settings.instapay_ipa],
       sp: settings.support_phone,
+      lbl: settings.line_labels,
       del: getDeletedProductIds()
     };
 
@@ -610,6 +615,9 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
     const safeNote = cleanNote.slice(0, maxNoteLen);
     const encodedNote = `${safeNote} ${metaTag}`;
 
+    const joinedVoda = settings.vodafone_cash_numbers.join(', ');
+    const joinedInsta = (settings.instapay_ipas || [settings.instapay_ipa]).join(', ');
+
     const payload: any = {
       id: 'default',
       store_name: settings.store_name,
@@ -617,17 +625,24 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       instapay_enabled: Boolean(settings.instapay_enabled),
       vodafone_cash_fee_percent: Number(settings.vodafone_cash_fee_percent || 0),
       maintenance_mode: Boolean(settings.maintenance_mode),
-      vodafone_cash_numbers: settings.vodafone_cash_numbers,
+      vodafone_cash_numbers: joinedVoda,
       instapay_ipa: (settings.instapay_ipas && settings.instapay_ipas[0]) || settings.instapay_ipa || '9thbatch@instapay',
-      instapay_ipas: settings.instapay_ipas || [settings.instapay_ipa],
+      instapay_ipas: joinedInsta,
       support_phone: settings.support_phone,
       pickup_note: encodedNote,
       updated_at: new Date().toISOString()
     };
 
+    // First try direct UPDATE by ID
     let { error } = await supabase
       .from('store_settings')
-      .upsert(payload);
+      .update(payload)
+      .eq('id', 'default');
+
+    if (error) {
+      const res = await supabase.from('store_settings').upsert(payload);
+      error = res.error;
+    }
 
     // Smart Column Fallback Loop for missing columns or type mismatches
     let attempts = 0;
