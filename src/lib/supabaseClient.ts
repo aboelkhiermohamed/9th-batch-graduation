@@ -471,11 +471,12 @@ export function decodeProdMeta(b64Str: string): any {
 
 export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
   try {
-    const { data, error } = await supabase
+    const { data: rows, error } = await supabase
       .from('store_settings')
       .select('*')
-      .eq('id', 'default')
-      .single();
+      .limit(1);
+
+    const data = (Array.isArray(rows) && rows.length > 0) ? rows[0] : null;
 
     if (error || !data) {
       return getMemorySettings();
@@ -618,8 +619,19 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
     const joinedVoda = settings.vodafone_cash_numbers.join(', ');
     const joinedInsta = (settings.instapay_ipas || [settings.instapay_ipa]).join(', ');
 
+    let targetId = settings.id || 'default';
+    try {
+      const { data: existingRows } = await supabase
+        .from('store_settings')
+        .select('id')
+        .limit(1);
+      if (existingRows && existingRows.length > 0 && existingRows[0].id) {
+        targetId = existingRows[0].id;
+      }
+    } catch (e) {}
+
     const payload: any = {
-      id: 'default',
+      id: targetId,
       store_name: settings.store_name,
       vodafone_cash_enabled: Boolean(settings.vodafone_cash_enabled),
       instapay_enabled: Boolean(settings.instapay_enabled),
@@ -633,16 +645,9 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       updated_at: new Date().toISOString()
     };
 
-    // First try direct UPDATE by ID
     let { error } = await supabase
       .from('store_settings')
-      .update(payload)
-      .eq('id', 'default');
-
-    if (error) {
-      const res = await supabase.from('store_settings').upsert(payload);
-      error = res.error;
-    }
+      .upsert(payload);
 
     // Smart Column Fallback Loop for missing columns or type mismatches
     let attempts = 0;

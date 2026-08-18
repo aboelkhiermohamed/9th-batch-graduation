@@ -2833,9 +2833,9 @@ export default function AdminDashboardPage() {
                                 setVodaLines(prev => {
                                   const next = [...prev];
                                   next[idx] = val;
+                                  setVodaInput(next.join(', '));
                                   return next;
                                 });
-                                setVodaInput(vodaLines.join(', '));
                               }}
                               className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-rose-500"
                             />
@@ -2897,10 +2897,10 @@ export default function AdminDashboardPage() {
                 </div>
 
                 {/* Display Parsed Badges */}
-                {vodaInput.split(',').filter(n => n.trim()).length > 0 && (
+                {vodaLines.filter(n => n.trim()).length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     <span className="text-[11px] text-slate-400 font-semibold ml-1">الأرقام المعروضة للعميل:</span>
-                    {vodaInput.split(',').map(n => n.trim()).filter(Boolean).map((num, i) => (
+                    {vodaLines.filter(n => n.trim()).map((num, i) => (
                       <span key={i} className="px-2.5 py-0.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-mono font-bold">
                         📞 {num}
                       </span>
