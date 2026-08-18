@@ -1298,11 +1298,31 @@ export default function AdminDashboardPage() {
 
   // Helper to identify ticket items
   const isTicketItem = (item: any) => {
+    // 1. Check if matching product in catalog is marked as is_event or has ticket/event category
+    if (item.product_id || item.product_title) {
+      const matchProd = products.find(p => 
+        (item.product_id && p.id === item.product_id) || 
+        (item.product_title && (p.title_ar === item.product_title || p.title === item.product_title))
+      );
+      if (matchProd) {
+        if (matchProd.is_event) return true;
+        const cat = (matchProd.category || '').toLowerCase();
+        if (cat.includes('event') || cat.includes('ticket') || cat.includes('تذكرة') || cat.includes('تذاكر') || cat.includes('حفل') || cat.includes('فعالية') || cat.includes('إيفينت')) return true;
+      }
+    }
+
+    // 2. Check attendees array
     if (item.attendees && Array.isArray(item.attendees) && item.attendees.length > 0) return true;
+
+    // 3. Check parsed attendees from customization_option
     const { attendees } = parseAttendeesAndCleanOpt(item.customization_option);
     if (attendees && attendees.length > 0) return true;
+
+    // 4. Check title keywords (Arabic & English)
     const title = (item.product_title || '').toLowerCase();
-    if (title.includes('تذكرة') || title.includes('تذاكر') || title.includes('ticket')) return true;
+    const ticketKeywords = ['تذكرة', 'تذاكر', 'ticket', 'scarb', 'إيفينت', 'ايقينت', 'ايڤينت', 'حفل', 'حفلة', 'فعالية', 'event', 'حضور', 'دعوة', 'تكت'];
+    if (ticketKeywords.some(kw => title.includes(kw))) return true;
+
     return false;
   };
 
