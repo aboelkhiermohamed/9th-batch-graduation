@@ -98,11 +98,11 @@ export default function StandaloneProductPage() {
 
         for (let i = 0; i < quantity; i++) {
           if (prev[i] && prev[i].name) {
-            updated.push(prev[i]);
+            updated.push({ ...prev[i], gender: prev[i].gender || 'male' });
           } else if (i === 0 && cust?.full_name) {
-            updated.push({ name: cust.full_name, phone: cust.phone_number || '' });
+            updated.push({ name: cust.full_name, phone: cust.phone_number || '', gender: 'male' });
           } else {
-            updated.push({ name: prev[i]?.name || '', phone: prev[i]?.phone || '' });
+            updated.push({ name: prev[i]?.name || '', phone: prev[i]?.phone || '', gender: 'male' });
           }
         }
         return updated;
@@ -664,6 +664,47 @@ export default function StandaloneProductPage() {
                             }}
                             className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono focus:outline-none focus:border-amber-500 transition"
                           />
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-slate-900 flex items-center justify-between">
+                        <label className="text-[11px] text-slate-300 font-semibold flex items-center gap-1">
+                          <span>النوع / الجنس:</span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttendees(prev => {
+                                const next = [...prev];
+                                next[idx] = { ...next[idx], gender: 'male' };
+                                return next;
+                              });
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+                              (att.gender || 'male') === 'male'
+                                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 ring-1 ring-cyan-500/30'
+                                : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800'
+                            }`}
+                          >
+                            <span>👨 ولد (ذكر)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttendees(prev => {
+                                const next = [...prev];
+                                next[idx] = { ...next[idx], gender: 'female' };
+                                return next;
+                              });
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+                              att.gender === 'female'
+                                ? 'bg-pink-500/20 text-pink-300 border-pink-500/50 ring-1 ring-pink-500/30'
+                                : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800'
+                            }`}
+                          >
+                            <span>👩 بنت (أنثى)</span>
+                          </button>
                         </div>
                       </div>
                     </div>

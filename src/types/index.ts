@@ -15,6 +15,7 @@ export type OrderStatus =
 export interface EventAttendee {
   name: string;
   phone?: string;
+  gender?: 'male' | 'female' | string;
   notes?: string;
 }
 

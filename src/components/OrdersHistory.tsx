@@ -30,7 +30,7 @@ import {
   AlertCircle,
   Ticket
 } from 'lucide-react';
-import { Order, OrderItem } from '@/types';
+import { Order, OrderItem, EventAttendee } from '@/types';
 
 interface OrdersHistoryProps {
   orders: Order[];
@@ -59,7 +59,7 @@ export default function OrdersHistory({
   const [editingAttendeesTarget, setEditingAttendeesTarget] = useState<{
     order: Order;
     item: OrderItem;
-    attendeesList: { name: string; phone: string }[];
+    attendeesList: EventAttendee[];
   } | null>(null);
   const [isSavingAttendees, setIsSavingAttendees] = useState(false);
 
@@ -69,14 +69,14 @@ export default function OrdersHistory({
 
   const handleOpenAttendeesModal = (order: Order, item: OrderItem) => {
     const qty = item.quantity || 1;
-    const initial: { name: string; phone: string }[] = [];
+    const initial: EventAttendee[] = [];
     for (let i = 0; i < qty; i++) {
       if (item.attendees && item.attendees[i]) {
-        initial.push({ name: item.attendees[i].name || '', phone: item.attendees[i].phone || '' });
+        initial.push({ name: item.attendees[i].name || '', phone: item.attendees[i].phone || '', gender: item.attendees[i].gender || 'male' });
       } else if (i === 0) {
-        initial.push({ name: order.customer_name || '', phone: order.customer_phone || '' });
+        initial.push({ name: order.customer_name || '', phone: order.customer_phone || '', gender: 'male' });
       } else {
-        initial.push({ name: '', phone: '' });
+        initial.push({ name: '', phone: '', gender: 'male' });
       }
     }
     setEditingAttendeesTarget({ order, item, attendeesList: initial });
@@ -1083,6 +1083,49 @@ export default function OrdersHistory({
                         }}
                         className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-amber-500"
                       />
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-slate-900 flex items-center justify-between">
+                    <label className="text-[11px] text-slate-300 font-semibold flex items-center gap-1">
+                      <span>النوع / الجنس:</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAttendeesTarget(prev => {
+                            if (!prev) return null;
+                            const nextList = [...prev.attendeesList];
+                            nextList[idx] = { ...nextList[idx], gender: 'male' };
+                            return { ...prev, attendeesList: nextList };
+                          });
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 border ${
+                          (att.gender || 'male') === 'male'
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50'
+                            : 'bg-slate-900 text-slate-400 border-slate-800'
+                        }`}
+                      >
+                        <span>👨 ولد (ذكر)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAttendeesTarget(prev => {
+                            if (!prev) return null;
+                            const nextList = [...prev.attendeesList];
+                            nextList[idx] = { ...nextList[idx], gender: 'female' };
+                            return { ...prev, attendeesList: nextList };
+                          });
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 border ${
+                          att.gender === 'female'
+                            ? 'bg-pink-500/20 text-pink-300 border-pink-500/50'
+                            : 'bg-slate-900 text-slate-400 border-slate-800'
+                        }`}
+                      >
+                        <span>👩 بنت (أنثى)</span>
+                      </button>
                     </div>
                   </div>
                 </div>

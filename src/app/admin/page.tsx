@@ -3078,6 +3078,29 @@ export default function AdminDashboardPage() {
               const embroideredPct = totalUnitsSold > 0 ? Math.round((embroideredItemsCount / totalUnitsSold) * 100) : 0;
               const avgOrderValue = totalOrdersCount > 0 ? Math.round(totalGrossRevenue / totalOrdersCount) : 0;
 
+              let totalEventTickets = 0;
+              let maleAttendeesCount = 0;
+              let femaleAttendeesCount = 0;
+
+              orders.forEach(order => {
+                if (order.status === 'cancelled') return;
+                (order.items || []).forEach(item => {
+                  const { attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
+                  const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
+                  if (attendeesList && attendeesList.length > 0) {
+                    totalEventTickets += attendeesList.length;
+                    attendeesList.forEach((att: any) => {
+                      const g = (att.gender || '').toLowerCase();
+                      if (g === 'female' || g === 'أنثى' || g === 'بنت' || g === 'فتاة') {
+                        femaleAttendeesCount++;
+                      } else {
+                        maleAttendeesCount++;
+                      }
+                    });
+                  }
+                });
+              });
+
               return (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -3185,6 +3208,64 @@ export default function AdminDashboardPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* KPI 9: Event Ticket Attendees (Boys vs Girls) Banner */}
+                  {totalEventTickets > 0 && (
+                    <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/80 to-slate-900 border border-indigo-500/40 space-y-4 shadow-2xl relative overflow-hidden">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-500/20 pb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-3 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-lg">
+                            <Ticket className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                              <span>🎟️ حصر وإحصائيات تذاكر الإيفينت والفعاليات (الأولاد والبنات)</span>
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-0.5">حساب وإجمالي عدد الحاضرين من الذكور والإناث المحجوز لهم تذاكر بالفاعلية</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-4 py-2 rounded-2xl bg-indigo-500/20 text-indigo-300 font-black text-sm border border-indigo-500/30">
+                            إجمالي التذاكر المباعة: {totalEventTickets} تذكرة
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Male Count Card */}
+                        <div className="p-4 rounded-2xl bg-slate-950/80 border border-cyan-500/40 flex items-center justify-between shadow-md">
+                          <div className="flex items-center gap-3.5">
+                            <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center text-2xl font-bold shadow-inner">
+                              👨
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-slate-400">عدد الأولاد (الذكور)</span>
+                              <p className="text-3xl font-black text-cyan-300">{maleAttendeesCount} <span className="text-xs font-bold text-slate-400">حاضر</span></p>
+                            </div>
+                          </div>
+                          <div className="text-left font-mono font-black text-base text-cyan-300 bg-cyan-500/10 px-3.5 py-1.5 rounded-xl border border-cyan-500/30">
+                            {totalEventTickets > 0 ? Math.round((maleAttendeesCount / totalEventTickets) * 100) : 0}%
+                          </div>
+                        </div>
+
+                        {/* Female Count Card */}
+                        <div className="p-4 rounded-2xl bg-slate-950/80 border border-pink-500/40 flex items-center justify-between shadow-md">
+                          <div className="flex items-center gap-3.5">
+                            <div className="w-12 h-12 rounded-2xl bg-pink-500/20 text-pink-300 border border-pink-500/40 flex items-center justify-center text-2xl font-bold shadow-inner">
+                              👩
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-slate-400">عدد البنات (الإناث)</span>
+                              <p className="text-3xl font-black text-pink-300">{femaleAttendeesCount} <span className="text-xs font-bold text-slate-400">حاضرة</span></p>
+                            </div>
+                          </div>
+                          <div className="text-left font-mono font-black text-base text-pink-300 bg-pink-500/10 px-3.5 py-1.5 rounded-xl border border-pink-500/30">
+                            {totalEventTickets > 0 ? Math.round((femaleAttendeesCount / totalEventTickets) * 100) : 0}%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Section 2: Size Demand & Payment Gateways Row */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
