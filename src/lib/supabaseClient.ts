@@ -410,35 +410,30 @@ export function cleanDisplayNotes(str?: string | null): string {
   if (!str) return '';
   let cleaned = String(str);
 
-  // 1. If notes string contains system metadata tags anywhere inside it, cut off from first keyword
-  const systemKeywords = [
-    /\[?\b(ITEMS_META|ITEMS_META_B64|PARTIAL_META|SETTINGS_META|RECEIPT_URL|VERIFIED_BY|CONFIRMED_LINE|MATCHED_DEV)\b/i,
-    /\b(product_id|unit_price|customization_option|custom_text|attendees|photo_url|is_event)\s*:/i,
-    /\b(quantity|product)\s*:\s*\d+/i,
-    /\b(id|title_ar|description_ar|image_url|stock|is_active|created_at|updated_at)\s*:/i
-  ];
+  // 1. Cut off from the earliest occurrence of any system metadata keyword
+  const keywordMatches = [
+    cleaned.search(/\[?\b(ITEMS_META|ITEMS_META_B64|PARTIAL_META|SETTINGS_META)\b/i),
+    cleaned.search(/\b(quantity|unit_price|product|product_id|title_ar|description_ar|image_url|is_event|customization_label|customization_option|stock|created_at|updated_at)\s*:/i)
+  ].filter(idx => idx !== -1);
 
-  let firstIndex = Infinity;
-  systemKeywords.forEach(regex => {
-    const idx = cleaned.search(regex);
-    if (idx !== -1 && idx < firstIndex) {
-      firstIndex = idx;
+  if (keywordMatches.length > 0) {
+    const earliestIdx = Math.min(...keywordMatches);
+    if (earliestIdx >= 0) {
+      cleaned = cleaned.substring(0, earliestIdx).trim();
     }
-  });
-
-  if (firstIndex !== Infinity && firstIndex >= 0) {
-    cleaned = cleaned.substring(0, firstIndex);
   }
 
-  // 2. Strip remaining single markers if any
-  cleaned = cleaned.replace(/\[\s*(RECEIPT_URL|VERIFIED_BY|CONFIRMED_LINE|MATCHED_DEV):[\s\S]*?\]/gi, '');
-  cleaned = cleaned.replace(/RECEIPT_URL:\s*https?:\/\/\S+/gi, '');
-  cleaned = cleaned.replace(/\[VERIFIED_BY:.*?\]/gi, '');
-  cleaned = cleaned.replace(/\[CONFIRMED_LINE:.*?\]/gi, '');
-  cleaned = cleaned.replace(/\[MATCHED_DEV:.*?\]/gi, '');
-  cleaned = cleaned.replace(/\[\[[\s\S]*?\]\]/gi, '');
+  // 2. Remove any remaining isolated system metadata markers
+  const systemPatterns = [
+    /\[?\b(ITEMS_META|ITEMS_META_B64|PARTIAL_META|SETTINGS_META|RECEIPT_URL|VERIFIED_BY|CONFIRMED_LINE|MATCHED_DEV)\b:?[\s\S]*/gi,
+    /\b(quantity|unit_price|product|product_id|title_ar|description_ar|image_url|images|is_event|sizes|addons|stock|is_active|created_at|updated_at|customization_label|custom_text|customization_option|attendees|photo_url|gender)\s*:[^\s]*/gi,
+    /PARTIAL/gi
+  ];
+  systemPatterns.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, '');
+  });
 
-  // 3. Clean symbols, brackets, and extra spaces
+  // 3. Clean remaining brackets, quotes, and extra whitespace
   cleaned = cleaned.replace(/[\{\}\[\]"']/g, '');
   cleaned = cleaned.replace(/(,\s*)+$/g, '');
   cleaned = cleaned.replace(/(،\s*)+$/g, '');
@@ -447,7 +442,7 @@ export function cleanDisplayNotes(str?: string | null): string {
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
   // 4. If what remains is just default placeholder text like "المقاسات والتسليم: تابع جروب"
-  if (cleaned.startsWith('المقاسات والتسليم:') && cleaned.length < 45) {
+  if (cleaned.startsWith('المقاسات والتسليم:') && cleaned.length < 50) {
     return '';
   }
 
@@ -455,6 +450,7 @@ export function cleanDisplayNotes(str?: string | null): string {
   if (!/[\p{L}\p{N}]/u.test(cleaned) || cleaned.length < 2) {
     return '';
   }
+
   return cleaned;
 }
 
