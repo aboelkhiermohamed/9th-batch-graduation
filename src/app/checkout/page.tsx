@@ -463,15 +463,22 @@ export default function CheckoutPage() {
             >
               <span>متابعة وتتبع حالة الطلب 🔍</span>
             </button>
-            <a
-              href={`https://wa.me/201555583154?text=${encodeURIComponent(`مرحباً إدارة المتجر، قمت بإنشاء الطلب رقم #${createdOrder.order_code} (${createdOrder.customer_name}) وأريد الاستفسار/التواصل بخصوص الطلب`)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-5 py-3.5 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-xs sm:text-sm border border-emerald-500/40 flex items-center justify-center gap-2 transition"
-            >
-              <MessageSquare className="w-4 h-4 text-emerald-400" />
-              <span>تواصل مع الإدارة (واتساب) 💬</span>
-            </a>
+            {(() => {
+              const rawSupport = (settings.support_phone || '01555583154').replace(/[^0-9]/g, '');
+              const cleanSupport = rawSupport.startsWith('20') ? rawSupport : `20${rawSupport.replace(/^0+/, '')}`;
+              const waUrl = `https://wa.me/${cleanSupport}?text=${encodeURIComponent(`مرحباً إدارة المتجر، قمت بإنشاء الطلب رقم #${createdOrder.order_code} (${createdOrder.customer_name}) وأريد الاستفسار/التواصل بخصوص الطلب`)}`;
+              return (
+                <a
+                  href={waUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-5 py-3.5 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-xs sm:text-sm border border-emerald-500/40 flex items-center justify-center gap-2 transition"
+                >
+                  <MessageSquare className="w-4 h-4 text-emerald-400" />
+                  <span>تواصل مع الإدارة (واتساب) 💬</span>
+                </a>
+              );
+            })()}
             <button
               onClick={() => router.push('/')}
               className="px-5 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs sm:text-sm border border-slate-700"
