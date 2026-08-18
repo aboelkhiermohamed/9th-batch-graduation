@@ -1296,14 +1296,53 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Helper to identify ticket items
+  const isTicketItem = (item: any) => {
+    if (item.attendees && Array.isArray(item.attendees) && item.attendees.length > 0) return true;
+    const { attendees } = parseAttendeesAndCleanOpt(item.customization_option);
+    if (attendees && attendees.length > 0) return true;
+    const title = (item.product_title || '').toLowerCase();
+    if (title.includes('تذكرة') || title.includes('تذاكر') || title.includes('ticket')) return true;
+    return false;
+  };
+
+  // Get effective items for report output, respecting pdfShowTickets toggle
+  const getReportEffectiveItems = (order: Order | null) => {
+    const items = getOrderEffectiveItems(order);
+    if (!pdfShowTickets) {
+      return items.filter(it => !isTicketItem(it));
+    }
+    return items;
+  };
+
+  // Filtered orders list for reports based on pdfShowTickets toggle
+  const reportOrders = pdfShowTickets
+    ? orders
+    : orders.filter(o => getOrderEffectiveItems(o).some(it => !isTicketItem(it)));
+
+  // Report specific Gross Revenue calculation
+  const reportGrossRevenue = pdfShowTickets
+    ? orders.reduce((sum, o) => o.status !== 'cancelled' ? sum + Number(o.total_amount) : sum, 0)
+    : orders.reduce((sum, o) => {
+        if (o.status === 'cancelled') return sum;
+        const nonTicketItems = getOrderEffectiveItems(o).filter(it => !isTicketItem(it));
+        const orderSubtotal = nonTicketItems.reduce((acc, it) => acc + (Number(it.unit_price) || 0) * (Number(it.quantity) || 1), 0);
+        return sum + orderSubtotal;
+      }, 0);
+
+  // Report specific Verified Orders Count
+  const reportVerifiedOrdersCount = reportOrders.filter(o => 
+    o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered'
+  ).length;
+
   // Calculate statistics for PDF export & breakdown (Confirmed Orders Only for Factory Manufacturing)
   const calculateProductSizeStats = () => {
     const stats: Record<string, { productTitle: string; sizeCounts: Record<string, number>; totalUnits: number; totalRevenue: number }> = {};
 
-    orders.forEach(order => {
+    reportOrders.forEach(order => {
       const isConfirmed = order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered';
       if (!isConfirmed) return;
-      const items = getOrderEffectiveItems(order);
+      const items = getReportEffectiveItems(order);
       items.forEach(item => {
         let rawTitle = item.product_title || 'منتج غير معرف';
         // Clean title from add-ons or embroidery details bracket tags for unified factory grouping
@@ -1339,11 +1378,11 @@ export default function AdminDashboardPage() {
   const calculateAddonStats = () => {
     const addonTally: Record<string, number> = {};
 
-    orders.forEach(order => {
+    reportOrders.forEach(order => {
       const isConfirmed = order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered';
       if (!isConfirmed) return;
 
-      const items = getOrderEffectiveItems(order);
+      const items = getReportEffectiveItems(order);
       items.forEach(item => {
         let optStr = item.customization_option || (item as any).customizationOption || '';
         const rawTitle = item.product_title || '';
@@ -1522,11 +1561,11 @@ export default function AdminDashboardPage() {
         <div class="kpi-grid">
           <div class="kpi-card">
             <div class="kpi-title">إجمالي المبيعات الإجمالية</div>
-            <div class="kpi-value">${totalGrossRevenue} <span class="kpi-unit">ج.م</span></div>
+            <div class="kpi-value">${reportGrossRevenue} <span class="kpi-unit">ج.م</span></div>
           </div>
           <div class="kpi-card">
             <div class="kpi-title">عدد الطلبات المؤكدة</div>
-            <div class="kpi-value">${totalVerifiedOrders} <span class="kpi-unit">طلب</span></div>
+            <div class="kpi-value">${reportVerifiedOrdersCount} <span class="kpi-unit">طلب</span></div>
           </div>
           <div class="kpi-card">
             <div class="kpi-title">إجمالي القطع للتصنيع</div>
@@ -1534,7 +1573,7 @@ export default function AdminDashboardPage() {
           </div>
           <div class="kpi-card">
             <div class="kpi-title">عدد الأصناف المطلوبة</div>
-            <div class="kpi-value">${products.length} <span class="kpi-unit">منتج</span></div>
+            <div class="kpi-value">${productSizeStats.length} <span class="kpi-unit">منتج</span></div>
           </div>
         </div>
 
@@ -1606,7 +1645,12 @@ export default function AdminDashboardPage() {
             </tr>
           </thead>
           <tbody>
-            ${orders.map(o => `
+            ${reportOrders.map(o => {
+              const effItems = getReportEffectiveItems(o);
+              const orderAmount = pdfShowTickets 
+                ? Number(o.total_amount) 
+                : effItems.reduce((acc, it) => acc + (Number(it.unit_price) || 0) * (Number(it.quantity) || 1), 0);
+              return `
               <tr>
                 ${pdfShowCode ? `<td class="font-mono text-amber">#${o.order_code}</td>` : ''}
                 <td><strong>${o.customer_name}</strong></td>
@@ -1621,7 +1665,7 @@ export default function AdminDashboardPage() {
                     '<span style="color: #b45309; font-weight: bold;">قيد الانتظار ⏳</span>'}
                 </td>` : ''}
                 <td>
-                  ${getOrderEffectiveItems(o).map(it => {
+                  ${effItems.map(it => {
                     const { cleanOpt, attendees: parsedAtt } = parseAttendeesAndCleanOpt(it.customization_option);
                     const attendees = (it.attendees && it.attendees.length > 0) ? it.attendees : parsedAtt;
                     const optText = pdfShowTickets ? (it.customization_option || '') : (cleanOpt || '');
@@ -1634,9 +1678,10 @@ export default function AdminDashboardPage() {
                     `;
                   }).join('')}
                 </td>
-                <td class="font-mono"><strong>${o.total_amount} ج.م</strong></td>
+                <td class="font-mono"><strong>${orderAmount} ج.م</strong></td>
               </tr>
-            `).join('')}
+            `;
+            }).join('')}
           </tbody>
         </table>
 
@@ -4832,7 +4877,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="text-left font-mono text-xs text-slate-700 space-y-1">
                   <p>تاريخ التقرير: <strong>{new Date().toLocaleDateString('ar-EG')}</strong></p>
-                  <p>إجمالي الطلبات: <strong>{orders.length}</strong></p>
+                  <p>إجمالي الطلبات: <strong>{reportOrders.length}</strong></p>
                 </div>
               </div>
 
@@ -4840,15 +4885,15 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200">
                   <p className="text-xs font-bold text-amber-800">إجمالي الطلبات المؤكدة</p>
-                  <p className="text-2xl font-black text-amber-900 mt-1">{totalVerifiedOrders}</p>
+                  <p className="text-2xl font-black text-amber-900 mt-1">{reportVerifiedOrdersCount}</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
                   <p className="text-xs font-bold text-emerald-800">إجمالي المبيعات الإجمالية</p>
-                  <p className="text-2xl font-black text-emerald-900 mt-1">{totalGrossRevenue} ج.م</p>
+                  <p className="text-2xl font-black text-emerald-900 mt-1">{reportGrossRevenue} ج.م</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200">
                   <p className="text-xs font-bold text-indigo-800">عدد أصناف المنتجات</p>
-                  <p className="text-2xl font-black text-indigo-900 mt-1">{products.length}</p>
+                  <p className="text-2xl font-black text-indigo-900 mt-1">{productSizeStats.length}</p>
                 </div>
               </div>
 
@@ -4946,36 +4991,42 @@ export default function AdminDashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
-                      {orders.map((o) => (
-                        <tr key={o.id} className="hover:bg-slate-50">
-                          {pdfShowCode && <td className="p-2.5 font-mono font-bold text-amber-800">#{o.order_code}</td>}
-                          <td className="p-2.5 font-bold text-slate-900">{o.customer_name}</td>
-                          {pdfShowPhone && <td className="p-2.5 font-mono">{o.customer_phone}</td>}
-                          {pdfShowRef && <td className="p-2.5 font-mono font-bold text-emerald-800">{o.transaction_ref || '—'}</td>}
-                          <td className="p-2.5 font-medium">{o.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}</td>
-                          <td className="p-2.5">
-                            {getOrderEffectiveItems(o).map((it, i) => {
-                              const { cleanOpt, attendees: parsedAtt } = parseAttendeesAndCleanOpt(it.customization_option);
-                              const attendees = (it.attendees && it.attendees.length > 0) ? it.attendees : parsedAtt;
-                              const optText = pdfShowTickets ? (it.customization_option || '') : (cleanOpt || '');
-                              return (
-                                <div key={i}>
-                                  • {it.product_title} {it.selected_size ? `[${it.selected_size}]` : ''} × {it.quantity}
-                                  {pdfShowCustomization && it.custom_text && <span className="text-amber-800 font-bold block"> (تطريز: {it.custom_text})</span>}
-                                  {pdfShowCustomization && optText && <span className="text-emerald-800 font-bold block"> (إضافات: {optText})</span>}
-                                  {pdfShowTickets && attendees && attendees.length > 0 && (
-                                    <span className="text-indigo-800 font-bold block">
-                                      🎟️ (تذاكر: {attendees.map((a: any) => a.name + (a.phone ? ` - ${a.phone}` : '')).join('، ')})
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </td>
-                          <td className="p-2.5 font-bold font-mono">{o.total_amount} ج.م</td>
-                          <td className="p-2.5 font-bold">{o.status}</td>
-                        </tr>
-                      ))}
+                      {reportOrders.map((o) => {
+                        const effItems = getReportEffectiveItems(o);
+                        const orderAmount = pdfShowTickets 
+                          ? Number(o.total_amount) 
+                          : effItems.reduce((acc, it) => acc + (Number(it.unit_price) || 0) * (Number(it.quantity) || 1), 0);
+                        return (
+                          <tr key={o.id} className="hover:bg-slate-50">
+                            {pdfShowCode && <td className="p-2.5 font-mono font-bold text-amber-800">#{o.order_code}</td>}
+                            <td className="p-2.5 font-bold text-slate-900">{o.customer_name}</td>
+                            {pdfShowPhone && <td className="p-2.5 font-mono">{o.customer_phone}</td>}
+                            {pdfShowRef && <td className="p-2.5 font-mono font-bold text-emerald-800">{o.transaction_ref || '—'}</td>}
+                            <td className="p-2.5 font-medium">{o.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}</td>
+                            <td className="p-2.5">
+                              {effItems.map((it, i) => {
+                                const { cleanOpt, attendees: parsedAtt } = parseAttendeesAndCleanOpt(it.customization_option);
+                                const attendees = (it.attendees && it.attendees.length > 0) ? it.attendees : parsedAtt;
+                                const optText = pdfShowTickets ? (it.customization_option || '') : (cleanOpt || '');
+                                return (
+                                  <div key={i}>
+                                    • {it.product_title} {it.selected_size ? `[${it.selected_size}]` : ''} × {it.quantity}
+                                    {pdfShowCustomization && it.custom_text && <span className="text-amber-800 font-bold block"> (تطريز: {it.custom_text})</span>}
+                                    {pdfShowCustomization && optText && <span className="text-emerald-800 font-bold block"> (إضافات: {optText})</span>}
+                                    {pdfShowTickets && attendees && attendees.length > 0 && (
+                                      <span className="text-indigo-800 font-bold block">
+                                        🎟️ (تذاكر: {attendees.map((a: any) => a.name + (a.phone ? ` - ${a.phone}` : '')).join('، ')})
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </td>
+                            <td className="p-2.5 font-bold font-mono">{orderAmount} ج.م</td>
+                            <td className="p-2.5 font-bold">{o.status}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
