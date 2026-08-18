@@ -617,9 +617,9 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       instapay_enabled: Boolean(settings.instapay_enabled),
       vodafone_cash_fee_percent: Number(settings.vodafone_cash_fee_percent || 0),
       maintenance_mode: Boolean(settings.maintenance_mode),
-      vodafone_cash_numbers: settings.vodafone_cash_numbers.join(', '),
+      vodafone_cash_numbers: settings.vodafone_cash_numbers,
       instapay_ipa: (settings.instapay_ipas && settings.instapay_ipas[0]) || settings.instapay_ipa || '9thbatch@instapay',
-      instapay_ipas: (settings.instapay_ipas || [settings.instapay_ipa]).join(', '),
+      instapay_ipas: settings.instapay_ipas || [settings.instapay_ipa],
       support_phone: settings.support_phone,
       pickup_note: encodedNote,
       updated_at: new Date().toISOString()
@@ -629,20 +629,27 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       .from('store_settings')
       .upsert(payload);
 
-    // Smart Column Fallback Loop for missing columns
+    // Smart Column Fallback Loop for missing columns or type mismatches
     let attempts = 0;
     while (error && attempts < 5) {
       attempts++;
-      const match = error.message.match(/Could not find the '([^']+)' column/i) || error.message.match(/column "([^"]+)"/i);
-      if (match && match[1]) {
-        const missingCol = match[1];
-        console.warn(`Stripping missing column '${missingCol}' from settings upsert payload...`);
-        delete payload[missingCol];
+      const errMsg = error.message || '';
+      if (errMsg.includes('invalid input syntax') || errMsg.includes('type json') || errMsg.includes('character varying')) {
+        payload.vodafone_cash_numbers = settings.vodafone_cash_numbers.join(', ');
+        payload.instapay_ipas = (settings.instapay_ipas || [settings.instapay_ipa]).join(', ');
         const res = await supabase.from('store_settings').upsert(payload);
         error = res.error;
       } else {
-        console.warn('Supabase store_settings upsert error detail:', error.message);
-        break;
+        const match = errMsg.match(/Could not find the '([^']+)' column/i) || errMsg.match(/column "([^"]+)"/i);
+        if (match && match[1]) {
+          const missingCol = match[1];
+          delete payload[missingCol];
+          const res = await supabase.from('store_settings').upsert(payload);
+          error = res.error;
+        } else {
+          console.warn('Supabase store_settings upsert error detail:', error.message);
+          break;
+        }
       }
     }
 

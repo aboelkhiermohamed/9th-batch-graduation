@@ -286,6 +286,7 @@ export default function AdminDashboardPage() {
   const [vodaEnabled, setVodaEnabled] = useState(true);
   const [instaEnabled, setInstaEnabled] = useState(true);
   const [vodaInput, setVodaInput] = useState('');
+  const [vodaLines, setVodaLines] = useState<string[]>(['01015339426']);
   const [lineLabelsMap, setLineLabelsMap] = useState<Record<string, string>>({});
   const [vodaFeePercentInput, setVodaFeePercentInput] = useState('1');
   const [instaInput, setInstaInput] = useState('');
@@ -537,8 +538,12 @@ export default function AdminDashboardPage() {
           if (s.line_labels) setLineLabelsMap(s.line_labels);
           setVodaEnabled(Boolean(s.vodafone_cash_enabled));
           setInstaEnabled(Boolean(s.instapay_enabled));
-          const vNums = Array.isArray(s.vodafone_cash_numbers) ? s.vodafone_cash_numbers.join(', ') : (s.vodafone_cash_numbers || '01015339426');
-          setVodaInput(vNums);
+          const rawNums = Array.isArray(s.vodafone_cash_numbers) 
+            ? s.vodafone_cash_numbers 
+            : (typeof s.vodafone_cash_numbers === 'string' ? s.vodafone_cash_numbers.split(',').map((n: string) => n.trim()).filter(Boolean) : ['01015339426']);
+          const cleanNums = rawNums.length > 0 ? rawNums : ['01015339426'];
+          setVodaLines(cleanNums);
+          setVodaInput(cleanNums.join(', '));
           setVodaFeePercentInput(s.vodafone_cash_fee_percent !== undefined ? String(s.vodafone_cash_fee_percent) : '1');
           const iIPAs = Array.isArray(s.instapay_ipas) ? s.instapay_ipas.join(', ') : (s.instapay_ipa || '');
           setInstaInput(iIPAs);
@@ -1111,8 +1116,7 @@ export default function AdminDashboardPage() {
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const vodaArray = vodaInput
-        .split(',')
+      const vodaArray = vodaLines
         .map(n => n.trim())
         .filter(Boolean);
 
@@ -2796,43 +2800,79 @@ export default function AdminDashboardPage() {
                   </label>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    أرقام وخطوط محفظة فودافون كاش (يمكنك إدخال حتى 4 أرقام مفصولة بفاصلة)
-                  </label>
-                  <input
-                    type="text"
-                    required={vodaEnabled}
-                    placeholder="01015339426, 01022223333, 01033334444, 01044445555"
-                    value={vodaInput}
-                    onChange={(e) => setVodaInput(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-rose-500"
-                  />
-                </div>
-
-                {/* Line Custom Labeling Editor */}
-                {vodaInput.split(',').map(n => n.trim()).filter(Boolean).length > 0 && (
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                    <p className="text-xs font-bold text-amber-400">🏷️ تخصيص وتسمية خطوط الاستلام (للتوضيح في صفحة الكاشير وللإدارة):</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {vodaInput.split(',').map(n => n.trim()).filter(Boolean).map((num, i) => (
-                        <div key={i} className="flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-800">
-                          <span className="text-[11px] font-mono font-bold text-slate-300 dir-ltr flex-shrink-0">{num}:</span>
-                          <input
-                            type="text"
-                            placeholder={`خط ${i + 1}`}
-                            value={lineLabelsMap[num] || `خط ${i + 1}`}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setLineLabelsMap(prev => ({ ...prev, [num]: val }));
-                            }}
-                            className="w-full px-2.5 py-1 rounded bg-slate-950 text-amber-300 text-xs font-semibold border border-slate-800 focus:outline-none"
-                          />
-                        </div>
-                      ))}
-                    </div>
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-200">
+                      أرقام وخطوط محفظة فودافون كاش المعروضة للعملاء (أضف أرقام الخطوط وتسميتها):
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setVodaLines(prev => [...prev, ''])}
+                      className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold text-xs transition flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4 text-rose-400" />
+                      <span>إضافة خط محفظة جديد ➕</span>
+                    </button>
                   </div>
-                )}
+
+                  <div className="space-y-2.5">
+                    {vodaLines.map((num, idx) => (
+                      <div key={idx} className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                          <div className="flex items-center gap-2 flex-1">
+                            <span className="px-2.5 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 font-mono text-xs font-bold border border-rose-500/20 whitespace-nowrap flex-shrink-0">
+                              خط {idx + 1}
+                            </span>
+                            <input
+                              type="tel"
+                              required={vodaEnabled}
+                              placeholder="010XXXXXXXX"
+                              value={num}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setVodaLines(prev => {
+                                  const next = [...prev];
+                                  next[idx] = val;
+                                  return next;
+                                });
+                                setVodaInput(vodaLines.join(', '));
+                              }}
+                              className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-rose-500"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder={`تسمية الخط (مثلاً: خط ${idx + 1})`}
+                              value={lineLabelsMap[num] || `خط ${idx + 1}`}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (num) {
+                                  setLineLabelsMap(prev => ({ ...prev, [num]: val }));
+                                }
+                              }}
+                              className="w-full sm:w-44 px-3 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold border border-slate-700 focus:outline-none"
+                            />
+
+                            {vodaLines.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setVodaLines(prev => prev.filter((_, i) => i !== idx));
+                                }}
+                                className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition flex-shrink-0"
+                                title="حذف هذا الخط"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
