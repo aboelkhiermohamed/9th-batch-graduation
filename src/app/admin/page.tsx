@@ -114,6 +114,7 @@ export default function AdminDashboardPage() {
   const [pdfShowRef, setPdfShowRef] = useState(true);
   const [pdfShowCustomization, setPdfShowCustomization] = useState(true);
   const [pdfShowStatus, setPdfShowStatus] = useState(true);
+  const [pdfShowTickets, setPdfShowTickets] = useState(false);
 
   // Backup & Restore State
   const [isRestoringBackup, setIsRestoringBackup] = useState(false);
@@ -1620,12 +1621,18 @@ export default function AdminDashboardPage() {
                     '<span style="color: #b45309; font-weight: bold;">قيد الانتظار ⏳</span>'}
                 </td>` : ''}
                 <td>
-                  ${getOrderEffectiveItems(o).map(it => `
-                    <div>• ${it.product_title} ${it.selected_size ? `[${it.selected_size}]` : ''} × ${it.quantity}
-                    ${pdfShowCustomization && it.custom_text ? `<br><small style="color: #b45309;">(تطريز: ${it.custom_text})</small>` : ''}
-                    ${pdfShowCustomization && it.customization_option ? `<br><small style="color: #047857;">(إضافة: ${it.customization_option})</small>` : ''}
-                    </div>
-                  `).join('')}
+                  ${getOrderEffectiveItems(o).map(it => {
+                    const { cleanOpt, attendees: parsedAtt } = parseAttendeesAndCleanOpt(it.customization_option);
+                    const attendees = (it.attendees && it.attendees.length > 0) ? it.attendees : parsedAtt;
+                    const optText = pdfShowTickets ? (it.customization_option || '') : (cleanOpt || '');
+                    return `
+                      <div>• ${it.product_title} ${it.selected_size ? `[${it.selected_size}]` : ''} × ${it.quantity}
+                      ${pdfShowCustomization && it.custom_text ? `<br><small style="color: #b45309;">(تطريز: ${it.custom_text})</small>` : ''}
+                      ${pdfShowCustomization && optText ? `<br><small style="color: #047857;">(إضافة: ${optText})</small>` : ''}
+                      ${pdfShowTickets && attendees && attendees.length > 0 ? `<br><small style="color: #4f46e5;">🎟️ (تذاكر: ${attendees.map((a: any) => a.name + (a.phone ? ` - ${a.phone}` : '')).join('، ')})</small>` : ''}
+                      </div>
+                    `;
+                  }).join('')}
                 </td>
                 <td class="font-mono"><strong>${o.total_amount} ج.م</strong></td>
               </tr>
@@ -4799,6 +4806,10 @@ export default function AdminDashboardPage() {
                     <input type="checkbox" checked={pdfShowCustomization} onChange={e => setPdfShowCustomization(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
                     <span>تفاصيل التطريز والإضافات</span>
                   </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={pdfShowTickets} onChange={e => setPdfShowTickets(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
+                    <span>أسماء وتفاصيل التذاكر 🎟️</span>
+                  </label>
                 </div>
               </div>
             </div>
@@ -4943,13 +4954,23 @@ export default function AdminDashboardPage() {
                           {pdfShowRef && <td className="p-2.5 font-mono font-bold text-emerald-800">{o.transaction_ref || '—'}</td>}
                           <td className="p-2.5 font-medium">{o.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}</td>
                           <td className="p-2.5">
-                            {getOrderEffectiveItems(o).map((it, i) => (
-                              <div key={i}>
-                                • {it.product_title} {it.selected_size ? `[${it.selected_size}]` : ''} × {it.quantity}
-                                {pdfShowCustomization && it.custom_text && <span className="text-amber-800 font-bold block"> (تطريز: {it.custom_text})</span>}
-                                {pdfShowCustomization && it.customization_option && <span className="text-emerald-800 font-bold block"> (إضافات: {it.customization_option})</span>}
-                              </div>
-                            ))}
+                            {getOrderEffectiveItems(o).map((it, i) => {
+                              const { cleanOpt, attendees: parsedAtt } = parseAttendeesAndCleanOpt(it.customization_option);
+                              const attendees = (it.attendees && it.attendees.length > 0) ? it.attendees : parsedAtt;
+                              const optText = pdfShowTickets ? (it.customization_option || '') : (cleanOpt || '');
+                              return (
+                                <div key={i}>
+                                  • {it.product_title} {it.selected_size ? `[${it.selected_size}]` : ''} × {it.quantity}
+                                  {pdfShowCustomization && it.custom_text && <span className="text-amber-800 font-bold block"> (تطريز: {it.custom_text})</span>}
+                                  {pdfShowCustomization && optText && <span className="text-emerald-800 font-bold block"> (إضافات: {optText})</span>}
+                                  {pdfShowTickets && attendees && attendees.length > 0 && (
+                                    <span className="text-indigo-800 font-bold block">
+                                      🎟️ (تذاكر: {attendees.map((a: any) => a.name + (a.phone ? ` - ${a.phone}` : '')).join('، ')})
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </td>
                           <td className="p-2.5 font-bold font-mono">{o.total_amount} ج.م</td>
                           <td className="p-2.5 font-bold">{o.status}</td>
