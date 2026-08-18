@@ -53,7 +53,8 @@ import {
   DollarSign,
   TrendingUp,
   Filter,
-  Ticket
+  Ticket,
+  X
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
 import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase, parseAttendeesAndCleanOpt } from '@/lib/supabaseClient';
@@ -125,6 +126,7 @@ export default function AdminDashboardPage() {
 
   // Order Items Editing Modal State
   const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
+  const [isEventTicketsModalOpen, setIsEventTicketsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [editOrderItems, setEditOrderItems] = useState<any[]>([]);
   const [editPaidAmount, setEditPaidAmount] = useState<string>('0');
@@ -1960,62 +1962,6 @@ export default function AdminDashboardPage() {
         {activeTab === 'orders' && (
           <div className="space-y-4 sm:space-y-6">
             
-            {/* Event Ticket Gender Analytics Banner */}
-            <div className="p-5 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/90 to-slate-900 border border-indigo-500/40 space-y-4 shadow-2xl relative overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-500/20 pb-3.5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-lg">
-                    <Ticket className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
-                      <span>🎟️ حصر وإحصائيات تذاكر الإيفينت والفعاليات (الأولاد والبنات)</span>
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">عدد ونسبة الحاضرين المحجوز لهم تذاكر بالفعالية</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-3.5 py-1.5 rounded-2xl bg-indigo-500/20 text-indigo-300 font-black text-xs border border-indigo-500/30">
-                    إجمالي التذاكر المسجلة: {totalEventTickets} تذكرة
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                {/* Male Count Card */}
-                <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-cyan-500/40 flex items-center justify-between shadow-md">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center text-xl font-bold shadow-inner">
-                      👨
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-400">عدد الأولاد (الذكور)</span>
-                      <p className="text-2xl font-black text-cyan-300">{maleAttendeesCount} <span className="text-xs font-bold text-slate-400">حاضر</span></p>
-                    </div>
-                  </div>
-                  <div className="text-left font-mono font-black text-sm text-cyan-300 bg-cyan-500/10 px-3 py-1 rounded-xl border border-cyan-500/30">
-                    {totalEventTickets > 0 ? Math.round((maleAttendeesCount / totalEventTickets) * 100) : 0}%
-                  </div>
-                </div>
-
-                {/* Female Count Card */}
-                <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-pink-500/40 flex items-center justify-between shadow-md">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-300 border border-pink-500/40 flex items-center justify-center text-xl font-bold shadow-inner">
-                      👩
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-400">عدد البنات (الإناث)</span>
-                      <p className="text-2xl font-black text-pink-300">{femaleAttendeesCount} <span className="text-xs font-bold text-slate-400">حاضرة</span></p>
-                    </div>
-                  </div>
-                  <div className="text-left font-mono font-black text-sm text-pink-300 bg-pink-500/10 px-3 py-1 rounded-xl border border-pink-500/30">
-                    {totalEventTickets > 0 ? Math.round((femaleAttendeesCount / totalEventTickets) * 100) : 0}%
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Filters Bar & PDF Export Button */}
             <div className="space-y-2">
               <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
@@ -2042,6 +1988,17 @@ export default function AdminDashboardPage() {
 
                 {/* Filters Group */}
                 <div className="flex flex-wrap items-center gap-2 flex-1 justify-start xl:justify-end">
+                  {/* Event Ticket Quick Stats Pill Button */}
+                  {totalEventTickets > 0 && (
+                    <button
+                      onClick={() => setIsEventTicketsModalOpen(true)}
+                      className="px-3.5 py-2 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/40 text-indigo-300 text-xs font-bold transition flex items-center gap-2 shadow-sm"
+                    >
+                      <Ticket className="w-4 h-4 text-indigo-400" />
+                      <span>حصر الإيفينت (🎟️ {totalEventTickets} | 👨 {maleAttendeesCount} | 👩 {femaleAttendeesCount})</span>
+                    </button>
+                  )}
+
                   <span className="text-xs text-slate-400 font-semibold flex-shrink-0 flex items-center gap-1">
                     <Filter className="w-3.5 h-3.5 text-amber-400" />
                     <span>تصفية:</span>
@@ -5577,6 +5534,115 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* EVENT TICKETS BREAKDOWN MODAL */}
+      {isEventTicketsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="relative max-w-3xl w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                  <Ticket className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                    <span>🎟️ حصر وإحصائيات تذاكر الإيفينت والفعاليات</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">بيانات وتوزيع الحاضرين (الأولاد والبنات) لجميع التذاكر المحجوزة</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEventTicketsModalOpen(false)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Boys & Girls Count Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Male Count Card */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-cyan-500/40 flex items-center justify-between shadow-md">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center text-2xl font-bold">
+                    👨
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-400">عدد الأولاد (الذكور)</span>
+                    <p className="text-3xl font-black text-cyan-300">{maleAttendeesCount} <span className="text-xs font-bold text-slate-400">حاضر</span></p>
+                  </div>
+                </div>
+                <div className="text-left font-mono font-black text-base text-cyan-300 bg-cyan-500/10 px-3.5 py-1.5 rounded-xl border border-cyan-500/30">
+                  {totalEventTickets > 0 ? Math.round((maleAttendeesCount / totalEventTickets) * 100) : 0}%
+                </div>
+              </div>
+
+              {/* Female Count Card */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-pink-500/40 flex items-center justify-between shadow-md">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-pink-500/20 text-pink-300 border border-pink-500/40 flex items-center justify-center text-2xl font-bold">
+                    👩
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-400">عدد البنات (الإناث)</span>
+                    <p className="text-3xl font-black text-pink-300">{femaleAttendeesCount} <span className="text-xs font-bold text-slate-400">حاضرة</span></p>
+                  </div>
+                </div>
+                <div className="text-left font-mono font-black text-base text-pink-300 bg-pink-500/10 px-3.5 py-1.5 rounded-xl border border-pink-500/30">
+                  {totalEventTickets > 0 ? Math.round((femaleAttendeesCount / totalEventTickets) * 100) : 0}%
+                </div>
+              </div>
+            </div>
+
+            {/* Attendees Full List Summary */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                <span>قائمة جميع أسماء الحاضرين في التذاكر ({totalEventTickets} تذكرة):</span>
+              </h4>
+              <div className="max-h-[45vh] overflow-y-auto pr-1 space-y-2">
+                {orders.flatMap(order => (order.items || []).map(item => {
+                  const { attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
+                  const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
+                  if (!attendeesList || attendeesList.length === 0) return null;
+                  return (
+                    <div key={item.id + order.id} className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-amber-400">
+                        <span>الطلب #{order.order_code} - {order.customer_name} ({item.product_title})</span>
+                        <span className="text-slate-400 font-mono">{order.customer_phone}</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {attendeesList.map((att: any, idx: number) => (
+                          <div key={idx} className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-xs flex items-center justify-between">
+                            <span className="text-white font-semibold">👤 {att.name} {att.phone ? `(${att.phone})` : ''}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                              (att.gender === 'female' || att.gender === 'أنثى' || att.gender === 'بنت')
+                                ? 'bg-pink-500/20 text-pink-300 border-pink-500/30'
+                                : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                            }`}>
+                              {(att.gender === 'female' || att.gender === 'أنثى' || att.gender === 'بنت') ? '👩 بنت' : '👨 ولد'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }))}
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-slate-800 pt-3">
+              <button
+                onClick={() => setIsEventTicketsModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition"
+              >
+                إغلاق النافذة
+              </button>
+            </div>
           </div>
         </div>
       )}
