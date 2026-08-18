@@ -608,24 +608,21 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
   try {
     const client = typeof window === 'undefined' ? supabaseAdmin : supabase;
 
-    // Ultra-compact metadata object (fits under 150 chars to strictly prevent VARCHAR(255) overflow)
+    // Ultra-compact metadata object (<80 chars to strictly prevent VARCHAR(255) overflow)
     const compactMeta = {
       v: settings.vodafone_cash_enabled ? 1 : 0,
       i: settings.instapay_enabled ? 1 : 0,
       vf: Number(settings.vodafone_cash_fee_percent || 0),
       m: settings.maintenance_mode ? 1 : 0,
-      vn: settings.vodafone_cash_numbers.join(','),
-      ia: (settings.instapay_ipas || [settings.instapay_ipa]).join(','),
       sp: settings.support_phone,
-      lbl: settings.line_labels,
-      del: getDeletedProductIds()
+      vn: settings.vodafone_cash_numbers.join(',')
     };
 
     const metaTag = `[META:${JSON.stringify(compactMeta)}]`;
-    let maxNoteLen = 235 - metaTag.length;
+    let maxNoteLen = 220 - metaTag.length;
     if (maxNoteLen < 10) maxNoteLen = 10;
     const safeNote = cleanNote.slice(0, maxNoteLen);
-    const encodedNote = `${safeNote} ${metaTag}`;
+    const encodedNote = `${safeNote} ${metaTag}`.slice(0, 240);
 
     const joinedVoda = settings.vodafone_cash_numbers.join(', ');
     const joinedInsta = (settings.instapay_ipas || [settings.instapay_ipa]).join(', ');
@@ -660,28 +657,29 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       .from('store_settings')
       .upsert(payload);
 
-    // Smart Column Fallback Loop for missing columns or type mismatches
+    // Smart Column & String Length Fallback Loop
     let attempts = 0;
-    while (error && attempts < 5) {
+    while (error && attempts < 10) {
       attempts++;
       const errMsg = error.message || '';
-      if (errMsg.includes('invalid input syntax') || errMsg.includes('type json') || errMsg.includes('character varying')) {
+      console.warn(`Supabase store_settings upsert attempt ${attempts} error:`, errMsg);
+
+      const match = errMsg.match(/Could not find the '([^']+)' column/i) || errMsg.match(/column "([^"]+)"/i);
+      if (match && match[1]) {
+        const missingCol = match[1];
+        console.warn(`Stripping missing column '${missingCol}' from store_settings payload...`);
+        delete payload[missingCol];
+      } else if (errMsg.includes('character varying') || errMsg.includes('too long') || errMsg.includes('value too long')) {
+        payload.pickup_note = cleanNote.slice(0, 100);
+      } else if (errMsg.includes('invalid input syntax') || errMsg.includes('type json')) {
         payload.vodafone_cash_numbers = settings.vodafone_cash_numbers;
         payload.instapay_ipas = settings.instapay_ipas || [settings.instapay_ipa];
-        const res = await client.from('store_settings').upsert(payload);
-        error = res.error;
       } else {
-        const match = errMsg.match(/Could not find the '([^']+)' column/i) || errMsg.match(/column "([^"]+)"/i);
-        if (match && match[1]) {
-          const missingCol = match[1];
-          delete payload[missingCol];
-          const res = await client.from('store_settings').upsert(payload);
-          error = res.error;
-        } else {
-          console.warn('Supabase store_settings upsert error detail:', error.message);
-          break;
-        }
+        break;
       }
+
+      const res = await client.from('store_settings').upsert(payload);
+      error = res.error;
     }
 
     if (error) {
