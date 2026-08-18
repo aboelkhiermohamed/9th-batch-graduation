@@ -1125,30 +1125,41 @@ export default function AdminDashboardPage() {
         .map(n => n.trim())
         .filter(Boolean);
 
+      const payload = {
+        vodafone_cash_enabled: vodaEnabled,
+        instapay_enabled: instaEnabled,
+        vodafone_cash_fee_percent: Number(vodaFeePercentInput) || 0,
+        vodafone_cash_numbers: vodaArray.length > 0 ? vodaArray : ['01015339426'],
+        line_labels: lineLabelsMap,
+        instapay_ipa: instaArray[0] || '9thbatch@instapay',
+        instapay_ipas: instaArray.length > 0 ? instaArray : ['9thbatch@instapay'],
+        pickup_note: pickupInput.trim(),
+        support_phone: supportPhoneInput.trim(),
+        maintenance_mode: Boolean(settings.maintenance_mode)
+      };
+
       const res = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vodafone_cash_enabled: vodaEnabled,
-          instapay_enabled: instaEnabled,
-          vodafone_cash_fee_percent: Number(vodaFeePercentInput) || 0,
-          vodafone_cash_numbers: vodaArray.length > 0 ? vodaArray : ['01015339426'],
-          line_labels: lineLabelsMap,
-          instapay_ipa: instaArray[0] || '9thbatch@instapay',
-          instapay_ipas: instaArray.length > 0 ? instaArray : ['9thbatch@instapay'],
-          pickup_note: pickupInput.trim(),
-          support_phone: supportPhoneInput.trim(),
-          maintenance_mode: Boolean(settings.maintenance_mode)
-        })
+        body: JSON.stringify(payload)
       });
 
-      if (res.ok) {
-        const data = await res.json();
+      const data = await res.json();
+
+      if (res.ok && data.success && data.settings) {
         setSettings(data.settings);
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('grad_store_settings', JSON.stringify(data.settings));
+            localStorage.setItem('graduation_store_voda_nums', JSON.stringify(vodaArray));
+          } catch (e) {}
+        }
         alert('تم حفظ إعدادات وأرقام التحويل بنجاح! 💾');
+      } else {
+        alert(data?.error || 'فشل حفظ الإعدادات في السيرفر');
       }
-    } catch (err) {
-      alert('فشل حفظ الإعدادات');
+    } catch (err: any) {
+      alert('حدث خطأ غير متوقع أثناء حفظ الإعدادات: ' + (err?.message || ''));
     }
   };
 

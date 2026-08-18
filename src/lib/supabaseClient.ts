@@ -538,15 +538,17 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
 
     const defaultIpa = meta?.ia?.[0] || meta?.instapay_ipa || data.instapay_ipa || currentMem.instapay_ipa || '9thbatch@instapay';
 
+    const metaVoda = meta?.vn ? parseArrayOrCommaString(meta.vn, []) : [];
     const parsedVodaCol = parseArrayOrCommaString(data.vodafone_cash_numbers, []);
-    const vodaNums = parsedVodaCol.length > 0 
-      ? parsedVodaCol 
-      : ((meta?.vn && Array.isArray(meta.vn) && meta.vn.length > 0) ? meta.vn : (currentMem.vodafone_cash_numbers || ['01015339426']));
+    const vodaNums = metaVoda.length > 0 
+      ? metaVoda 
+      : (parsedVodaCol.length > 0 ? parsedVodaCol : (currentMem.vodafone_cash_numbers || ['01015339426']));
 
+    const metaInsta = meta?.ia ? parseArrayOrCommaString(meta.ia, []) : [];
     const parsedInstaCol = parseArrayOrCommaString(data.instapay_ipas, []);
-    const instaAccounts = parsedInstaCol.length > 0 
-      ? parsedInstaCol 
-      : ((meta?.ia && Array.isArray(meta.ia) && meta.ia.length > 0) ? meta.ia : (currentMem.instapay_ipas || [defaultIpa]));
+    const instaAccounts = metaInsta.length > 0
+      ? metaInsta 
+      : (parsedInstaCol.length > 0 ? parsedInstaCol : (currentMem.instapay_ipas || [defaultIpa]));
 
     let isMaintenance = false;
     if (meta && meta.m !== undefined) {
@@ -606,12 +608,14 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
   try {
     const client = typeof window === 'undefined' ? supabaseAdmin : supabase;
 
-    // Ultra-compact metadata object (<80 chars to strictly prevent VARCHAR(255) overflow)
+    // Ultra-compact metadata object (fits under 150 chars to strictly prevent VARCHAR(255) overflow)
     const compactMeta = {
       v: settings.vodafone_cash_enabled ? 1 : 0,
       i: settings.instapay_enabled ? 1 : 0,
       vf: Number(settings.vodafone_cash_fee_percent || 0),
       m: settings.maintenance_mode ? 1 : 0,
+      vn: settings.vodafone_cash_numbers.join(','),
+      ia: (settings.instapay_ipas || [settings.instapay_ipa]).join(','),
       sp: settings.support_phone,
       lbl: settings.line_labels,
       del: getDeletedProductIds()
