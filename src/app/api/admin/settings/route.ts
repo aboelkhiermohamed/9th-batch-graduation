@@ -53,7 +53,10 @@ export async function PUT(req: NextRequest) {
     };
 
     setMemorySettings(updated);
-    await saveSettingsToSupabase(updated);
+    const saveOk = await saveSettingsToSupabase(updated);
+    if (!saveOk) {
+      return NextResponse.json({ error: 'فشل حفظ الإعدادات في قاعدة البيانات' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, settings: updated });
   } catch (err: any) {

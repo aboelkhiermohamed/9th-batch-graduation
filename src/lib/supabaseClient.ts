@@ -3,8 +3,12 @@ import { Product, Order, StoreSettings, IncomingTransaction, OrderItem, GatewayD
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://gthedzjjumbxdaxmehqb.supabase.co';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseAdmin = supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
+  : supabase;
 
 export function parseAttendeesAndCleanOpt(custOpt?: string | null): { attendees?: any[]; cleanOpt?: string } {
   if (!custOpt) return { cleanOpt: undefined, attendees: undefined };
@@ -471,7 +475,8 @@ export function decodeProdMeta(b64Str: string): any {
 
 export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
   try {
-    const { data: rows, error } = await supabase
+    const client = typeof window === 'undefined' ? supabaseAdmin : supabase;
+    const { data: rows, error } = await client
       .from('store_settings')
       .select('*')
       .limit(1);
@@ -599,6 +604,8 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
   setMemorySettings(memoryPayload);
 
   try {
+    const client = typeof window === 'undefined' ? supabaseAdmin : supabase;
+
     // Ultra-compact metadata object (<80 chars to strictly prevent VARCHAR(255) overflow)
     const compactMeta = {
       v: settings.vodafone_cash_enabled ? 1 : 0,
@@ -621,7 +628,7 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
 
     let targetId = settings.id || 'default';
     try {
-      const { data: existingRows } = await supabase
+      const { data: existingRows } = await client
         .from('store_settings')
         .select('id')
         .limit(1);
@@ -645,7 +652,7 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       updated_at: new Date().toISOString()
     };
 
-    let { error } = await supabase
+    let { error } = await client
       .from('store_settings')
       .upsert(payload);
 
@@ -655,16 +662,16 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       attempts++;
       const errMsg = error.message || '';
       if (errMsg.includes('invalid input syntax') || errMsg.includes('type json') || errMsg.includes('character varying')) {
-        payload.vodafone_cash_numbers = settings.vodafone_cash_numbers.join(', ');
-        payload.instapay_ipas = (settings.instapay_ipas || [settings.instapay_ipa]).join(', ');
-        const res = await supabase.from('store_settings').upsert(payload);
+        payload.vodafone_cash_numbers = settings.vodafone_cash_numbers;
+        payload.instapay_ipas = settings.instapay_ipas || [settings.instapay_ipa];
+        const res = await client.from('store_settings').upsert(payload);
         error = res.error;
       } else {
         const match = errMsg.match(/Could not find the '([^']+)' column/i) || errMsg.match(/column "([^"]+)"/i);
         if (match && match[1]) {
           const missingCol = match[1];
           delete payload[missingCol];
-          const res = await supabase.from('store_settings').upsert(payload);
+          const res = await client.from('store_settings').upsert(payload);
           error = res.error;
         } else {
           console.warn('Supabase store_settings upsert error detail:', error.message);
@@ -672,6 +679,12 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
         }
       }
     }
+
+    if (error) {
+      console.error('Final error saving settings to Supabase DB:', error.message);
+      return false;
+    }
+    return true;
 
     return true;
   } catch (err) {
