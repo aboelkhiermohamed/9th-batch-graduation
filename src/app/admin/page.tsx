@@ -1664,6 +1664,165 @@ export default function AdminDashboardPage() {
     printWindow.document.close();
   };
 
+  const handlePrintEventTicketsPdf = (filterGender: 'all' | 'male' | 'female' = 'all') => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('يرجى السماح بالنوافذ المنبثقة (Popups) في متصفحك لطباعة التقرير');
+      return;
+    }
+
+    let allTickets: {
+      orderCode: string;
+      customerName: string;
+      customerPhone: string;
+      productTitle: string;
+      attendeeName: string;
+      attendeePhone?: string;
+      gender: 'male' | 'female';
+    }[] = [];
+
+    orders.forEach(order => {
+      if (order.status === 'cancelled') return;
+      (order.items || []).forEach(item => {
+        const { attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
+        const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
+        if (attendeesList && attendeesList.length > 0) {
+          attendeesList.forEach((att: any) => {
+            const g = (att.gender || '').toLowerCase();
+            const isFemale = g === 'female' || g === 'أنثى' || g === 'بنت' || g === 'فتاة';
+            const genderType: 'male' | 'female' = isFemale ? 'female' : 'male';
+
+            if (filterGender === 'all' || filterGender === genderType) {
+              allTickets.push({
+                orderCode: order.order_code,
+                customerName: order.customer_name || 'عميل',
+                customerPhone: order.customer_phone || '-',
+                productTitle: item.product_title || 'تذكرة فاعلية',
+                attendeeName: att.name || '-',
+                attendeePhone: att.phone || '',
+                gender: genderType
+              });
+            }
+          });
+        }
+      });
+    });
+
+    const totalFiltered = allTickets.length;
+    const boysCount = allTickets.filter(t => t.gender === 'male').length;
+    const girlsCount = allTickets.filter(t => t.gender === 'female').length;
+
+    const titleFilterText = filterGender === 'male' ? ' (قائمة الأولاد / الذكور فقط)' : filterGender === 'female' ? ' (قائمة البنات / الإناث فقط)' : ' (كشف الحصر الشامل)';
+
+    const tableRowsHtml = allTickets.map((t, idx) => `
+      <tr style="border-bottom: 1px solid #e2e8f0; ${idx % 2 === 1 ? 'background-color: #f8fafc;' : ''}">
+        <td style="padding: 10px; text-align: center; font-weight: bold; color: #475569;">${idx + 1}</td>
+        <td style="padding: 10px; text-align: right; font-weight: bold; font-family: monospace; color: #0284c7;">#${t.orderCode}</td>
+        <td style="padding: 10px; text-align: right; font-weight: bold; color: #1e293b; font-size: 14px;">${t.attendeeName}</td>
+        <td style="padding: 10px; text-align: center; font-weight: bold; font-family: monospace; color: #059669;">${t.attendeePhone || '-'}</td>
+        <td style="padding: 10px; text-align: center;">
+          <span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; ${t.gender === 'female' ? 'background: #fce7f3; color: #be185d; border: 1px solid #fbcfe8;' : 'background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;'}">
+            ${t.gender === 'female' ? '👩 بنت (أنثى)' : '👨 ولد (ذكر)'}
+          </span>
+        </td>
+        <td style="padding: 10px; text-align: right; color: #475569; font-size: 13px;">${t.productTitle}</td>
+        <td style="padding: 10px; text-align: right; color: #334155; font-size: 13px;">${t.customerName} <br><small style="color:#64748b; font-family:monospace;">${t.customerPhone}</small></td>
+      </tr>
+    `).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="utf-8">
+        <title>كشف تذاكر وحاضرين الإيفينت - ${new Date().toLocaleDateString('ar-EG')}</title>
+        <style>
+          @page { size: A4 portrait; margin: 15mm; }
+          body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; padding: 25px; color: #0f172a; line-height: 1.5; background: #fff; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; }
+          .logo-box { display: flex; align-items: center; gap: 12px; }
+          .logo-img { height: 44px; width: auto; object-fit: contain; }
+          .kpi-container { display: flex; gap: 15px; margin-bottom: 25px; background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; }
+          .kpi-card { flex: 1; text-align: center; padding: 10px; background: #fff; border-radius: 8px; border: 1px solid #cbd5e1; }
+          .kpi-num { font-size: 22px; font-weight: 900; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+          th { background: #0f172a; color: #fff; padding: 12px 10px; text-align: right; font-size: 12px; }
+          @media print {
+            body { padding: 0; }
+            .no-print { display: none !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print" style="margin-bottom: 20px; text-align: left;">
+          <button onclick="window.print()" style="background: #0284c7; color: white; padding: 10px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+            🖨️ طباعة أو حفظ كـ PDF الآن
+          </button>
+        </div>
+
+        <div class="header">
+          <div class="logo-box">
+            <img src="/logo-removebg-preview.png" alt="the medix" class="logo-img" />
+            <div>
+              <h2 style="margin:0; font-size: 20px; color: #0f172a;">كشف حصر وحضور تذاكر الإيفينت ${titleFilterText}</h2>
+              <small style="color: #64748b;">تاريخ التقرير: ${new Date().toLocaleString('ar-EG')}</small>
+            </div>
+          </div>
+          <div style="text-align: left;">
+            <span style="background: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 13px;">
+              إجمالي المحصور: ${totalFiltered} تذكرة
+            </span>
+          </div>
+        </div>
+
+        <div class="kpi-container">
+          <div class="kpi-card">
+            <div style="font-size: 12px; color: #64748b; font-weight: bold;">🎟️ إجمالي التذاكر</div>
+            <div class="kpi-num" style="color: #0284c7;">${totalFiltered}</div>
+          </div>
+          <div class="kpi-card" style="border-color: #bae6fd;">
+            <div style="font-size: 12px; color: #0369a1; font-weight: bold;">👨 عدد الأولاد (الذكور)</div>
+            <div class="kpi-num" style="color: #0284c7;">${boysCount}</div>
+          </div>
+          <div class="kpi-card" style="border-color: #fbcfe8;">
+            <div style="font-size: 12px; color: #be185d; font-weight: bold;">👩 عدد البنات (الإناث)</div>
+            <div class="kpi-num" style="color: #be185d;">${girlsCount}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align: center; width: 40px;">#</th>
+              <th style="width: 90px;">كود الطلب</th>
+              <th>اسم الحاضر بالكامل</th>
+              <th style="text-align: center;">موبايل الحاضر</th>
+              <th style="text-align: center; width: 110px;">النوع / الجنس</th>
+              <th>الفعالية / التذكرة</th>
+              <th>بيانات المشتري</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHtml || '<tr><td colspan="7" style="text-align:center; padding: 20px; color: #64748b;">لا توجد تذاكر مسجلة</td></tr>'}
+          </tbody>
+        </table>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 300);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
@@ -5635,10 +5794,37 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            <div className="flex justify-end border-t border-slate-800 pt-3">
+            {/* Modal Actions Bar with PDF Printing Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 border-t border-slate-800 pt-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePrintEventTicketsPdf('all')}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>طباعة الكشف الشامل (PDF) 🖨️</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintEventTicketsPdf('male')}
+                  className="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold text-xs transition flex items-center gap-1.5"
+                >
+                  <span>👨 كشف الأولاد فقط</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrintEventTicketsPdf('female')}
+                  className="px-3.5 py-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/40 font-bold text-xs transition flex items-center gap-1.5"
+                >
+                  <span>👩 كشف البنات فقط</span>
+                </button>
+              </div>
+
               <button
+                type="button"
                 onClick={() => setIsEventTicketsModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition"
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition"
               >
                 إغلاق النافذة
               </button>
