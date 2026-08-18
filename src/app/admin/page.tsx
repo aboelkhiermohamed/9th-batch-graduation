@@ -1721,6 +1721,29 @@ export default function AdminDashboardPage() {
   const totalVerifiedOrders = orders.filter(o => o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered').length;
   const totalGrossRevenue = orders.reduce((sum, o) => o.status !== 'cancelled' ? sum + Number(o.total_amount) : sum, 0);
 
+  let totalEventTickets = 0;
+  let maleAttendeesCount = 0;
+  let femaleAttendeesCount = 0;
+
+  orders.forEach(order => {
+    if (order.status === 'cancelled') return;
+    (order.items || []).forEach(item => {
+      const { attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
+      const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
+      if (attendeesList && attendeesList.length > 0) {
+        totalEventTickets += attendeesList.length;
+        attendeesList.forEach((att: any) => {
+          const g = (att.gender || '').toLowerCase();
+          if (g === 'female' || g === 'أنثى' || g === 'بنت' || g === 'فتاة') {
+            femaleAttendeesCount++;
+          } else {
+            maleAttendeesCount++;
+          }
+        });
+      }
+    });
+  });
+
   const isSuperAdmin = currentAdmin?.role === 'superadmin';
 
   const navSections = [
@@ -1728,7 +1751,7 @@ export default function AdminDashboardPage() {
       groupTitle: 'العمليات والمبيعات',
       items: [
         { id: 'analytics', label: 'إحصائيات ومبيعات 📊', badge: 'حي', badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', icon: BarChart3 },
-        { id: 'orders', label: 'إدارة الطلبات', badge: `${orders.length}`, badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30', icon: ShoppingBag },
+        { id: 'orders', label: 'إدارة الطلبات', badge: totalEventTickets > 0 ? `${orders.length} | 🎟️ ${totalEventTickets}` : `${orders.length}`, badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30', icon: ShoppingBag },
         { id: 'products', label: 'المنتجات والمعرض', badge: `${products.length}`, badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', icon: Package }
       ]
     },
@@ -1937,6 +1960,62 @@ export default function AdminDashboardPage() {
         {activeTab === 'orders' && (
           <div className="space-y-4 sm:space-y-6">
             
+            {/* Event Ticket Gender Analytics Banner */}
+            <div className="p-5 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/90 to-slate-900 border border-indigo-500/40 space-y-4 shadow-2xl relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-500/20 pb-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-lg">
+                    <Ticket className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                      <span>🎟️ حصر وإحصائيات تذاكر الإيفينت والفعاليات (الأولاد والبنات)</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-0.5">عدد ونسبة الحاضرين المحجوز لهم تذاكر بالفعالية</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3.5 py-1.5 rounded-2xl bg-indigo-500/20 text-indigo-300 font-black text-xs border border-indigo-500/30">
+                    إجمالي التذاكر المسجلة: {totalEventTickets} تذكرة
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Male Count Card */}
+                <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-cyan-500/40 flex items-center justify-between shadow-md">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center text-xl font-bold shadow-inner">
+                      👨
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-400">عدد الأولاد (الذكور)</span>
+                      <p className="text-2xl font-black text-cyan-300">{maleAttendeesCount} <span className="text-xs font-bold text-slate-400">حاضر</span></p>
+                    </div>
+                  </div>
+                  <div className="text-left font-mono font-black text-sm text-cyan-300 bg-cyan-500/10 px-3 py-1 rounded-xl border border-cyan-500/30">
+                    {totalEventTickets > 0 ? Math.round((maleAttendeesCount / totalEventTickets) * 100) : 0}%
+                  </div>
+                </div>
+
+                {/* Female Count Card */}
+                <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-pink-500/40 flex items-center justify-between shadow-md">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-pink-500/20 text-pink-300 border border-pink-500/40 flex items-center justify-center text-xl font-bold shadow-inner">
+                      👩
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-400">عدد البنات (الإناث)</span>
+                      <p className="text-2xl font-black text-pink-300">{femaleAttendeesCount} <span className="text-xs font-bold text-slate-400">حاضرة</span></p>
+                    </div>
+                  </div>
+                  <div className="text-left font-mono font-black text-sm text-pink-300 bg-pink-500/10 px-3 py-1 rounded-xl border border-pink-500/30">
+                    {totalEventTickets > 0 ? Math.round((femaleAttendeesCount / totalEventTickets) * 100) : 0}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Filters Bar & PDF Export Button */}
             <div className="space-y-2">
               <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
