@@ -411,7 +411,10 @@ export function cleanDisplayNotes(str?: string | null): string {
   let cleaned = String(str);
 
   // Strip META tags even if truncated at the end
-  cleaned = cleaned.replace(/\[\s*(META|SETTINGS_META):[\s\S]*/gi, '');
+  cleaned = cleaned.replace(/\[\s*(META|SETTINGS_META|ITEMS_META|ITEMS_META_B64|PARTIAL_META):[\s\S]*/gi, '');
+  cleaned = cleaned.replace(/\[ITEMS_META_B64:[A-Za-z0-9+/=]+\]/g, '');
+  cleaned = cleaned.replace(/\[ITEMS_META:[\s\S]*?\]\]?/g, '');
+  cleaned = cleaned.replace(/ITEMS_META[\s\S]*/gi, '');
   cleaned = cleaned.replace(/META:\s*\{[\s\S]*/gi, '');
   cleaned = cleaned.replace(/\{"v":[\s\S]*/gi, '');
   cleaned = cleaned.replace(/"(v|i|vf|m|vn|ia|sp|del)":[\s\S]*/gi, '');
@@ -736,9 +739,15 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
       }
       return copy;
     });
-    const itemsMetaMarker = order.items && order.items.length > 0 ? ` [ITEMS_META:${JSON.stringify(cleanItemsMeta)}]` : '';
+    const b64Items = encodeProdMeta(cleanItemsMeta);
+    const itemsMetaMarker = b64Items ? ` [ITEMS_META_B64:${b64Items}]` : '';
 
-    let cleanBaseNotes = (order.notes || '').replace(/\[PARTIAL_META:.*?\]/g, '').replace(/\[ITEMS_META:.*?\]/g, '').trim();
+    let cleanBaseNotes = (order.notes || '')
+      .replace(/\[PARTIAL_META:.*?\]/g, '')
+      .replace(/\[ITEMS_META_B64:[A-Za-z0-9+/=]+\]/g, '')
+      .replace(/\[ITEMS_META:[\s\S]*?\]\]?/g, '')
+      .replace(/ITEMS_META[\s\S]*/g, '')
+      .trim();
     const orderNotes = (cleanBaseNotes + receiptMarker + lineMarker + devMarker + partialMeta + itemsMetaMarker).trim();
 
     const orderPayload: any = {
@@ -792,9 +801,8 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
       console.warn('Supabase store_orders insert warning:', orderError.message);
     }
 
-    if (insertedOrder?.id) {
-      order.id = insertedOrder.id;
-    }
+    const finalOrderId = insertedOrder?.id || order.id;
+    order.id = finalOrderId;
 
     // Insert items into store_order_items
     if (order.items && order.items.length > 0) {
@@ -812,7 +820,7 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
           ? item.id
           : (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'f' + Date.now().toString(16).padStart(11, '0') + '-4000-8000-000000000000');
 
-        item.order_id = order.id;
+        item.order_id = finalOrderId;
 
         const customOptStr = item.customization_option || (item as any).customizationOption || '';
         const customTextStr = item.custom_text || (item as any).customText || '';
@@ -836,7 +844,7 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
 
         return {
           id: itemId,
-          order_id: order.id,
+          order_id: finalOrderId,
           product_id: pId,
           product_title: titleWithDetails + imgMarker,
           image_url: itemImg || null,
@@ -972,15 +980,50 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
       }
 
       let extractedItemsFromNotes: any[] | undefined = undefined;
-      if (rawNotes.includes('[ITEMS_META:')) {
-        const match = rawNotes.match(/\[ITEMS_META:([\s\S]*?)\]\]?/);
-        if (match && match[1]) {
-          try {
-            extractedItemsFromNotes = JSON.parse(match[1]);
-            rawNotes = rawNotes.replace(/\[ITEMS_META:[\s\S]*?\]\]?/, '').trim();
-          } catch (e) {}
+
+      if (rawNotes.includes('[ITEMS_META_B64:')) {
+        const b64Match = rawNotes.match(/\[ITEMS_META_B64:([A-Za-z0-9+/=]+)\]/);
+        if (b64Match && b64Match[1]) {
+          const decoded = decodeProdMeta(b64Match[1]);
+          if (decoded && Array.isArray(decoded)) {
+            extractedItemsFromNotes = decoded;
+          }
+          rawNotes = rawNotes.replace(/\[ITEMS_META_B64:[A-Za-z0-9+/=]+\]/, '').trim();
         }
       }
+
+      if (!extractedItemsFromNotes && rawNotes.includes('[ITEMS_META:')) {
+        const tag = '[ITEMS_META:';
+        const startIdx = rawNotes.indexOf(tag);
+        if (startIdx !== -1) {
+          const rest = rawNotes.substring(startIdx + tag.length);
+          const trimmedRest = rest.trim();
+          const firstChar = trimmedRest[0];
+          if (firstChar === '[' || firstChar === '{') {
+            let depth = 0;
+            let jsonEnd = -1;
+            const startPos = rest.indexOf(firstChar);
+            for (let i = startPos; i < rest.length; i++) {
+              if (rest[i] === '[' || rest[i] === '{') depth++;
+              else if (rest[i] === ']' || rest[i] === '}') {
+                depth--;
+                if (depth === 0) {
+                  jsonEnd = i;
+                  break;
+                }
+              }
+            }
+            if (jsonEnd !== -1) {
+              const jsonStr = rest.substring(startPos, jsonEnd + 1);
+              try {
+                extractedItemsFromNotes = JSON.parse(jsonStr);
+              } catch (e) {}
+            }
+          }
+        }
+        rawNotes = rawNotes.replace(/\s*\[ITEMS_META:[\s\S]*?\]\]?/gi, '').trim();
+      }
+      rawNotes = rawNotes.replace(/ITEMS_META[\s\S]*/gi, '').trim();
 
       let items: OrderItem[] = (o.store_order_items || []).map((item: any) => {
         let title = item.product_title || '';
