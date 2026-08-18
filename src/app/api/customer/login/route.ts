@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
+import { normalizePhoneNumber } from '@/lib/smsParser';
 
 export async function POST(req: Request) {
   try {
@@ -9,26 +10,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'يرجى إدخال رقم الموبايل/الإيميل وكلمة المرور' }, { status: 400 });
     }
 
-    const cleanIdentifier = identifier.trim().toLowerCase();
+    const rawIdentifier = identifier.trim();
     const cleanPassword = password.trim();
+    const isEmail = rawIdentifier.includes('@');
+    const cleanIdentifier = isEmail ? rawIdentifier.toLowerCase() : normalizePhoneNumber(rawIdentifier);
 
     if (supabase) {
       try {
-        const { data: customerByPhone, error: errPhone } = await supabase
+        let { data: targetCustomer } = await supabase
           .from('store_customers')
           .select('*')
-          .eq('phone_number', cleanIdentifier)
+          .eq(isEmail ? 'email' : 'phone_number', cleanIdentifier)
           .single();
 
-        let targetCustomer = customerByPhone;
-
-        if (!targetCustomer) {
-          const { data: customerByEmail } = await supabase
+        if (!targetCustomer && !isEmail) {
+          const { data: customerByRaw } = await supabase
             .from('store_customers')
             .select('*')
-            .eq('email', cleanIdentifier)
+            .eq('phone_number', rawIdentifier)
             .single();
-          targetCustomer = customerByEmail;
+          targetCustomer = customerByRaw;
         }
 
         if (targetCustomer) {
@@ -65,3 +66,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err.message || 'خطأ في تسجيل دخول العميل' }, { status: 500 });
   }
 }
+

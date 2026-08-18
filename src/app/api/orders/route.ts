@@ -139,17 +139,23 @@ export async function GET(req: NextRequest) {
 
   if (phone && phone.trim()) {
     const rawQuery = phone.trim().toLowerCase();
-    const cleanPhone = rawQuery.replace(/[^0-9]/g, '');
+    const cleanPhone = normalizePhoneNumber(rawQuery);
+    const digitsOnly = rawQuery.replace(/[^0-9]/g, '');
+    const queryDigits = cleanPhone || digitsOnly;
 
     const found = orders.filter(o => {
-      const p1 = (o.customer_phone || '').replace(/[^0-9]/g, '');
-      const p2 = (o.sender_phone || '').replace(/[^0-9]/g, '');
+      const p1 = normalizePhoneNumber(o.customer_phone || '');
+      const p2 = normalizePhoneNumber(o.sender_phone || '');
+      const rawP1 = (o.customer_phone || '').replace(/[^0-9]/g, '');
+      const rawP2 = (o.sender_phone || '').replace(/[^0-9]/g, '');
       const ref = (o.transaction_ref || '').toLowerCase();
       const oCode = (o.order_code || '').toLowerCase();
 
       if (oCode === rawQuery || ref === rawQuery) return true;
-      if (cleanPhone.length >= 7) {
-        return p1.endsWith(cleanPhone) || p2.endsWith(cleanPhone) || p1 === cleanPhone;
+      if (queryDigits.length >= 6) {
+        return p1.includes(queryDigits) || p2.includes(queryDigits) || 
+               rawP1.includes(queryDigits) || rawP2.includes(queryDigits) ||
+               p1.endsWith(queryDigits) || p2.endsWith(queryDigits);
       }
       return false;
     });

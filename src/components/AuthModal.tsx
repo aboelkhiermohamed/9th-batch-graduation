@@ -78,11 +78,14 @@ export default function AuthModal({
     setIsSubmitting(true);
 
     try {
+      const rawIdent = loginIdentifier.trim();
+      const cleanIdent = rawIdent.includes('@') ? rawIdent : normalizePhoneNumber(rawIdent);
+
       const res = await fetch('/api/customer/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          identifier: loginIdentifier.trim(),
+          identifier: cleanIdent,
           password: loginPassword.trim()
         })
       });
@@ -326,7 +329,7 @@ export default function AuthModal({
 
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                البريد الإلكتروني (اختياري)
+                البريد الإلكتروني
               </label>
               <input
                 type="email"

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { Order } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
+import { isValidEgyptianPhone, normalizePhoneNumber } from '@/lib/smsParser';
 
 export default function CustomerProfilePage() {
   const router = useRouter();
@@ -94,6 +95,7 @@ export default function CustomerProfilePage() {
   const [completePhone, setCompletePhone] = useState('');
   const [completeEmail, setCompleteEmail] = useState('');
   const [isSavingCompleteProfile, setIsSavingCompleteProfile] = useState(false);
+  const [completeProfileError, setCompleteProfileError] = useState('');
 
   // Load Customer Session from localStorage or Supabase Google Auth
   useEffect(() => {
@@ -238,9 +240,10 @@ export default function CustomerProfilePage() {
   const fetchCustomerOrders = async (phone: string) => {
     if (!phone) return;
     setIsLoadingOrders(true);
+    const cleanPhone = normalizePhoneNumber(phone) || phone;
     try {
       const [resOrders, resProd] = await Promise.all([
-        fetch(`/api/orders?search=${encodeURIComponent(phone)}`),
+        fetch(`/api/orders?search=${encodeURIComponent(cleanPhone)}`),
         fetch('/api/products')
       ]);
 
@@ -268,6 +271,16 @@ export default function CustomerProfilePage() {
     e.preventDefault();
     if (!customerSession) return;
     setProfileMessage(null);
+
+    const cleanPhone = normalizePhoneNumber(phoneInput);
+    if (!isValidEgyptianPhone(cleanPhone)) {
+      setProfileMessage({
+        type: 'error',
+        text: 'يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً'
+      });
+      return;
+    }
+
     setIsUpdatingProfile(true);
 
     try {
@@ -275,7 +288,9 @@ export default function CustomerProfilePage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: customerSession.id,
           phone_number: customerSession.phone_number,
+          new_phone: cleanPhone,
           full_name: fullNameInput.trim(),
           email: emailInput.trim()
         })
@@ -285,12 +300,15 @@ export default function CustomerProfilePage() {
       if (res.ok && data.success) {
         const updatedSess = {
           ...customerSession,
+          phone_number: cleanPhone,
           full_name: data.customer?.full_name || fullNameInput.trim(),
           email: data.customer?.email || emailInput.trim()
         };
         setCustomerSession(updatedSess);
+        setPhoneInput(cleanPhone);
         localStorage.setItem('graduation_customer_session', JSON.stringify(updatedSess));
-        setProfileMessage({ type: 'success', text: data.message || 'تم حفظ البيانات بنجاح' });
+        setProfileMessage({ type: 'success', text: data.message || 'تم حفظ البيانات وتحديث رقم الموبايل بنجاح' });
+        fetchCustomerOrders(cleanPhone);
       } else {
         setProfileMessage({ type: 'error', text: data.error || 'حدث خطأ أثناء حفظ البيانات' });
       }
@@ -382,8 +400,14 @@ export default function CustomerProfilePage() {
     e.preventDefault();
     setGuestAuthError('');
 
-    if (!regFullName.trim() || !regPhone.trim() || !regPassword.trim()) {
+    const cleanPhone = normalizePhoneNumber(regPhone);
+    if (!regFullName.trim() || !cleanPhone || !regPassword.trim()) {
       setGuestAuthError('يرجى إكمال الحقول الإلزامية (الاسم، الموبايل، كلمة المرور)');
+      return;
+    }
+
+    if (!isValidEgyptianPhone(cleanPhone)) {
+      setGuestAuthError('يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
       return;
     }
 
@@ -404,7 +428,7 @@ export default function CustomerProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: regFullName.trim(),
-          phone_number: regPhone.trim(),
+          phone_number: cleanPhone,
           email: regEmail.trim() || undefined,
           password: regPassword.trim()
         })
@@ -464,8 +488,14 @@ export default function CustomerProfilePage() {
 
   const handleConfirmGoogleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!googleEmail.trim() || !googleName.trim() || !googlePhone.trim()) {
+    const cleanPhone = normalizePhoneNumber(googlePhone);
+    if (!googleEmail.trim() || !googleName.trim() || !cleanPhone) {
       alert('يرجى إكمال جميع بيانات حساب Google والموبايل');
+      return;
+    }
+
+    if (!isValidEgyptianPhone(cleanPhone)) {
+      alert('يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
       return;
     }
 
@@ -476,7 +506,7 @@ export default function CustomerProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: `${googleName.trim()} (Google)`,
-          phone_number: googlePhone.trim(),
+          phone_number: cleanPhone,
           email: googleEmail.trim().toLowerCase(),
           password: 'google-oauth-customer-' + Date.now().toString(36)
         })
@@ -492,7 +522,7 @@ export default function CustomerProfilePage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            identifier: googlePhone.trim(),
+            identifier: cleanPhone,
             password: 'google-oauth-customer'
           })
         });
@@ -503,7 +533,7 @@ export default function CustomerProfilePage() {
           customerData = {
             id: 'cust-google-' + Date.now().toString(36),
             full_name: `${googleName.trim()} (Google)`,
-            phone_number: googlePhone.trim(),
+            phone_number: cleanPhone,
             email: googleEmail.trim().toLowerCase(),
             created_at: new Date().toISOString()
           };
@@ -526,8 +556,18 @@ export default function CustomerProfilePage() {
 
   const handleSaveCompleteProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!completeFullName.trim() || !completePhone.trim()) {
-      alert('يرجى كِتابة الاسم بالكامل ورقم الموبايل على الأقل');
+    setCompleteProfileError('');
+
+    const cleanPhone = normalizePhoneNumber(completePhone);
+    const cleanName = completeFullName.trim();
+
+    if (!cleanName || !cleanPhone) {
+      setCompleteProfileError('يرجى كِتابة الاسم بالكامل ورقم الموبايل');
+      return;
+    }
+
+    if (!isValidEgyptianPhone(cleanPhone)) {
+      setCompleteProfileError('رقم الموبايل غير صحيح! يجب إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
       return;
     }
 
@@ -539,18 +579,24 @@ export default function CustomerProfilePage() {
         body: JSON.stringify({
           id: customerSession?.id,
           phone_number: customerSession?.phone_number,
-          new_phone: completePhone.trim(),
-          full_name: completeFullName.trim(),
+          new_phone: cleanPhone,
+          full_name: cleanName,
           email: completeEmail.trim()
         })
       });
 
       const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setCompleteProfileError(data.error || 'حدث خطأ أثناء حفظ البيانات، يرجى التأكد من الصحة');
+        return;
+      }
+
       const updatedSess = {
         ...customerSession,
         id: customerSession?.id || 'cust-' + Date.now().toString(36),
-        full_name: completeFullName.trim(),
-        phone_number: completePhone.trim(),
+        full_name: cleanName,
+        phone_number: cleanPhone,
         email: completeEmail.trim()
       };
 
@@ -560,11 +606,10 @@ export default function CustomerProfilePage() {
       setFullNameInput(updatedSess.full_name);
       setPhoneInput(updatedSess.phone_number);
       setEmailInput(updatedSess.email || '');
-      fetchCustomerOrders(updatedSess.phone_number);
+      fetchCustomerOrders(cleanPhone);
       setIsCompleteProfileOpen(false);
-      alert('🎉 تم استكمال وتأكيد بيانات حسابك بنجاح!');
     } catch (err) {
-      alert('حدث خطأ أثناء حفظ البيانات');
+      setCompleteProfileError('حدث خطأ أثناء الاتصال بالخادم، حاول مرة أخرى');
     } finally {
       setIsSavingCompleteProfile(false);
     }
@@ -802,17 +847,25 @@ export default function CustomerProfilePage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-2">رقم الموبايل (لا يمكن تغييره لمعرف الحساب)</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-2 flex items-center justify-between">
+                      <span>رقم الموبايل للتواصل واستلام الطلبات *</span>
+                      <span className="text-[11px] text-amber-400">ويرتبط بحسابك لعرض طلباتك 🎓</span>
+                    </label>
                     <input
-                      type="text"
-                      disabled
+                      type="tel"
+                      required
                       value={phoneInput}
-                      className="w-full px-4 py-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-slate-500 text-sm cursor-not-allowed"
+                      onChange={(e) => setPhoneInput(e.target.value)}
+                      placeholder="01012345678"
+                      className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-100 text-sm font-mono focus:outline-none focus:border-amber-500 transition"
                     />
+                    <p className="text-[11px] text-slate-400 mt-1.5">
+                      💡 يمكنك تصحيح وتغيير رقم موبايلك هنا في أي وقت لإظهار ومتابعة جميع طلباتك.
+                    </p>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-2">البريد الإلكتروني (اختياري)</label>
+                    <label className="block text-xs font-semibold text-slate-300 mb-2">البريد الإلكتروني</label>
                     <input
                       type="email"
                       placeholder="example@domain.com"
@@ -1054,12 +1107,19 @@ export default function CustomerProfilePage() {
               </p>
             </div>
 
+            {/* Error Banner */}
+            {completeProfileError && (
+              <div className="p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold text-center leading-relaxed">
+                {completeProfileError}
+              </div>
+            )}
+
             {/* Form */}
             <form onSubmit={handleSaveCompleteProfile} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-amber-400" />
-                  <span>الاسم بالكامل (سيُطرز على وشاح/روب التخرج)</span>
+                  <span>الاسم بالكامل</span>
                 </label>
                 <input
                   type="text"
@@ -1074,7 +1134,7 @@ export default function CustomerProfilePage() {
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
                   <Phone className="w-3.5 h-3.5 text-amber-400" />
-                  <span>رقم الموبايل للتواصل والواتساب (مهم لتسلم الطلب)</span>
+                  <span>رقم الموبايل</span>
                 </label>
                 <input
                   type="tel"
@@ -1084,12 +1144,15 @@ export default function CustomerProfilePage() {
                   onChange={(e) => setCompletePhone(e.target.value)}
                   className="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-slate-100 text-sm focus:outline-none focus:border-amber-500 font-mono"
                 />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  💡 يجب إدخال رقم موبايل مصري يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً
+                </p>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5 text-amber-400" />
-                  <span>البريد الإلكتروني (اختياري)</span>
+                  <span>البريد الإلكتروني</span>
                 </label>
                 <input
                   type="email"
