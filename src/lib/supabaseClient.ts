@@ -1009,15 +1009,15 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
           if (decoded && Array.isArray(decoded)) {
             extractedItemsFromNotes = decoded;
           }
-          rawNotes = rawNotes.replace(/\[ITEMS_META_B64:[A-Za-z0-9+/=]+\]/, '').trim();
         }
+        const b64Idx = rawNotes.indexOf('[ITEMS_META_B64:');
+        if (b64Idx !== -1) rawNotes = rawNotes.substring(0, b64Idx).trim();
       }
 
-      if (!extractedItemsFromNotes && rawNotes.includes('[ITEMS_META:')) {
-        const tag = '[ITEMS_META:';
-        const startIdx = rawNotes.indexOf(tag);
+      if (rawNotes.includes('[ITEMS_META:')) {
+        const startIdx = rawNotes.indexOf('[ITEMS_META:');
         if (startIdx !== -1) {
-          const rest = rawNotes.substring(startIdx + tag.length);
+          const rest = rawNotes.substring(startIdx + 12);
           const trimmedRest = rest.trim();
           const firstChar = trimmedRest[0];
           if (firstChar === '[' || firstChar === '{') {
@@ -1041,10 +1041,18 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
               } catch (e) {}
             }
           }
+          rawNotes = rawNotes.substring(0, startIdx).trim();
         }
-        rawNotes = rawNotes.replace(/\s*\[ITEMS_META:[\s\S]*?\]\]?/gi, '').trim();
       }
-      rawNotes = rawNotes.replace(/ITEMS_META[\s\S]*/gi, '').trim();
+
+      if (rawNotes.includes('ITEMS_META')) {
+        const idx = rawNotes.indexOf('ITEMS_META');
+        if (idx !== -1) rawNotes = rawNotes.substring(0, idx).trim();
+      }
+      if (rawNotes.includes('quantity:')) {
+        const idx = rawNotes.indexOf('quantity:');
+        if (idx !== -1) rawNotes = rawNotes.substring(0, idx).trim();
+      }
 
       let items: OrderItem[] = (o.store_order_items || []).map((item: any) => {
         let title = item.product_title || '';
