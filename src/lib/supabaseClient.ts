@@ -410,11 +410,13 @@ export function cleanDisplayNotes(str?: string | null): string {
   if (!str) return '';
   let cleaned = String(str);
 
-  // Strip META tags even if truncated at the end
-  cleaned = cleaned.replace(/\[\s*(META|SETTINGS_META|ITEMS_META|ITEMS_META_B64|PARTIAL_META):[\s\S]*/gi, '');
-  cleaned = cleaned.replace(/\[ITEMS_META_B64:[A-Za-z0-9+/=]+\]/g, '');
-  cleaned = cleaned.replace(/\[ITEMS_META:[\s\S]*?\]\]?/g, '');
+  // 1. Strip all bracketed metadata markers (even if truncated at end)
+  cleaned = cleaned.replace(/\[\s*(META|SETTINGS_META|ITEMS_META|ITEMS_META_B64|PARTIAL_META|RECEIPT_URL|VERIFIED_BY|CONFIRMED_LINE|MATCHED_DEV):[\s\S]*/gi, '');
+  cleaned = cleaned.replace(/\[ITEMS_META_B64:[A-Za-z0-9+/=]+\]/gi, '');
+  cleaned = cleaned.replace(/\[ITEMS_META:[\s\S]*?\]\]?/gi, '');
+  cleaned = cleaned.replace(/\[PARTIAL_META:[\s\S]*?\]\]?/gi, '');
   cleaned = cleaned.replace(/ITEMS_META[\s\S]*/gi, '');
+  cleaned = cleaned.replace(/PARTIAL_META[\s\S]*/gi, '');
   cleaned = cleaned.replace(/META:\s*\{[\s\S]*/gi, '');
   cleaned = cleaned.replace(/\{"v":[\s\S]*/gi, '');
   cleaned = cleaned.replace(/"(v|i|vf|m|vn|ia|sp|del)":[\s\S]*/gi, '');
@@ -425,8 +427,12 @@ export function cleanDisplayNotes(str?: string | null): string {
   cleaned = cleaned.replace(/\[CONFIRMED_LINE:.*?\]/gi, '');
   cleaned = cleaned.replace(/\[MATCHED_DEV:.*?\]/gi, '');
   cleaned = cleaned.replace(/\[\[[\s\S]*?\]\]/gi, '');
-  cleaned = cleaned.replace(/\["[^"]*?@instapay[^"]*?"\]/gi, '');
-  cleaned = cleaned.replace(/\[[a-z0-9_\-\.]+\.(jpg|jpeg|png|webp|pdf)\]/gi, '');
+
+  // 2. Strip JSON payload residue if raw JSON properties remain
+  cleaned = cleaned.replace(/(quantity|unit_price|product|product_id|title_ar|description_ar|image_url|images|is_event|sizes|addons|stock|is_active|created_at|updated_at|customization_label|custom_text|customization_option|attendees|photo_url|gender):[^\s,]*/gi, '');
+  cleaned = cleaned.replace(/PARTIAL/gi, '');
+
+  // 3. Clean symbols, brackets, and extra spaces
   cleaned = cleaned.replace(/[\{\}\[\]"']/g, '');
   cleaned = cleaned.replace(/(,\s*)+$/g, '');
   cleaned = cleaned.replace(/(،\s*)+$/g, '');
@@ -434,6 +440,10 @@ export function cleanDisplayNotes(str?: string | null): string {
   cleaned = cleaned.replace(/،+/g, ' ');
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
+  // 4. Return empty if no real letters or numbers remain
+  if (!/[\p{L}\p{N}]/u.test(cleaned) || cleaned.length < 2) {
+    return '';
+  }
   return cleaned;
 }
 
