@@ -4137,6 +4137,28 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">نوع / قسم المنتج (Category)</label>
+                <select
+                  value={newProdCategory}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewProdCategory(val);
+                    if (val.includes('تذاكر') || val.includes('Tickets') || val.includes('Event')) {
+                      setNewProdIsEvent(true);
+                      setNewProdSizes('');
+                    }
+                  }}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500 font-semibold"
+                >
+                  <option value="الملابس (Apparel)">👔 الملابس (Apparel)</option>
+                  <option value="تذاكر وفعاليات (Event Tickets)">🎟️ تذاكر وفعاليات (Event Tickets)</option>
+                  <option value="أدوات مكتبية (Stationery)">📝 أدوات مكتبية (Stationery)</option>
+                  <option value="مستلزمات (Drinkware & Accessories)">☕ مستلزمات وإكسسوارات (Accessories)</option>
+                  <option value="هدايا تخرج (Graduation Gifts)">🎓 هدايا تخرج (Graduation Gifts)</option>
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">السعر (ج.م) *</label>
@@ -4434,6 +4456,28 @@ export default function AdminDashboardPage() {
                   onChange={(e) => setEditProdTitleAr(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">نوع / قسم المنتج (Category)</label>
+                <select
+                  value={editProdCategory}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditProdCategory(val);
+                    if (val.includes('تذاكر') || val.includes('Tickets') || val.includes('Event')) {
+                      setEditProdIsEvent(true);
+                      setEditProdSizes('');
+                    }
+                  }}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500 font-semibold"
+                >
+                  <option value="الملابس (Apparel)">👔 الملابس (Apparel)</option>
+                  <option value="تذاكر وفعاليات (Event Tickets)">🎟️ تذاكر وفعاليات (Event Tickets)</option>
+                  <option value="أدوات مكتبية (Stationery)">📝 أدوات مكتبية (Stationery)</option>
+                  <option value="مستلزمات (Drinkware & Accessories)">☕ مستلزمات وإكسسوارات (Accessories)</option>
+                  <option value="هدايا تخرج (Graduation Gifts)">🎓 هدايا تخرج (Graduation Gifts)</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
