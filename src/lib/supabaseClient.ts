@@ -659,21 +659,27 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
 
     // Smart Column & String Length Fallback Loop
     let attempts = 0;
-    while (error && attempts < 10) {
+    while (error && attempts < 15) {
       attempts++;
       const errMsg = error.message || '';
       console.warn(`Supabase store_settings upsert attempt ${attempts} error:`, errMsg);
 
-      const match = errMsg.match(/Could not find the '([^']+)' column/i) || errMsg.match(/column "([^"]+)"/i);
-      if (match && match[1]) {
+      const match = 
+        errMsg.match(/Could not find the '([^']+)' column/i) ||
+        errMsg.match(/Could not find the "([^"]+)" column/i) ||
+        errMsg.match(/column '([^']+)'/i) ||
+        errMsg.match(/column "([^"]+)"/i) ||
+        errMsg.match(/'([^']+)' column/i);
+
+      if (match && match[1] && payload[match[1]] !== undefined) {
         const missingCol = match[1];
         console.warn(`Stripping missing column '${missingCol}' from store_settings payload...`);
         delete payload[missingCol];
       } else if (errMsg.includes('character varying') || errMsg.includes('too long') || errMsg.includes('value too long')) {
         payload.pickup_note = cleanNote.slice(0, 100);
       } else if (errMsg.includes('invalid input syntax') || errMsg.includes('type json')) {
-        payload.vodafone_cash_numbers = settings.vodafone_cash_numbers;
-        payload.instapay_ipas = settings.instapay_ipas || [settings.instapay_ipa];
+        payload.vodafone_cash_numbers = settings.vodafone_cash_numbers.join(', ');
+        payload.instapay_ipas = (settings.instapay_ipas || [settings.instapay_ipa]).join(', ');
       } else {
         break;
       }
