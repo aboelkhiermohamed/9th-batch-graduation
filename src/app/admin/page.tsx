@@ -253,6 +253,7 @@ export default function AdminDashboardPage() {
   const [newProdSizeChartUploading, setNewProdSizeChartUploading] = useState(false);
   const [newProdHasCustomization, setNewProdHasCustomization] = useState(true);
   const [newProdCustomLabel, setNewProdCustomLabel] = useState('اسم الطالب أو الكلية للتطريز على القطعة');
+  const [newProdIsEvent, setNewProdIsEvent] = useState(false);
   const [newProdSizes, setNewProdSizes] = useState('S, M, L, XL, XXL');
   const [newProdDescAr, setNewProdDescAr] = useState('');
   const [newProdAddons, setNewProdAddons] = useState<{id: string; name: string; price: string; image_url?: string; description?: string}[]>([]);
@@ -275,6 +276,7 @@ export default function AdminDashboardPage() {
   const [editProdSizeChartUploading, setEditProdSizeChartUploading] = useState(false);
   const [editProdHasCustomization, setEditProdHasCustomization] = useState(true);
   const [editProdCustomLabel, setEditProdCustomLabel] = useState('اسم الطالب أو الكلية للتطريز على القطعة');
+  const [editProdIsEvent, setEditProdIsEvent] = useState(false);
   const [editProdSizes, setEditProdSizes] = useState('S, M, L, XL, XXL');
   const [editProdDescAr, setEditProdDescAr] = useState('');
   const [editProdAddons, setEditProdAddons] = useState<{id: string; name: string; price: string; image_url?: string; description?: string}[]>([]);
@@ -960,6 +962,7 @@ export default function AdminDashboardPage() {
           size_chart_url: newProdSizeChart || undefined,
           has_customization: newProdHasCustomization,
           customization_label: newProdCustomLabel.trim() || undefined,
+          is_event: newProdIsEvent,
           sizes: sizesArray,
           description_ar: newProdDescAr,
           addons: addonsPayload,
@@ -976,6 +979,7 @@ export default function AdminDashboardPage() {
         setNewProdGalleryPreviews([]);
         setNewProdSizeChart('');
         setNewProdSizeChartPreview('');
+        setNewProdIsEvent(false);
         setNewProdAddons([]);
         fetchAllData();
       } else {
@@ -1003,6 +1007,7 @@ export default function AdminDashboardPage() {
     setEditProdSizeChartPreview(product.size_chart_url || '');
     setEditProdHasCustomization(Boolean(product.has_customization));
     setEditProdCustomLabel(product.customization_label || 'اسم الطالب أو الكلية للتطريز على القطعة');
+    setEditProdIsEvent(Boolean(product.is_event));
     setEditProdSizes((product.sizes || []).join(', '));
     setEditProdDescAr(product.description_ar || product.description || '');
     setEditProdAddons(
@@ -1057,6 +1062,7 @@ export default function AdminDashboardPage() {
           size_chart_url: editProdSizeChart || undefined,
           has_customization: editProdHasCustomization,
           customization_label: editProdCustomLabel.trim() || undefined,
+          is_event: editProdIsEvent,
           sizes: sizesArray,
           description_ar: editProdDescAr,
           addons: addonsPayload,
@@ -2129,6 +2135,16 @@ export default function AdminDashboardPage() {
                                   <p className="text-[11px] text-emerald-400/90 font-medium mt-0.5">
                                     💎 {item.customization_option}
                                   </p>
+                                )}
+                                {item.attendees && item.attendees.length > 0 && (
+                                  <div className="mt-1 p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 space-y-0.5">
+                                    <span className="font-bold text-indigo-400 block">🎟️ الحاضرين والتذاكر ({item.attendees.length}):</span>
+                                    {item.attendees.map((att, aIdx) => (
+                                      <div key={aIdx} className="text-[10px] text-slate-200">
+                                        • {att.name} {att.phone ? `(${att.phone})` : ''}
+                                      </div>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
                             ))
@@ -3853,6 +3869,20 @@ export default function AdminDashboardPage() {
                 )}
               </div>
 
+              {/* Event Ticket Toggle */}
+              <div className="p-3.5 rounded-2xl bg-indigo-950/60 border border-indigo-500/30 space-y-1">
+                <label className="flex items-center gap-2 text-xs font-bold text-indigo-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newProdIsEvent}
+                    onChange={(e) => setNewProdIsEvent(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-500 bg-slate-950 border-slate-700"
+                  />
+                  <span>🎟️ تذكرة إيفينت / فعالية (توليد حقول أسماء الحاضرين ديناميكياً)</span>
+                </label>
+                <p className="text-[11px] text-slate-400">عند التفعيل، سيظهر للعميل نموذج ديناميكي لكتابة اسم كل شخص سيحضر الفعالية حسب عدد التذاكر</p>
+              </div>
+
               {/* Sizes */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">المقاسات المتاحة (مفصولة بفاصلة) — أتركها فارغة لو لا يوجد مقاسات</label>
@@ -4122,6 +4152,20 @@ export default function AdminDashboardPage() {
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none"
                   />
                 )}
+              </div>
+
+              {/* Event Ticket Toggle */}
+              <div className="p-3.5 rounded-2xl bg-indigo-950/60 border border-indigo-500/30 space-y-1">
+                <label className="flex items-center gap-2 text-xs font-bold text-indigo-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editProdIsEvent}
+                    onChange={(e) => setEditProdIsEvent(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-500 bg-slate-950 border-slate-700"
+                  />
+                  <span>🎟️ تذكرة إيفينت / فعالية (توليد حقول أسماء الحاضرين ديناميكياً)</span>
+                </label>
+                <p className="text-[11px] text-slate-400">عند التفعيل، سيظهر للعميل نموذج ديناميكي لكتابة اسم كل شخص سيحضر الفعالية حسب عدد التذاكر</p>
               </div>
 
               {/* Sizes */}

@@ -11,6 +11,13 @@ export type OrderStatus =
   | 'delivered'
   | 'cancelled';
 
+// Event Attendee Details for Event Booking Tickets
+export interface EventAttendee {
+  name: string;
+  phone?: string;
+  notes?: string;
+}
+
 // Add-on option that can be attached to a product (e.g. "تطريز اسم: +50 ج.م")
 export interface ProductAddon {
   id: string;
@@ -33,6 +40,10 @@ export interface Product {
   size_chart_url?: string;
   has_customization?: boolean;
   customization_label?: string;
+  is_event?: boolean; // Flag to indicate if product is an Event Ticket / Booking
+  event_date?: string; // Optional Event Date (e.g. "2026-09-25")
+  event_location?: string; // Optional Event Venue / Location
+  max_tickets_per_order?: number; // Optional limit for tickets per order
   sizes: string[];
   addons?: ProductAddon[]; // Optional add-ons with extra prices
   stock: number;
@@ -53,6 +64,7 @@ export interface OrderItem {
   custom_text?: string;
   customization_option?: string;
   selected_addons?: ProductAddon[]; // Selected add-ons for this item
+  attendees?: EventAttendee[]; // List of attendee details corresponding to ticket quantity
   product?: Product;
 }
 
@@ -142,6 +154,7 @@ export interface CartItem {
   customizationOption?: string;
   quantity: number;
   selectedAddons?: ProductAddon[];
+  attendees?: EventAttendee[];
 }
 
 export interface AdminUser {

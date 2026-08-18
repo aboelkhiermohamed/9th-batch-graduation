@@ -24,7 +24,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, title_ar, description, description_ar, price, category, image_url, images, size_chart_url, has_customization, customization_label, sizes, stock, addons } = body;
+    const { title, title_ar, description, description_ar, price, category, image_url, images, size_chart_url, has_customization, customization_label, is_event, sizes, stock, addons } = body;
 
     if (!title_ar || !price || !image_url) {
       return NextResponse.json(
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
       size_chart_url: size_chart_url || undefined,
       has_customization: Boolean(has_customization),
       customization_label: customization_label || undefined,
+      is_event: Boolean(is_event),
       sizes: Array.isArray(sizes) ? sizes : [],
       addons: Array.isArray(addons) ? addons : [],
       stock: Number(stock || 100),
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, title_ar, price, stock, sizes, image_url, images, size_chart_url, has_customization, customization_label, is_active, category, addons, description_ar } = body;
+    const { id, title_ar, price, stock, sizes, image_url, images, size_chart_url, has_customization, customization_label, is_event, is_active, category, addons, description_ar } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'معرف المنتج مطلوب' }, { status: 400 });
@@ -94,6 +95,7 @@ export async function PUT(req: NextRequest) {
       size_chart_url,
       has_customization: Boolean(has_customization),
       customization_label,
+      is_event: Boolean(is_event),
       category: category || 'Apparel',
       addons: Array.isArray(addons) ? addons : [],
       is_active: is_active !== undefined ? Boolean(is_active) : true,

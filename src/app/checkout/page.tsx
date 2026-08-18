@@ -23,7 +23,8 @@ import {
   Minus,
   Lock,
   Wrench,
-  MessageSquare
+  MessageSquare,
+  Ticket
 } from 'lucide-react';
 import { CartItem, Order, PaymentMethod, StoreSettings, ProductAddon } from '@/types';
 import { DEFAULT_SETTINGS, cleanDisplayNotes } from '@/lib/supabaseClient';
@@ -276,6 +277,7 @@ export default function CheckoutPage() {
           customText: item.customText,
           customization_option: addonsSummary,
           selected_addons: item.selectedAddons,
+          attendees: item.attendees,
           quantity: item.quantity,
           unit_price: unitPrice,
           product: item.product
@@ -916,6 +918,23 @@ export default function CheckoutPage() {
                                     <span className="font-mono text-emerald-300 font-bold">+{a.price} ج.م</span>
                                   </div>
                                 ))}
+                              </div>
+                            )}
+
+                            {/* Event Attendees Breakdown */}
+                            {item.attendees && item.attendees.length > 0 && (
+                              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1 text-xs">
+                                <span className="font-bold text-amber-400 block flex items-center gap-1">
+                                  <Ticket className="w-3.5 h-3.5" /> أسماء الحاضرين للتذاكر ({item.attendees.length}):
+                                </span>
+                                <div className="space-y-1 pt-0.5">
+                                  {item.attendees.map((att, aIdx) => (
+                                    <div key={aIdx} className="text-[11px] text-slate-200 flex justify-between bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
+                                      <span>👤 {att.name}</span>
+                                      {att.phone && <span className="font-mono text-slate-400">{att.phone}</span>}
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
                           </div>

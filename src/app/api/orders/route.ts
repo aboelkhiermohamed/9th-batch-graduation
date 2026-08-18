@@ -69,6 +69,8 @@ export async function POST(req: NextRequest) {
         selected_size: item.selectedSize || item.selected_size,
         custom_text: item.customText || item.custom_text || null,
         customization_option: item.customizationOption || item.customization_option || null,
+        selected_addons: item.selected_addons || item.selectedAddons || undefined,
+        attendees: item.attendees && Array.isArray(item.attendees) ? item.attendees : undefined,
         quantity: qty,
         unit_price: price,
         product: item.product

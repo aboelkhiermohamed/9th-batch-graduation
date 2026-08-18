@@ -27,7 +27,8 @@ import {
   Eye,
   Layers,
   ArrowUpRight,
-  AlertCircle
+  AlertCircle,
+  Ticket
 } from 'lucide-react';
 import { Order, OrderItem } from '@/types';
 
@@ -247,6 +248,7 @@ export default function OrdersHistory({
           ${item.selected_size ? `<br><small style="color: #64748b;">المقاس: ${item.selected_size}</small>` : ''}
           ${item.custom_text ? `<br><small style="color: #d97706;">التطريز: "${item.custom_text}"</small>` : ''}
           ${item.customization_option ? `<br><small style="color: #059669;">الإضافات: ${item.customization_option}</small>` : ''}
+          ${item.attendees && item.attendees.length > 0 ? `<br><small style="color: #6366f1;"><strong>أسماء الحاضرين والتذاكر:</strong> ${item.attendees.map(a => a.name + (a.phone ? ` (${a.phone})` : '')).join('، ')}</small>` : ''}
         </td>
         <td style="padding: 12px; text-align: center; font-weight: bold;">${item.quantity}</td>
         <td style="padding: 12px; text-align: left;">${item.unit_price} ج.م</td>
@@ -761,6 +763,21 @@ export default function OrdersHistory({
                                           <span>💎 الإضافات:</span>
                                           <strong>{item.customization_option}</strong>
                                         </span>
+                                      )}
+
+                                      {item.attendees && item.attendees.length > 0 && (
+                                        <div className="w-full mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 space-y-1">
+                                          <span className="font-bold text-amber-400 block flex items-center gap-1">
+                                            <Ticket className="w-3.5 h-3.5" /> أسماء الحاضرين والتذاكر ({item.attendees.length}):
+                                          </span>
+                                          <div className="flex flex-wrap gap-1.5 pt-1">
+                                            {item.attendees.map((att, aIdx) => (
+                                              <span key={aIdx} className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-200">
+                                                👤 {att.name} {att.phone ? `(${att.phone})` : ''}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
                                       )}
                                     </div>
                                   </div>

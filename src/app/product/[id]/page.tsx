@@ -18,9 +18,11 @@ import {
   ArrowLeft,
   RefreshCw,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  Ticket,
+  User
 } from 'lucide-react';
-import { Product, ProductAddon, CartItem, StoreSettings } from '@/types';
+import { Product, ProductAddon, CartItem, StoreSettings, EventAttendee } from '@/types';
 import { DEFAULT_PRODUCTS, fetchProductsFromSupabase, cleanProductDescription } from '@/lib/supabaseClient';
 
 export default function StandaloneProductPage() {
@@ -41,6 +43,9 @@ export default function StandaloneProductPage() {
   const [selectedAddons, setSelectedAddons] = useState<ProductAddon[]>([]);
   const [quantity, setQuantity] = useState(1);
 
+  // Event Tickets & Attendees State
+  const [attendees, setAttendees] = useState<EventAttendee[]>([]);
+
   // Modals & UI Feedback
   const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
   const [addedToast, setAddedToast] = useState(false);
@@ -49,6 +54,14 @@ export default function StandaloneProductPage() {
   // Cart State from localStorage
   const [cart, setCart] = useState<CartItem[]>([]);
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const isEvent = Boolean(
+    product?.is_event || 
+    product?.category?.includes('تذاكر') || 
+    product?.category?.includes('إيفينت') || 
+    product?.category?.includes('Event') || 
+    product?.category?.includes('حفل')
+  );
 
   useEffect(() => {
     try {
@@ -65,6 +78,29 @@ export default function StandaloneProductPage() {
     setCart(updatedCart);
     localStorage.setItem('graduation_store_cart', JSON.stringify(updatedCart));
   };
+
+  // Sync Attendees array with quantity for event tickets
+  useEffect(() => {
+    if (isEvent) {
+      setAttendees(prev => {
+        const updated: EventAttendee[] = [];
+        const savedCustomer = typeof window !== 'undefined' ? localStorage.getItem('graduation_customer_session') : null;
+        let cust: any = null;
+        if (savedCustomer) { try { cust = JSON.parse(savedCustomer); } catch(e) {} }
+
+        for (let i = 0; i < quantity; i++) {
+          if (prev[i] && prev[i].name) {
+            updated.push(prev[i]);
+          } else if (i === 0 && cust?.full_name) {
+            updated.push({ name: cust.full_name, phone: cust.phone_number || '' });
+          } else {
+            updated.push({ name: prev[i]?.name || '', phone: prev[i]?.phone || '' });
+          }
+        }
+        return updated;
+      });
+    }
+  }, [quantity, isEvent]);
 
   useEffect(() => {
     async function loadProductData() {
@@ -138,23 +174,23 @@ export default function StandaloneProductPage() {
       return;
     }
 
-    const currentCart = [...cart];
-    const existingIdx = currentCart.findIndex(
-      item => item.product.id === product.id && item.selectedSize === selectedSize && item.customText === customText
-    );
-
-    if (existingIdx > -1) {
-      currentCart[existingIdx].quantity += quantity;
-      currentCart[existingIdx].selectedAddons = selectedAddons.length > 0 ? selectedAddons : currentCart[existingIdx].selectedAddons;
-    } else {
-      currentCart.push({
-        product,
-        selectedSize: selectedSize || undefined,
-        customText: customText.trim() || undefined,
-        quantity,
-        selectedAddons: selectedAddons.length > 0 ? [...selectedAddons] : undefined
-      });
+    if (isEvent) {
+      const missingIdx = attendees.findIndex(a => !a.name.trim());
+      if (missingIdx > -1) {
+        alert(`يرجى كتابة اسم الحاضر للتذكرة رقم ${missingIdx + 1}`);
+        return;
+      }
     }
+
+    const currentCart = [...cart];
+    currentCart.push({
+      product,
+      selectedSize: selectedSize || undefined,
+      customText: customText.trim() || undefined,
+      quantity,
+      selectedAddons: selectedAddons.length > 0 ? [...selectedAddons] : undefined,
+      attendees: isEvent ? [...attendees] : undefined
+    });
 
     saveCartToStorage(currentCart);
 
@@ -525,7 +561,9 @@ export default function StandaloneProductPage() {
             {/* Quantity Controller & Totals */}
             <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-300">الكمية:</span>
+                <span className="text-xs font-bold text-slate-300">
+                  {isEvent ? 'عدد تذاكر الإيفينت المطلوب:' : 'الكمية:'}
+                </span>
                 <div className="flex items-center gap-3 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -548,6 +586,73 @@ export default function StandaloneProductPage() {
                 <span className="text-xl font-black text-emerald-400">{totalPriceCalculated} ج.م</span>
               </div>
             </div>
+
+            {/* Event Attendees Form (Dynamic according to Quantity) */}
+            {isEvent && (
+              <div className="p-5 rounded-3xl bg-slate-900/90 border-2 border-amber-500/50 space-y-4 shadow-xl shadow-amber-500/5">
+                <div className="flex items-center gap-2 pb-3 border-b border-slate-800">
+                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    <Ticket className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100">
+                      بيانات الحاضرين والتذاكر ({quantity} {quantity === 1 ? 'تذكرة' : 'تذاكر'}):
+                    </h3>
+                    <p className="text-[11px] text-slate-400">يرجى كتابة اسم كل شخص سيحضر الفعالية لإصدار التذكرة باسمه</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {attendees.map((att, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-amber-400 flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5" />
+                          <span>{idx === 0 ? 'التذكرة 1 (الحاضر الرئيسي)' : `التذكرة ${idx + 1} (مرافق)`}</span>
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[11px] text-slate-300 mb-1 font-semibold">اسم الحاضر بالكامل *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder={idx === 0 ? "اسمك الثلاثي" : `اسم الشخص المرافق ${idx + 1}`}
+                            value={att.name}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAttendees(prev => {
+                                const next = [...prev];
+                                next[idx] = { ...next[idx], name: val };
+                                return next;
+                              });
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-amber-500 transition"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-300 mb-1 font-semibold">رقم الموبايل (اختياري)</label>
+                          <input
+                            type="tel"
+                            placeholder="01012345678"
+                            value={att.phone || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAttendees(prev => {
+                                const next = [...prev];
+                                next[idx] = { ...next[idx], phone: val };
+                                return next;
+                              });
+                            }}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs font-mono focus:outline-none focus:border-amber-500 transition"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Purchase Action Buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
