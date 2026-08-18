@@ -303,6 +303,7 @@ export default function AdminDashboardPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [lineFilter, setLineFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<'verified_only' | 'all'>('verified_only');
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedBaseUrl, setCopiedBaseUrl] = useState(false);
   const [originUrl, setOriginUrl] = useState('https://graduation-store.com');
@@ -1738,6 +1739,16 @@ export default function AdminDashboardPage() {
     printWindow.document.close();
   };
 
+  const getEffectiveTicketOrders = () => {
+    return orders.filter(order => {
+      if (order.status === 'cancelled') return false;
+      if (ticketStatusFilter === 'verified_only') {
+        return order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered';
+      }
+      return true;
+    });
+  };
+
   const handlePrintEventTicketsPdf = (filterGender: 'all' | 'male' | 'female' = 'all') => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
@@ -1755,8 +1766,7 @@ export default function AdminDashboardPage() {
       gender: 'male' | 'female';
     }[] = [];
 
-    orders.forEach(order => {
-      if (order.status === 'cancelled') return;
+    getEffectiveTicketOrders().forEach(order => {
       (order.items || []).forEach(item => {
         const { attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
         const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
@@ -1787,6 +1797,7 @@ export default function AdminDashboardPage() {
     const girlsCount = allTickets.filter(t => t.gender === 'female').length;
 
     const titleFilterText = filterGender === 'male' ? ' (قائمة الأولاد / الذكور فقط)' : filterGender === 'female' ? ' (قائمة البنات / الإناث فقط)' : ' (كشف الحصر الشامل)';
+    const statusNote = ticketStatusFilter === 'verified_only' ? 'الطلبات المؤكدة فقط' : 'جميع الطلبات (شاملة المعلقة)';
 
     const tableRowsHtml = allTickets.map((t, idx) => `
       <tr style="border-bottom: 1px solid #e2e8f0; ${idx % 2 === 1 ? 'background-color: #f8fafc;' : ''}">
@@ -1839,7 +1850,7 @@ export default function AdminDashboardPage() {
             <img src="/logo-removebg-preview.png" alt="the medix" class="logo-img" />
             <div>
               <h2 style="margin:0; font-size: 20px; color: #0f172a;">كشف حصر وحضور تذاكر الإيفينت ${titleFilterText}</h2>
-              <small style="color: #64748b;">تاريخ التقرير: ${new Date().toLocaleString('ar-EG')}</small>
+              <small style="color: #64748b;">تاريخ التقرير: ${new Date().toLocaleString('ar-EG')} (${statusNote})</small>
             </div>
           </div>
           <div style="text-align: left;">
@@ -1902,7 +1913,7 @@ export default function AdminDashboardPage() {
   const handleDownloadAllAttendeePhotosZip = async () => {
     const allAttendeePhotos: { name: string; orderCode: string; photoUrl: string }[] = [];
 
-    orders.forEach(order => {
+    getEffectiveTicketOrders().forEach(order => {
       (order.items || []).forEach(item => {
         const { attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
         const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
@@ -2021,8 +2032,7 @@ export default function AdminDashboardPage() {
   let maleAttendeesCount = 0;
   let femaleAttendeesCount = 0;
 
-  orders.forEach(order => {
-    if (order.status === 'cancelled') return;
+  getEffectiveTicketOrders().forEach(order => {
     (order.items || []).forEach(item => {
       const { attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
       const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
@@ -5922,6 +5932,35 @@ export default function AdminDashboardPage() {
               </button>
             </div>
 
+            {/* Status Filter Toggle Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-2xl bg-slate-950 border border-slate-800">
+              <span className="text-xs font-bold text-slate-300">تصفية التذاكر حسب حالة الطلب:</span>
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-900 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setTicketStatusFilter('verified_only')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    ticketStatusFilter === 'verified_only'
+                      ? 'bg-emerald-500 text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  ✅ الطلبات المؤكدة فقط
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTicketStatusFilter('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    ticketStatusFilter === 'all'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📋 جميع الطلبات (شاملة المعلقة)
+                </button>
+              </div>
+            </div>
+
             {/* Boys & Girls Count Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Male Count Card */}
@@ -5941,7 +5980,7 @@ export default function AdminDashboardPage() {
               </div>
 
               {/* Female Count Card */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-pink-500/40 flex items-center justify-between shadow-md">
+              <div className="p-4 rounded-2xl bg-pink-950/20 border border-pink-500/40 flex items-center justify-between shadow-md">
                 <div className="flex items-center gap-3.5">
                   <div className="w-12 h-12 rounded-2xl bg-pink-500/20 text-pink-300 border border-pink-500/40 flex items-center justify-center text-2xl font-bold">
                     👩
@@ -5960,10 +5999,10 @@ export default function AdminDashboardPage() {
             {/* Attendees Full List Summary */}
             <div className="space-y-2">
               <h4 className="text-xs font-bold text-slate-300 flex items-center justify-between">
-                <span>قائمة جميع أسماء الحاضرين في التذاكر ({totalEventTickets} تذكرة):</span>
+                <span>قائمة أسماء الحاضرين ({totalEventTickets} تذكرة - {ticketStatusFilter === 'verified_only' ? 'الطلبات المؤكدة فقط' : 'جميع الطلبات'}):</span>
               </h4>
               <div className="max-h-[45vh] overflow-y-auto pr-1 space-y-2">
-                {orders.flatMap(order => (order.items || []).map(item => {
+                {getEffectiveTicketOrders().flatMap(order => (order.items || []).map(item => {
                   const { attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
                   const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
                   if (!attendeesList || attendeesList.length === 0) return null;
