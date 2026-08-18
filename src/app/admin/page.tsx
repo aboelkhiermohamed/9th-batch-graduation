@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import JSZip from 'jszip';
 import { 
   ShieldCheck, 
   Package, 
@@ -54,6 +55,7 @@ import {
   TrendingUp,
   Filter,
   Ticket,
+  Camera,
   X
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
@@ -1893,6 +1895,67 @@ export default function AdminDashboardPage() {
     printWindow.document.open();
     printWindow.document.write(htmlContent);
     printWindow.document.close();
+  };
+
+  const [isZipping, setIsZipping] = useState(false);
+
+  const handleDownloadAllAttendeePhotosZip = async () => {
+    const allAttendeePhotos: { name: string; orderCode: string; photoUrl: string }[] = [];
+
+    orders.forEach(order => {
+      (order.items || []).forEach(item => {
+        const { attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
+        const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
+        if (attendeesList && attendeesList.length > 0) {
+          attendeesList.forEach((att: any) => {
+            if (att.photo_url) {
+              allAttendeePhotos.push({
+                name: (att.name || 'حاضر').trim().replace(/[/\\?%*:|"<>]/g, '-'),
+                orderCode: String(order.order_code || order.id || 'ORDER'),
+                photoUrl: att.photo_url
+              });
+            }
+          });
+        }
+      });
+    });
+
+    if (allAttendeePhotos.length === 0) {
+      alert('عفواً، لا توجد صور مرفوعة لأي من الحاضرين حالياً لتنزيلها');
+      return;
+    }
+
+    setIsZipping(true);
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder('صور_حاضرين_التذاكر');
+
+      for (let i = 0; i < allAttendeePhotos.length; i++) {
+        const photo = allAttendeePhotos[i];
+        try {
+          const response = await fetch(photo.photoUrl);
+          const blob = await response.blob();
+          const cleanName = `${photo.name}_${photo.orderCode}_${i + 1}.jpg`;
+          folder?.file(cleanName, blob);
+        } catch (e) {
+          console.warn(`Failed to fetch image for ${photo.name}:`, e);
+        }
+      }
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const zipUrl = URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = zipUrl;
+      link.download = `صور_حاضرين_تذاكر_الدفعة_التاسعة_${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(zipUrl);
+    } catch (err: any) {
+      alert('حدث خطأ أثناء تجميع ملف ZIP: ' + (err.message || ''));
+    } finally {
+      setIsZipping(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -5912,9 +5975,37 @@ export default function AdminDashboardPage() {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {attendeesList.map((att: any, idx: number) => (
-                          <div key={idx} className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-xs flex items-center justify-between">
-                            <span className="text-white font-semibold">👤 {att.name} {att.phone ? `(${att.phone})` : ''}</span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                          <div key={idx} className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {att.photo_url ? (
+                                <a href={att.photo_url} target="_blank" rel="noreferrer" title="اضغط للتكبير">
+                                  <img src={att.photo_url} alt={att.name} className="w-10 h-10 rounded-xl object-cover border border-amber-500/50 flex-shrink-0 hover:scale-105 transition" />
+                                </a>
+                              ) : (
+                                <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-500 flex-shrink-0">
+                                  <User className="w-5 h-5" />
+                                </div>
+                              )}
+                              <div className="min-w-0 space-y-0.5">
+                                <span className="text-white font-bold block truncate">{att.name} {att.phone ? `(${att.phone})` : ''}</span>
+                                {att.photo_url ? (
+                                  <a
+                                    href={att.photo_url}
+                                    download={`${(att.name || 'حاضر').trim().replace(/[/\\?%*:|"<>]/g, '-')}_#${order.order_code}.jpg`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 hover:underline"
+                                  >
+                                    <Download className="w-3 h-3" />
+                                    <span>تحميل صورة الشخص 📷</span>
+                                  </a>
+                                ) : (
+                                  <span className="text-[10px] text-slate-500 font-medium">بدون صورة مرفوعة</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold border flex-shrink-0 ${
                               (att.gender === 'female' || att.gender === 'أنثى' || att.gender === 'بنت')
                                 ? 'bg-pink-500/20 text-pink-300 border-pink-500/30'
                                 : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
@@ -5930,30 +6021,39 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* Modal Actions Bar with PDF Printing Buttons */}
+            {/* Modal Actions Bar with PDF Printing & Bulk ZIP Download Buttons */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 border-t border-slate-800 pt-4">
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadAllAttendeePhotosZip}
+                  disabled={isZipping}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4 text-amber-400" />
+                  <span>{isZipping ? 'جاري تحزيم الصور... ⏳' : '📦 تحميل جميع صور الحاضرين (ملف ZIP)'}</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => handlePrintEventTicketsPdf('all')}
                   className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-md transition flex items-center gap-1.5"
                 >
                   <Printer className="w-4 h-4" />
-                  <span>طباعة الكشف الشامل (PDF) 🖨️</span>
+                  <span>طباعة الكشف (PDF) 🖨️</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handlePrintEventTicketsPdf('male')}
-                  className="px-3.5 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold text-xs transition flex items-center gap-1.5"
+                  className="px-3 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 font-bold text-xs transition flex items-center gap-1.5"
                 >
-                  <span>👨 كشف الأولاد فقط</span>
+                  <span>👨 كشف الأولاد</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handlePrintEventTicketsPdf('female')}
-                  className="px-3.5 py-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/40 font-bold text-xs transition flex items-center gap-1.5"
+                  className="px-3 py-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/40 font-bold text-xs transition flex items-center gap-1.5"
                 >
-                  <span>👩 كشف البنات فقط</span>
+                  <span>👩 كشف البنات</span>
                 </button>
               </div>
 

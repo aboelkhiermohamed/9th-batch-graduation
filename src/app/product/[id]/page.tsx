@@ -20,7 +20,9 @@ import {
   ExternalLink,
   ShieldCheck,
   Ticket,
-  User
+  User,
+  Upload,
+  Camera
 } from 'lucide-react';
 import { Product, ProductAddon, CartItem, StoreSettings, EventAttendee } from '@/types';
 import { DEFAULT_PRODUCTS, fetchProductsFromSupabase, cleanProductDescription } from '@/lib/supabaseClient';
@@ -718,6 +720,72 @@ export default function StandaloneProductPage() {
                             <span>👩 بنت (أنثى)</span>
                           </button>
                         </div>
+                      </div>
+
+                      {/* Photo Upload Box (Optional) */}
+                      <div className="pt-2.5 border-t border-slate-900 space-y-2">
+                        <label className="block text-[11px] text-slate-300 font-semibold flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 text-amber-400">
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>صورة شخصية للحاضر (اختياري / للطباعة على التذكرة):</span>
+                          </span>
+                          {att.photo_url && (
+                            <span className="text-[10px] text-emerald-400 font-bold">✓ تم إرفاق الصورة</span>
+                          )}
+                        </label>
+
+                        {att.photo_url ? (
+                          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                            <img src={att.photo_url} alt={att.name} className="w-12 h-12 rounded-xl object-cover border border-amber-500/40 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-white truncate">{att.name || `تذكرة ${idx + 1}`}</p>
+                              <p className="text-[10px] text-emerald-400 font-mono">جاهزة للطباعة والتنزيل</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAttendees(prev => {
+                                  const next = [...prev];
+                                  next[idx] = { ...next[idx], photo_url: undefined };
+                                  return next;
+                                });
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 text-[11px] font-bold hover:bg-rose-500/30 transition"
+                            >
+                              إزالة الصورة
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-slate-900 border border-dashed border-slate-700 hover:border-amber-500/60 cursor-pointer transition">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                try {
+                                  const fd = new FormData();
+                                  fd.append('file', file);
+                                  fd.append('folder', 'attendees');
+                                  const res = await fetch('/api/upload', { method: 'POST', body: fd });
+                                  const data = await res.json();
+                                  if (data.url) {
+                                    setAttendees(prev => {
+                                      const next = [...prev];
+                                      next[idx] = { ...next[idx], photo_url: data.url };
+                                      return next;
+                                    });
+                                  }
+                                } catch (err) {
+                                  console.error('Attendee photo upload error:', err);
+                                }
+                              }}
+                            />
+                            <Upload className="w-4 h-4 text-amber-400" />
+                            <span className="text-xs text-slate-300">رفع صورة شخصية للحاضر {idx + 1} (اختياري)</span>
+                          </label>
+                        )}
                       </div>
                     </div>
                   ))}

@@ -16,6 +16,7 @@ export interface EventAttendee {
   name: string;
   phone?: string;
   gender?: 'male' | 'female' | string;
+  photo_url?: string; // Optional attendee personal photo URL
   notes?: string;
 }
 
