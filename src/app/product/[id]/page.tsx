@@ -58,17 +58,29 @@ export default function StandaloneProductPage() {
   const isEvent = Boolean(
     product?.is_event || 
     product?.category?.includes('تذاكر') || 
+    product?.category?.includes('تذكرة') || 
+    product?.category?.includes('تذكره') || 
     product?.category?.includes('إيفينت') || 
+    product?.category?.includes('ايقينت') || 
     product?.category?.includes('Event') || 
+    product?.category?.includes('Ticket') || 
     product?.category?.includes('حفل') ||
+    product?.category?.includes('فعالية') ||
     product?.category?.includes('Day') ||
     product?.title_ar?.toLowerCase().includes('scarb') ||
     product?.title_ar?.toLowerCase().includes('day') ||
+    product?.title_ar?.toLowerCase().includes('تذكر') ||
+    product?.title_ar?.includes('تذكرة') ||
+    product?.title_ar?.includes('تذكره') ||
     product?.title_ar?.includes('يوم') ||
     product?.title_ar?.includes('حفل') ||
-    product?.title_ar?.includes('تذكرة') ||
+    product?.title_ar?.includes('حفلة') ||
+    product?.title_ar?.includes('فعالية') ||
+    product?.title_ar?.includes('إيفينت') ||
+    product?.title_ar?.includes('ايقينت') ||
     product?.title?.toLowerCase().includes('scarb') ||
-    product?.title?.toLowerCase().includes('day')
+    product?.title?.toLowerCase().includes('day') ||
+    product?.title?.toLowerCase().includes('ticket')
   );
 
   useEffect(() => {

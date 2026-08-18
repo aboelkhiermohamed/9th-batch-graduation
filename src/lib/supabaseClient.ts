@@ -235,6 +235,10 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
             ? prodMeta.addons
             : (Array.isArray(p.addons) ? p.addons : (typeof p.addons === 'string' ? JSON.parse(p.addons) : []));
 
+          const resolvedIsEvent = p.is_event !== undefined 
+            ? Boolean(p.is_event) 
+            : (prodMeta?.evt !== undefined ? Boolean(prodMeta.evt) : false);
+
           dbProds.push({
             id: p.id,
             title: p.title || p.title_ar,
@@ -248,6 +252,7 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
             size_chart_url: resolvedSizeChart,
             has_customization: Boolean(p.has_customization),
             customization_label: p.customization_label || undefined,
+            is_event: resolvedIsEvent,
             sizes: Array.isArray(p.sizes) ? p.sizes : (typeof p.sizes === 'string' ? JSON.parse(p.sizes) : []),
             addons: resolvedAddons,
             stock: Number(p.stock || 0),
@@ -299,7 +304,8 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
     const prodMeta = {
       imgs: rawImages,
       chart: product.size_chart_url || undefined,
-      addons: rawAddons
+      addons: rawAddons,
+      evt: Boolean(product.is_event)
     };
     const b64Meta = encodeProdMeta(prodMeta);
     const encodedDesc = b64Meta ? `${cleanDesc} [PROD_META_B64:${b64Meta}]` : cleanDesc;
@@ -316,6 +322,7 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
       size_chart_url: product.size_chart_url || null,
       has_customization: Boolean(product.has_customization),
       customization_label: product.customization_label || null,
+      is_event: Boolean(product.is_event),
       sizes: rawSizes,
       addons: rawAddons,
       stock: Number(product.stock) || 0,
