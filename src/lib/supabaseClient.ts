@@ -480,7 +480,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
     const cleanNote = cleanDisplayNotes(rawNote) || 'تابع جروب التليجرام';
 
     const vodaFeePct = meta?.vf !== undefined ? Number(meta.vf) : (data.vodafone_cash_fee_percent !== undefined ? Number(data.vodafone_cash_fee_percent) : (currentMem.vodafone_cash_fee_percent ?? 1));
-    const supportPhone = meta?.sp || meta?.support_phone || data.support_phone || currentMem.support_phone || '01555583154';
+    const supportPhone = data.support_phone || meta?.sp || meta?.support_phone || currentMem.support_phone || '01555583154';
 
     const settings: StoreSettings = {
       id: data.id,
@@ -522,7 +522,7 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       m: settings.maintenance_mode ? 1 : 0,
       vn: settings.vodafone_cash_numbers,
       ia: settings.instapay_ipas || [settings.instapay_ipa],
-      sp: settings.support_phone || '01555583154',
+      sp: settings.support_phone,
       del: getDeletedProductIds()
     };
 
@@ -542,6 +542,7 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       vodafone_cash_numbers: settings.vodafone_cash_numbers.join(', '),
       instapay_ipa: (settings.instapay_ipas && settings.instapay_ipas[0]) || settings.instapay_ipa || '9thbatch@instapay',
       instapay_ipas: (settings.instapay_ipas || [settings.instapay_ipa]).join(', '),
+      support_phone: settings.support_phone,
       pickup_note: encodedNote,
       updated_at: new Date().toISOString()
     };
