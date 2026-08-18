@@ -410,29 +410,35 @@ export function cleanDisplayNotes(str?: string | null): string {
   if (!str) return '';
   let cleaned = String(str);
 
-  // 1. Strip all bracketed metadata markers (even if truncated at end)
-  cleaned = cleaned.replace(/\[\s*(META|SETTINGS_META|ITEMS_META|ITEMS_META_B64|PARTIAL_META|RECEIPT_URL|VERIFIED_BY|CONFIRMED_LINE|MATCHED_DEV):[\s\S]*/gi, '');
-  cleaned = cleaned.replace(/\[ITEMS_META_B64:[A-Za-z0-9+/=]+\]/gi, '');
-  cleaned = cleaned.replace(/\[ITEMS_META:[\s\S]*?\]\]?/gi, '');
-  cleaned = cleaned.replace(/\[PARTIAL_META:[\s\S]*?\]\]?/gi, '');
+  // 1. If notes string contains system metadata tags anywhere inside it, cut off from first keyword
+  const systemKeywords = [
+    /\[?\b(ITEMS_META|ITEMS_META_B64|PARTIAL_META|SETTINGS_META|RECEIPT_URL|VERIFIED_BY|CONFIRMED_LINE|MATCHED_DEV)\b/i,
+    /\b(product_id|unit_price|customization_option|custom_text|attendees|photo_url|is_event)\s*:/i,
+    /\b(quantity|product)\s*:\s*\d+/i,
+    /\b(id|title_ar|description_ar|image_url|stock|is_active|created_at|updated_at)\s*:/i
+  ];
 
-  // 2. Strip un-bracketed raw metadata residue blobs starting with system keywords
-  cleaned = cleaned.replace(/(ITEMS_META|PARTIAL_META|ITEMS_META_B64|quantity:\d+|product:id:|unit_price:\d+)[\s\S]*/gi, '');
-  cleaned = cleaned.replace(/META:\s*\{[\s\S]*/gi, '');
-  cleaned = cleaned.replace(/\{"v":[\s\S]*/gi, '');
-  cleaned = cleaned.replace(/"(v|i|vf|m|vn|ia|sp|del)":[\s\S]*/gi, '');
-  cleaned = cleaned.replace(/\bsp:\s*\d+/gi, '');
+  let firstIndex = Infinity;
+  systemKeywords.forEach(regex => {
+    const idx = cleaned.search(regex);
+    if (idx !== -1 && idx < firstIndex) {
+      firstIndex = idx;
+    }
+  });
+
+  if (firstIndex !== Infinity && firstIndex >= 0) {
+    cleaned = cleaned.substring(0, firstIndex);
+  }
+
+  // 2. Strip remaining single markers if any
+  cleaned = cleaned.replace(/\[\s*(RECEIPT_URL|VERIFIED_BY|CONFIRMED_LINE|MATCHED_DEV):[\s\S]*?\]/gi, '');
   cleaned = cleaned.replace(/RECEIPT_URL:\s*https?:\/\/\S+/gi, '');
   cleaned = cleaned.replace(/\[VERIFIED_BY:.*?\]/gi, '');
   cleaned = cleaned.replace(/\[CONFIRMED_LINE:.*?\]/gi, '');
   cleaned = cleaned.replace(/\[MATCHED_DEV:.*?\]/gi, '');
   cleaned = cleaned.replace(/\[\[[\s\S]*?\]\]/gi, '');
 
-  // 3. Strip JSON property keys if any remain
-  cleaned = cleaned.replace(/(quantity|unit_price|product|product_id|title_ar|description_ar|image_url|images|is_event|sizes|addons|stock|is_active|created_at|updated_at|customization_label|custom_text|customization_option|attendees|photo_url|gender):/gi, '');
-  cleaned = cleaned.replace(/PARTIAL/gi, '');
-
-  // 4. Clean symbols, brackets, and extra spaces
+  // 3. Clean symbols, brackets, and extra spaces
   cleaned = cleaned.replace(/[\{\}\[\]"']/g, '');
   cleaned = cleaned.replace(/(,\s*)+$/g, '');
   cleaned = cleaned.replace(/(،\s*)+$/g, '');
@@ -440,12 +446,12 @@ export function cleanDisplayNotes(str?: string | null): string {
   cleaned = cleaned.replace(/،+/g, ' ');
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
-  // 5. If what remains is just default placeholder text like "المقاسات والتسليم: تابع جروب"
-  if (cleaned.startsWith('المقاسات والتسليم:') && cleaned.length < 35) {
+  // 4. If what remains is just default placeholder text like "المقاسات والتسليم: تابع جروب"
+  if (cleaned.startsWith('المقاسات والتسليم:') && cleaned.length < 45) {
     return '';
   }
 
-  // 6. Return empty if no real letters or numbers remain
+  // 5. Return empty if no real letters or numbers remain
   if (!/[\p{L}\p{N}]/u.test(cleaned) || cleaned.length < 2) {
     return '';
   }
