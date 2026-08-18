@@ -723,8 +723,23 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
       h: order.edit_history || []
     })}]`;
 
-    let cleanBaseNotes = (order.notes || '').replace(/\[PARTIAL_META:.*?\]/g, '').trim();
-    const orderNotes = (cleanBaseNotes + receiptMarker + lineMarker + devMarker + partialMeta).trim();
+    const cleanItemsMeta = (order.items || []).map(item => {
+      const copy = { ...item };
+      if (copy.attendees && Array.isArray(copy.attendees)) {
+        copy.attendees = copy.attendees.map((a: any) => {
+          let pUrl = a.photo_url;
+          if (pUrl && pUrl.length > 2000 && pUrl.startsWith('data:')) {
+            pUrl = pUrl.substring(0, 100) + '...';
+          }
+          return { ...a, photo_url: pUrl };
+        });
+      }
+      return copy;
+    });
+    const itemsMetaMarker = order.items && order.items.length > 0 ? ` [ITEMS_META:${JSON.stringify(cleanItemsMeta)}]` : '';
+
+    let cleanBaseNotes = (order.notes || '').replace(/\[PARTIAL_META:.*?\]/g, '').replace(/\[ITEMS_META:.*?\]/g, '').trim();
+    const orderNotes = (cleanBaseNotes + receiptMarker + lineMarker + devMarker + partialMeta + itemsMetaMarker).trim();
 
     const orderPayload: any = {
       order_code: order.order_code,
@@ -956,7 +971,18 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         }
       }
 
-      const items = (o.store_order_items || []).map((item: any) => {
+      let extractedItemsFromNotes: any[] | undefined = undefined;
+      if (rawNotes.includes('[ITEMS_META:')) {
+        const match = rawNotes.match(/\[ITEMS_META:([\s\S]*?)\]\]?/);
+        if (match && match[1]) {
+          try {
+            extractedItemsFromNotes = JSON.parse(match[1]);
+            rawNotes = rawNotes.replace(/\[ITEMS_META:[\s\S]*?\]\]?/, '').trim();
+          } catch (e) {}
+        }
+      }
+
+      let items: OrderItem[] = (o.store_order_items || []).map((item: any) => {
         let title = item.product_title || '';
         let custOpt = item.customization_option || undefined;
         let custText = item.custom_text || undefined;
@@ -1006,6 +1032,17 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
           unit_price: Number(item.unit_price || 0)
         };
       });
+
+      if (items.length === 0) {
+        if (extractedItemsFromNotes && Array.isArray(extractedItemsFromNotes) && extractedItemsFromNotes.length > 0) {
+          items = extractedItemsFromNotes;
+        } else {
+          const memMatch = getMemoryOrders().find(m => m.id === o.id || m.order_code === o.order_code);
+          if (memMatch && memMatch.items && memMatch.items.length > 0) {
+            items = memMatch.items;
+          }
+        }
+      }
 
       const orderTotal = Number(o.total_amount || 0);
       const matchedTxSum = txSumMap[o.id] || txSumMap[o.order_code] || 0;
