@@ -25,6 +25,7 @@ import {
   Camera
 } from 'lucide-react';
 import { Product, ProductAddon, CartItem, StoreSettings, EventAttendee } from '@/types';
+import { DEFAULT_PRODUCTS, fetchProductsFromSupabase, cleanProductDescription } from '@/lib/supabaseClient';
 const compressImageFile = async (file: File): Promise<File> => {
   return new Promise((resolve) => {
     if (!file.type.startsWith('image/') || file.size < 150 * 1024) {
