@@ -60,7 +60,15 @@ export default function StandaloneProductPage() {
     product?.category?.includes('تذاكر') || 
     product?.category?.includes('إيفينت') || 
     product?.category?.includes('Event') || 
-    product?.category?.includes('حفل')
+    product?.category?.includes('حفل') ||
+    product?.category?.includes('Day') ||
+    product?.title_ar?.toLowerCase().includes('scarb') ||
+    product?.title_ar?.toLowerCase().includes('day') ||
+    product?.title_ar?.includes('يوم') ||
+    product?.title_ar?.includes('حفل') ||
+    product?.title_ar?.includes('تذكرة') ||
+    product?.title?.toLowerCase().includes('scarb') ||
+    product?.title?.toLowerCase().includes('day')
   );
 
   useEffect(() => {

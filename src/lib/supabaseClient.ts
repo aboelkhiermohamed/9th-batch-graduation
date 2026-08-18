@@ -678,6 +678,14 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
         const itemImg = item.image_url || item.product?.image_url || (Array.isArray(item.product?.images) ? item.product.images[0] : undefined);
         const imgMarker = itemImg ? ` [IMG:${itemImg}]` : '';
 
+        let finalCustomOpt = customOptStr || '';
+        if (item.attendees && Array.isArray(item.attendees) && item.attendees.length > 0) {
+          const attTag = ` [ATTENDEES:${JSON.stringify(item.attendees)}]`;
+          if (!finalCustomOpt.includes('[ATTENDEES:')) {
+            finalCustomOpt = `${finalCustomOpt}${attTag}`.trim();
+          }
+        }
+
         return {
           id: itemId,
           order_id: order.id,
@@ -686,7 +694,7 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
           image_url: itemImg || null,
           selected_size: item.selected_size || (item as any).selectedSize || null,
           custom_text: customTextStr || null,
-          customization_option: customOptStr || null,
+          customization_option: finalCustomOpt || null,
           quantity: item.quantity,
           unit_price: item.unit_price
         };
@@ -844,6 +852,15 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
           }
         }
 
+        let attendees: any = undefined;
+        if (custOpt && custOpt.includes('[ATTENDEES:')) {
+          const match = custOpt.match(/\[ATTENDEES:(.*?)\]/);
+          if (match && match[1]) {
+            try { attendees = JSON.parse(match[1]); } catch (e) {}
+            custOpt = custOpt.replace(/\[ATTENDEES:.*?\]/, '').trim() || undefined;
+          }
+        }
+
         return {
           id: item.id,
           order_id: item.order_id,
@@ -853,6 +870,7 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
           selected_size: item.selected_size,
           custom_text: custText,
           customization_option: custOpt,
+          attendees: attendees && Array.isArray(attendees) ? attendees : undefined,
           quantity: Number(item.quantity || 1),
           unit_price: Number(item.unit_price || 0)
         };
@@ -1073,18 +1091,28 @@ export async function updateOrderInSupabase(updatedOrder: Order): Promise<boolea
     if (updatedOrder.items && updatedOrder.items.length > 0) {
       await supabase.from('store_order_items').delete().eq('order_id', updatedOrder.id);
       
-      const itemsPayload = updatedOrder.items.map(item => ({
-        id: (item.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)) ? item.id : undefined,
-        order_id: updatedOrder.id,
-        product_id: item.product_id || item.product?.id,
-        product_title: item.product_title,
-        image_url: item.image_url || null,
-        selected_size: item.selected_size || null,
-        custom_text: item.custom_text || null,
-        customization_option: item.customization_option || null,
-        quantity: item.quantity,
-        unit_price: item.unit_price
-      }));
+      const itemsPayload = updatedOrder.items.map(item => {
+        let finalCustomOpt = item.customization_option || '';
+        if (item.attendees && Array.isArray(item.attendees) && item.attendees.length > 0) {
+          const attTag = ` [ATTENDEES:${JSON.stringify(item.attendees)}]`;
+          if (!finalCustomOpt.includes('[ATTENDEES:')) {
+            finalCustomOpt = `${finalCustomOpt}${attTag}`.trim();
+          }
+        }
+
+        return {
+          id: (item.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)) ? item.id : undefined,
+          order_id: updatedOrder.id,
+          product_id: item.product_id || item.product?.id,
+          product_title: item.product_title,
+          image_url: item.image_url || null,
+          selected_size: item.selected_size || null,
+          custom_text: item.custom_text || null,
+          customization_option: finalCustomOpt || null,
+          quantity: item.quantity,
+          unit_price: item.unit_price
+        };
+      });
 
       await supabase.from('store_order_items').insert(itemsPayload);
     }
