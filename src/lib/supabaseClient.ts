@@ -6,6 +6,50 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+export function parseAttendeesAndCleanOpt(custOpt?: string | null): { attendees?: any[]; cleanOpt?: string } {
+  if (!custOpt) return { cleanOpt: undefined, attendees: undefined };
+
+  let cleanOpt = custOpt;
+  let attendees: any = undefined;
+
+  if (cleanOpt.includes('[ATTENDEES:')) {
+    const attIdx = cleanOpt.indexOf('[ATTENDEES:');
+    if (attIdx !== -1) {
+      const rest = cleanOpt.substring(attIdx + 11);
+      const trimmedRest = rest.trim();
+      const firstChar = trimmedRest[0];
+      if (firstChar === '[' || firstChar === '{') {
+        let depth = 0;
+        let jsonEnd = -1;
+        const startPos = rest.indexOf(firstChar);
+        for (let i = startPos; i < rest.length; i++) {
+          if (rest[i] === '[' || rest[i] === '{') depth++;
+          else if (rest[i] === ']' || rest[i] === '}') {
+            depth--;
+            if (depth === 0) {
+              jsonEnd = i;
+              break;
+            }
+          }
+        }
+        if (jsonEnd !== -1) {
+          const jsonStr = rest.substring(startPos, jsonEnd + 1);
+          try {
+            const parsed = JSON.parse(jsonStr);
+            attendees = Array.isArray(parsed) ? parsed : [parsed];
+          } catch (e) {}
+        }
+      }
+    }
+    cleanOpt = cleanOpt.replace(/\[ATTENDEES:[\s\S]*?\]\]?/g, '').trim();
+  }
+
+  return {
+    cleanOpt: cleanOpt || undefined,
+    attendees: Array.isArray(attendees) && attendees.length > 0 ? attendees : undefined
+  };
+}
+
 // --- INITIAL FALLBACK / SEED DATA ---
 export const DEFAULT_SETTINGS: StoreSettings = {
   id: 'default',
@@ -854,11 +898,9 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
 
         let attendees: any = undefined;
         if (custOpt && custOpt.includes('[ATTENDEES:')) {
-          const match = custOpt.match(/\[ATTENDEES:(.*?)\]/);
-          if (match && match[1]) {
-            try { attendees = JSON.parse(match[1]); } catch (e) {}
-            custOpt = custOpt.replace(/\[ATTENDEES:.*?\]/, '').trim() || undefined;
-          }
+          const parsed = parseAttendeesAndCleanOpt(custOpt);
+          attendees = parsed.attendees;
+          custOpt = parsed.cleanOpt;
         }
 
         return {

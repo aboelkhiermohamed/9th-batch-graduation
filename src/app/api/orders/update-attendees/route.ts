@@ -18,16 +18,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (order.items && order.items.length > 0) {
-      if (item_id) {
-        order.items = order.items.map(item => {
-          if (item.id === item_id || item.product_id === item_id) {
-            return { ...item, attendees };
-          }
-          return item;
-        });
-      } else {
-        order.items[0].attendees = attendees;
-      }
+      order.items = order.items.map((item, idx) => {
+        if (!item_id || item.id === item_id || item.product_id === item_id || idx === 0) {
+          let cleanOpt = item.customization_option || '';
+          cleanOpt = cleanOpt.replace(/\[ATTENDEES:[\s\S]*?\]\]?/g, '').trim();
+          return {
+            ...item,
+            customization_option: cleanOpt || undefined,
+            attendees
+          };
+        }
+        return item;
+      });
     }
 
     await updateOrderInSupabase(order);

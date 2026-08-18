@@ -52,10 +52,11 @@ import {
   Ruler,
   DollarSign,
   TrendingUp,
-  Filter
+  Filter,
+  Ticket
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
-import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase } from '@/lib/supabaseClient';
+import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase, parseAttendeesAndCleanOpt } from '@/lib/supabaseClient';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -2131,21 +2132,29 @@ export default function AdminDashboardPage() {
                                     ✨ التطريز: &quot;{item.custom_text}&quot;
                                   </p>
                                 )}
-                                {item.customization_option && (
-                                  <p className="text-[11px] text-emerald-400/90 font-medium mt-0.5">
-                                    💎 {item.customization_option}
-                                  </p>
-                                )}
-                                {item.attendees && item.attendees.length > 0 && (
-                                  <div className="mt-1 p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 space-y-0.5">
-                                    <span className="font-bold text-indigo-400 block">🎟️ الحاضرين والتذاكر ({item.attendees.length}):</span>
-                                    {item.attendees.map((att, aIdx) => (
-                                      <div key={aIdx} className="text-[10px] text-slate-200">
-                                        • {att.name} {att.phone ? `(${att.phone})` : ''}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
+                                {(() => {
+                                  const { cleanOpt, attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
+                                  const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
+                                  return (
+                                    <>
+                                      {cleanOpt && (
+                                        <p className="text-[11px] text-emerald-400/90 font-medium mt-0.5">
+                                          💎 {cleanOpt}
+                                        </p>
+                                      )}
+                                      {attendeesList && attendeesList.length > 0 && (
+                                        <div className="mt-1 p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 space-y-0.5">
+                                          <span className="font-bold text-indigo-400 block">🎟️ الحاضرين والتذاكر ({attendeesList.length}):</span>
+                                          {attendeesList.map((att: any, aIdx: number) => (
+                                            <div key={aIdx} className="text-[10px] text-slate-200">
+                                              • {att.name} {att.phone ? `(${att.phone})` : ''}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
                               </div>
                             ))
                           )}
@@ -4902,17 +4911,42 @@ export default function AdminDashboardPage() {
                           </span>
                         </div>
                       )}
-                      {item.customization_option && (
-                        <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-500/15 to-teal-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <Sparkles className="w-4 h-4 text-emerald-400" />
-                            <span>💎 الإضافات المطلوبة (Add-ons):</span>
-                          </span>
-                          <span className="bg-slate-950 px-3 py-1 rounded-lg text-emerald-300 font-bold text-xs border border-emerald-500/30">
-                            {item.customization_option}
-                          </span>
-                        </div>
-                      )}
+                      {(() => {
+                        const { cleanOpt, attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
+                        const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
+                        return (
+                          <>
+                            {cleanOpt && (
+                              <div className="p-3 rounded-xl bg-gradient-to-r from-emerald-500/15 to-teal-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-between">
+                                <span className="flex items-center gap-1.5">
+                                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                                  <span>💎 الإضافات المطلوبة (Add-ons):</span>
+                                </span>
+                                <span className="bg-slate-950 px-3 py-1 rounded-lg text-emerald-300 font-bold text-xs border border-emerald-500/30">
+                                  {cleanOpt}
+                                </span>
+                              </div>
+                            )}
+                            {attendeesList && attendeesList.length > 0 && (
+                              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-500/15 to-purple-500/15 border border-indigo-500/40 text-indigo-300 text-xs font-bold space-y-2">
+                                <span className="flex items-center gap-1.5 text-indigo-300 text-xs font-extrabold">
+                                  <Ticket className="w-4 h-4 text-indigo-400" />
+                                  <span>🎟️ أسماء الحاضرين والتذاكر المحجوزة ({attendeesList.length}):</span>
+                                </span>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {attendeesList.map((att: any, aIdx: number) => (
+                                    <div key={aIdx} className="p-2.5 rounded-xl bg-slate-950/80 border border-indigo-500/20 text-xs text-slate-200 space-y-0.5">
+                                      <span className="text-[10px] text-amber-400 font-mono block font-bold">التذكرة {aIdx + 1}:</span>
+                                      <div className="font-bold text-white">👤 {att.name}</div>
+                                      {att.phone && <div className="text-[11px] text-slate-400 font-mono">📱 {att.phone}</div>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   ))
                 )}
