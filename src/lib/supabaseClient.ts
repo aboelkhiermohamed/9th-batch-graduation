@@ -484,13 +484,37 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
     let meta: any = null;
     let rawNote = data.pickup_note || '';
 
-    // Match compact [META:...] or full [SETTINGS_META:...]
-    const match = rawNote.match(/\[(META|SETTINGS_META):(.*?)]/);
-    if (match && match[2]) {
-      try {
-        meta = JSON.parse(match[2]);
-        rawNote = rawNote.replace(/\s*\[(META|SETTINGS_META):.*?\]/g, '').trim();
-      } catch (e) {}
+    // Match compact [META:...] or full [SETTINGS_META:...] with nested array support
+    if (rawNote.includes('[META:') || rawNote.includes('[SETTINGS_META:')) {
+      const tag = rawNote.includes('[META:') ? '[META:' : '[SETTINGS_META:';
+      const startIdx = rawNote.indexOf(tag);
+      if (startIdx !== -1) {
+        const rest = rawNote.substring(startIdx + tag.length);
+        const trimmedRest = rest.trim();
+        const firstChar = trimmedRest[0];
+        if (firstChar === '{' || firstChar === '[') {
+          let depth = 0;
+          let jsonEnd = -1;
+          const startPos = rest.indexOf(firstChar);
+          for (let i = startPos; i < rest.length; i++) {
+            if (rest[i] === '{' || rest[i] === '[') depth++;
+            else if (rest[i] === '}' || rest[i] === ']') {
+              depth--;
+              if (depth === 0) {
+                jsonEnd = i;
+                break;
+              }
+            }
+          }
+          if (jsonEnd !== -1) {
+            const jsonStr = rest.substring(startPos, jsonEnd + 1);
+            try {
+              meta = JSON.parse(jsonStr);
+            } catch (e) {}
+          }
+        }
+      }
+      rawNote = rawNote.replace(/\s*\[(META|SETTINGS_META):[\s\S]*?\]\]?/g, '').trim();
     }
 
     if (Array.isArray(meta?.del) && meta.del.length > 0) {
@@ -507,8 +531,12 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
       : (data.instapay_enabled !== undefined ? Boolean(data.instapay_enabled) : Boolean(currentMem.instapay_enabled));
 
     const defaultIpa = meta?.ia?.[0] || meta?.instapay_ipa || data.instapay_ipa || currentMem.instapay_ipa || '9thbatch@instapay';
-    const vodaNums = meta?.vn || meta?.vodafone_cash_numbers || parseArrayOrCommaString(data.vodafone_cash_numbers, currentMem.vodafone_cash_numbers || ['01015339426']);
-    const instaAccounts = meta?.ia || meta?.instapay_ipas || parseArrayOrCommaString(data.instapay_ipas, currentMem.instapay_ipas || [defaultIpa]);
+    const vodaNums = (meta?.vn && Array.isArray(meta.vn) && meta.vn.length > 0) 
+      ? meta.vn 
+      : parseArrayOrCommaString(data.vodafone_cash_numbers, currentMem.vodafone_cash_numbers || ['01015339426']);
+    const instaAccounts = (meta?.ia && Array.isArray(meta.ia) && meta.ia.length > 0) 
+      ? meta.ia 
+      : parseArrayOrCommaString(data.instapay_ipas, currentMem.instapay_ipas || [defaultIpa]);
 
     let isMaintenance = false;
     if (meta && meta.m !== undefined) {
@@ -552,6 +580,12 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
 export async function saveSettingsToSupabase(settings: StoreSettings): Promise<boolean> {
   if (typeof window !== 'undefined' && window.localStorage) {
     localStorage.setItem('graduation_store_maintenance', settings.maintenance_mode ? 'true' : 'false');
+    if (settings.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0) {
+      localStorage.setItem('graduation_store_voda_nums', JSON.stringify(settings.vodafone_cash_numbers));
+    }
+    if (settings.instapay_ipas && settings.instapay_ipas.length > 0) {
+      localStorage.setItem('graduation_store_insta_ipas', JSON.stringify(settings.instapay_ipas));
+    }
   }
   const cleanNote = cleanDisplayNotes(settings.pickup_note || 'تابع جروب التليجرام');
   const memoryPayload = { ...settings, pickup_note: cleanNote };
