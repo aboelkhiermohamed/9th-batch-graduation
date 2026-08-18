@@ -152,11 +152,32 @@ export default function CustomerProfilePage() {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
             const gUser = session.user;
+            let userPhone = gUser.phone || gUser.user_metadata?.phone || '';
+            let userFullName = gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google';
+
+            // Lookup existing customer profile in DB by email to fetch saved phone_number
+            if (gUser.email) {
+              try {
+                const authRes = await fetch('/api/customer/auth', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: gUser.email, full_name: userFullName })
+                });
+                if (authRes.ok) {
+                  const authData = await authRes.json();
+                  if (authData.customer && authData.customer.phone_number) {
+                    userPhone = authData.customer.phone_number;
+                    if (authData.customer.full_name) userFullName = authData.customer.full_name;
+                  }
+                }
+              } catch (e) {}
+            }
+
             const googleSess = {
               id: gUser.id,
-              full_name: gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google',
+              full_name: userFullName,
               email: gUser.email || '',
-              phone_number: gUser.phone || gUser.user_metadata?.phone || '',
+              phone_number: userPhone,
               created_at: gUser.created_at || new Date().toISOString()
             };
 
@@ -193,7 +214,7 @@ export default function CustomerProfilePage() {
     initSession();
 
     if (supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
           const gUser = session.user;
           const saved = localStorage.getItem('graduation_customer_session');
@@ -202,17 +223,36 @@ export default function CustomerProfilePage() {
             try { savedSess = JSON.parse(saved); } catch (e) {}
           }
 
-          // If local session already exists with phone_number, keep it!
           if (savedSess && savedSess.phone_number) {
             setCustomerSession(savedSess);
             return;
           }
 
+          let userPhone = gUser.phone || gUser.user_metadata?.phone || '';
+          let userFullName = gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google';
+
+          if (gUser.email) {
+            try {
+              const authRes = await fetch('/api/customer/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: gUser.email, full_name: userFullName })
+              });
+              if (authRes.ok) {
+                const authData = await authRes.json();
+                if (authData.customer && authData.customer.phone_number) {
+                  userPhone = authData.customer.phone_number;
+                  if (authData.customer.full_name) userFullName = authData.customer.full_name;
+                }
+              }
+            } catch (e) {}
+          }
+
           const googleSess = {
             id: gUser.id,
-            full_name: gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google',
+            full_name: userFullName,
             email: gUser.email || '',
-            phone_number: gUser.phone || gUser.user_metadata?.phone || '',
+            phone_number: userPhone,
             created_at: gUser.created_at || new Date().toISOString()
           };
 
@@ -438,16 +478,11 @@ export default function CustomerProfilePage() {
       if (res.ok && data.success && data.customer) {
         setCustomerSession(data.customer);
         localStorage.setItem('graduation_customer_session', JSON.stringify(data.customer));
+        localStorage.setItem('graduation_profile_dismissed', 'true');
         setFullNameInput(data.customer.full_name || '');
         setEmailInput(data.customer.email || '');
         setPhoneInput(data.customer.phone_number || '');
         fetchCustomerOrders(data.customer.phone_number);
-
-        // Open completion modal so user can confirm and complete details
-        setCompleteFullName(data.customer.full_name || '');
-        setCompletePhone(data.customer.phone_number || '');
-        setCompleteEmail(data.customer.email || '');
-        setIsCompleteProfileOpen(true);
       } else {
         setGuestAuthError(data.error || 'فشل إنشاء الحساب، يرجى المحاولة لاحقاً');
       }
@@ -592,12 +627,24 @@ export default function CustomerProfilePage() {
         return;
       }
 
+      try {
+        await fetch('/api/customer/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone_number: cleanPhone,
+            email: completeEmail.trim() || customerSession?.email,
+            full_name: cleanName
+          })
+        });
+      } catch (e) {}
+
       const updatedSess = {
         ...customerSession,
         id: customerSession?.id || 'cust-' + Date.now().toString(36),
         full_name: cleanName,
         phone_number: cleanPhone,
-        email: completeEmail.trim()
+        email: completeEmail.trim() || customerSession?.email || ''
       };
 
       setCustomerSession(updatedSess);
