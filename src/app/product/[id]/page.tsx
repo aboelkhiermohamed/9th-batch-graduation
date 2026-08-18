@@ -190,17 +190,27 @@ export default function StandaloneProductPage() {
       }
     }
 
-    const currentCart = [...cart];
-    currentCart.push({
+    const newItem: CartItem = {
       product,
       selectedSize: selectedSize || undefined,
       customText: customText.trim() || undefined,
       quantity,
       selectedAddons: selectedAddons.length > 0 ? [...selectedAddons] : undefined,
       attendees: isEvent ? [...attendees] : undefined
-    });
+    };
 
-    saveCartToStorage(currentCart);
+    let updatedCart: CartItem[];
+
+    if (redirectAfter) {
+      // Buy Now: Replace cart with this immediate purchase to avoid accumulating old items
+      updatedCart = [newItem];
+    } else {
+      // Add to Cart: Replace previous selection of the same product with new selection
+      const filtered = cart.filter(item => item.product.id !== product.id);
+      updatedCart = [...filtered, newItem];
+    }
+
+    saveCartToStorage(updatedCart);
 
     if (redirectAfter) {
       router.push('/checkout');
