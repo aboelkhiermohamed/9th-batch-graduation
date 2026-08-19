@@ -915,8 +915,14 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
       supabase.from('store_transactions').select('matched_order_id, amount').not('matched_order_id', 'is', null)
     ]);
 
-    if (error || !dbOrders || dbOrders.length === 0) {
+    if (error) {
+      console.warn('Error reading from Supabase:', error);
       return getMemoryOrders();
+    }
+
+    if (!dbOrders || dbOrders.length === 0) {
+      setMemoryOrders([]);
+      return [];
     }
 
     // Build map of sum of matched transaction amounts per order ID & order_code
@@ -1156,22 +1162,8 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
       };
     });
 
-    // Merge DB orders with memory cache for complete dataset
-    const memory = getMemoryOrders();
-    const mergedMap = new Map<string, Order>();
-    fetchedOrders.forEach(o => {
-      // If DB return has empty items but memory order has items, preserve memory items!
-      const memOrder = memory.find(m => m.id === o.id || m.order_code === o.order_code);
-      if ((!o.items || o.items.length === 0) && memOrder?.items && memOrder.items.length > 0) {
-        o.items = memOrder.items;
-      }
-      mergedMap.set(o.id, o);
-    });
-    memory.forEach(o => {
-      if (!mergedMap.has(o.id)) mergedMap.set(o.id, o);
-    });
-
-    return Array.from(mergedMap.values());
+    setMemoryOrders(fetchedOrders);
+    return fetchedOrders;
   } catch (err) {
     console.warn('Error reading from Supabase:', err);
     return getMemoryOrders();
@@ -1402,11 +1394,17 @@ export async function fetchTransactionsFromSupabase(): Promise<IncomingTransacti
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error || !data || data.length === 0) {
+    if (error) {
+      console.warn('Error fetching transactions from Supabase:', error);
       return getMemoryTransactions();
     }
 
-    return data.map((t: any) => ({
+    if (!data || data.length === 0) {
+      setMemoryTransactions([]);
+      return [];
+    }
+
+    const txs = data.map((t: any) => ({
       id: t.id,
       payment_method: t.payment_method || 'vodafone_cash',
       amount: Number(t.amount || 0),
@@ -1419,6 +1417,9 @@ export async function fetchTransactionsFromSupabase(): Promise<IncomingTransacti
       received_at: t.received_at || t.created_at || new Date().toISOString(),
       created_at: t.created_at || new Date().toISOString()
     }));
+
+    setMemoryTransactions(txs);
+    return txs;
   } catch (err) {
     console.warn('Error fetching transactions from Supabase:', err);
     return getMemoryTransactions();
