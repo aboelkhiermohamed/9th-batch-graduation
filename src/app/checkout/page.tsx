@@ -244,20 +244,20 @@ export default function CheckoutPage() {
 
     const rawPhone = (customerPhone.trim() || customerSession?.phone_number || '').trim();
     const finalPhone = normalizePhoneNumber(rawPhone);
+    const cleanSenderPhone = normalizePhoneNumber(senderPhone.trim());
 
-    if (!customerName.trim() || !finalPhone || !transactionRef.trim()) {
-      alert('يرجى إدخال اسم العميل ورقم الموبايل والرقم المرجعي للعملية');
+    if (!customerName.trim() || !finalPhone || !cleanSenderPhone || !transactionRef.trim()) {
+      alert('جميع البيانات مطلوبة: الاسم بالكامل، رقم موبايلك، رقم المحفظة المحول منها، والرقم المرجعي للمعاملة');
       return;
     }
 
     if (!isValidEgyptianPhone(finalPhone)) {
-      alert('عفواً، رقم الموبايل غير صحيح! يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
+      alert('عفواً، رقم الموبايل الشخصي غير صحيح! يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
       return;
     }
 
-    const cleanSenderPhone = senderPhone.trim() ? normalizePhoneNumber(senderPhone) : finalPhone;
-    if (senderPhone.trim() && !isValidEgyptianPhone(senderPhone)) {
-      alert('عفواً، رقم محفظة الراسل غير صحيح! يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
+    if (!isValidEgyptianPhone(cleanSenderPhone)) {
+      alert('عفواً، رقم محفظة المحول منها غير صحيح! يرجى إدخال رقم موبايل مصري صحيح يبدأ بـ (010, 011, 012, 015) ومكون من 11 رقماً');
       return;
     }
 
@@ -756,21 +756,22 @@ export default function CheckoutPage() {
                     />
                   </div>
 
-                  {/* Sender Wallet Phone Number (Optional) */}
+                  {/* Sender Wallet Phone Number (Required) */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-slate-200 mb-1 flex flex-wrap items-center justify-between gap-1">
-                      <span>رقم المحفظة المحوّل منها <span className="text-slate-400 font-normal">(في حالة التحويل من رقم آخر/والدك/صديقك)</span></span>
+                      <span>رقم المحفظة المحوّل منها <span className="text-rose-500 font-black">* (إجباري)</span></span>
                       <span className="text-[10px] text-indigo-300 font-mono">Sender Wallet Phone</span>
                     </label>
                     <input
                       type="tel"
-                      placeholder="أدخل رقم المحفظة في حالة التحويل من رقم مختلف عن رقمك"
+                      required
+                      placeholder="أدخل رقم المحفظة التي قمت بالتحويل منها (سواء رقمك أو رقم والدك/صديقك)"
                       value={senderPhone}
                       onChange={(e) => setSenderPhone(e.target.value)}
                       className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm font-mono"
                     />
                     <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
-                      💡 <strong className="text-amber-300">ملاحظة توضيحية:</strong> يُكتب رقم المحفظة هنا فقط إذا قمت بالتحويل من محفظة شخص آخر (مثل رقم والدك أو صديقك).
+                      💡 <strong className="text-amber-300">ملاحظة توضيحية:</strong> أدخل رقم المحفظة التي حولت منها بالضبط (سواء كانت محفظتك الشخصية أو محفظة والدك/صديقك).
                     </div>
                   </div>
 
