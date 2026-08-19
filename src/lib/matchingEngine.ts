@@ -115,7 +115,12 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
   }
 
   if (matchedOrder) {
-    const confirmedLine = tx.recipient_phone || tx.device_name || undefined;
+    let confirmedLine = tx.recipient_phone;
+    if (!confirmedLine && tx.raw_sms) {
+      const match = tx.raw_sms.match(/(?:على رقم محفظتك|على محفظتك|محفظة|إلى رقم|إلى|خط)\s*(?:20)?(01[0125]\d{8})/i);
+      if (match && match[1]) confirmedLine = match[1];
+    }
+    if (!confirmedLine) confirmedLine = tx.device_name || undefined;
     
     // Accumulate total paid amount for this order from all matched transactions
     const allTxs = await fetchTransactionsFromSupabase();
@@ -265,7 +270,12 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
     }
 
     if (matchedTx) {
-      const confirmedLine = matchedTx.recipient_phone || matchedTx.device_name || undefined;
+      let confirmedLine = matchedTx.recipient_phone;
+      if (!confirmedLine && matchedTx.raw_sms) {
+        const match = matchedTx.raw_sms.match(/(?:على رقم محفظتك|على محفظتك|محفظة|إلى رقم|إلى|خط)\s*(?:20)?(01[0125]\d{8})/i);
+        if (match && match[1]) confirmedLine = match[1];
+      }
+      if (!confirmedLine) confirmedLine = matchedTx.device_name || undefined;
 
       const orderTotal = Number(newOrder.total_amount || 0);
       const prevPaid = Number(newOrder.paid_amount || 0);

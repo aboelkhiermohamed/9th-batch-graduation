@@ -60,6 +60,7 @@ import {
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
 import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase, parseAttendeesAndCleanOpt, clearOrdersInSupabase, deleteOrderFromSupabase } from '@/lib/supabaseClient';
+import { normalizePhoneNumber, isValidEgyptianPhone } from '@/lib/smsParser';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -355,20 +356,75 @@ export default function AdminDashboardPage() {
 
   // Dynamic helper to resolve confirmed line even for legacy/past matched orders
   const getEffectiveConfirmedLine = (o: Order) => {
-    if (o.confirmed_line) return o.confirmed_line;
+    const extractPhoneFromText = (str: string | undefined): string | undefined => {
+      if (!str) return undefined;
+      const normDigits = str.replace(/[^0-9]/g, '');
+      if (normDigits.length >= 11) {
+        const norm = normalizePhoneNumber(normDigits);
+        if (norm && isValidEgyptianPhone(norm)) return norm;
+      }
+      const match = str.match(/(?:على رقم محفظتك|على محفظتك|محفظة|إلى رقم|إلى|خط)\s*(?:20)?(01[0125]\d{8})/i);
+      if (match && match[1]) {
+        const norm = normalizePhoneNumber(match[1]);
+        if (norm && isValidEgyptianPhone(norm)) return norm;
+      }
+      const matchAny = str.match(/(?:20)?(01[0125]\d{8})/);
+      if (matchAny && matchAny[1]) {
+        const norm = normalizePhoneNumber(matchAny[1]);
+        if (norm && isValidEgyptianPhone(norm)) return norm;
+      }
+      return undefined;
+    };
+
+    if (o.confirmed_line) {
+      const p = extractPhoneFromText(o.confirmed_line);
+      if (p) return p;
+    }
     if (o.notes && o.notes.includes('[CONFIRMED_LINE:')) {
       const match = o.notes.match(/\[CONFIRMED_LINE:\s*(.*?)\]/);
-      if (match && match[1]) return match[1];
+      if (match && match[1]) {
+        const p = extractPhoneFromText(match[1]);
+        if (p) return p;
+      }
     }
     const tx = findMatchedTx(o);
     if (tx) {
-      if (tx.recipient_phone) return tx.recipient_phone;
+      if (tx.recipient_phone) {
+        const p = extractPhoneFromText(tx.recipient_phone);
+        if (p) return p;
+      }
       if (tx.raw_sms) {
-        const match = tx.raw_sms.match(/(?:على رقم محفظتك|على محفظتك|محفظة|إلى رقم|إلى)\s*(01[0125]\d{8})/i);
-        if (match && match[1]) return match[1];
+        const p = extractPhoneFromText(tx.raw_sms);
+        if (p) return p;
+      }
+      if (tx.device_name) {
+        const p = extractPhoneFromText(tx.device_name);
+        if (p) return p;
       }
     }
-    return undefined;
+    if (o.matched_device_id || o.matched_device_name) {
+      const dev = devices.find(d => 
+        (o.matched_device_id && d.id === o.matched_device_id) ||
+        (o.matched_device_name && d.device_name === o.matched_device_name)
+      );
+      if (dev && dev.phone_number) {
+        const p = extractPhoneFromText(dev.phone_number);
+        if (p) return p;
+      }
+    }
+    return o.confirmed_line || undefined;
+  };
+
+  const isOrderMatchedToLine = (o: Order, targetNum: string) => {
+    const line = getEffectiveConfirmedLine(o);
+    if (!line) return false;
+    const cleanLine = normalizePhoneNumber(line) || line.replace(/[^0-9]/g, '');
+    const cleanTarget = normalizePhoneNumber(targetNum) || targetNum.replace(/[^0-9]/g, '');
+    if (!cleanTarget) return false;
+    return cleanLine === cleanTarget ||
+           cleanLine.endsWith(cleanTarget.slice(-8)) ||
+           line.includes(targetNum) ||
+           targetNum.includes(line);
   };
 
   // Filtered orders list
@@ -395,7 +451,7 @@ export default function AdminDashboardPage() {
     const effectiveLine = getEffectiveConfirmedLine(o);
     const matchLine = lineFilter === 'all' ||
       (lineFilter === 'manual' ? Boolean(!effectiveLine && o.verified_by) :
-      (effectiveLine && effectiveLine.includes(lineFilter)));
+      isOrderMatchedToLine(o, lineFilter));
 
     const matchPayment = paymentFilter === 'all' || o.payment_method === paymentFilter;
 
@@ -2376,10 +2432,7 @@ export default function AdminDashboardPage() {
                   >
                     <option value="all" className="bg-slate-900 text-slate-100">📱 كافة الخطوط ({orders.length})</option>
                     {settings.vodafone_cash_numbers.map((num, idx) => {
-                      const count = orders.filter(o => {
-                        const line = getEffectiveConfirmedLine(o);
-                        return line && line.includes(num);
-                      }).length;
+                      const count = orders.filter(o => isOrderMatchedToLine(o, num)).length;
                       return (
                         <option key={idx} value={num} className="bg-slate-900 text-amber-300">
                           {settings.line_labels?.[num] || `خط ${idx + 1}`} ({num}) [{count}]
