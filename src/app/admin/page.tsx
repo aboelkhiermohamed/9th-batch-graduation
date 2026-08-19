@@ -59,7 +59,7 @@ import {
   X
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
-import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase, parseAttendeesAndCleanOpt } from '@/lib/supabaseClient';
+import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase, parseAttendeesAndCleanOpt, clearOrdersInSupabase, deleteOrderFromSupabase } from '@/lib/supabaseClient';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -932,19 +932,15 @@ export default function AdminDashboardPage() {
 
     try {
       setIsPurgingOrders(true);
-      const res = await fetch('/api/orders', { method: 'DELETE' });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setOrders([]);
-        setTransactions([]);
-        if (typeof window !== 'undefined' && window.localStorage) {
-          localStorage.removeItem('grad_store_orders');
-          localStorage.removeItem('grad_store_transactions');
-        }
-        alert('تم تصفير وحذف كافة الطلبات والمعاملات بنجاح من قاعدة البيانات 🧹');
-      } else {
-        alert(data.error || data.message || 'حدث خطأ أثناء تصفير الطلبات في قاعدة البيانات');
+      await fetch('/api/orders', { method: 'DELETE' });
+      await clearOrdersInSupabase();
+      setOrders([]);
+      setTransactions([]);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('grad_store_orders');
+        localStorage.removeItem('grad_store_transactions');
       }
+      alert('تم تصفير وحذف كافة الطلبات والمعاملات بنجاح من قاعدة البيانات 🧹');
     } catch (e: any) {
       alert('حدث خطأ أثناء الاتصال بالسيرفر لمسح البيانات');
     } finally {

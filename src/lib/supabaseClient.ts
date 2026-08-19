@@ -2,13 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 import { Product, Order, StoreSettings, IncomingTransaction, OrderItem, GatewayDevice } from '@/types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://gthedzjjumbxdaxmehqb.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0aGVkempqdW1ieGRheG1laHFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMTUxOTUsImV4cCI6MjA5NjY5MTE5NX0.0VLC7lmV6lIIiIjfzQuETbBc-vP3frJ8HZGONrYX7Pg';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0aGVkempqdW1ieGRheG1laHFiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTExNTE5NSwiZXhwIjoyMDk2NjkxMTk1fQ.mbDgzO8msuixs0zDHj_EuCYlr134ajLPa51rpW0RFqo';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-export const supabaseAdmin = supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
-  : supabase;
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
 
 export function parseAttendeesAndCleanOpt(custOpt?: string | null): { attendees?: any[]; cleanOpt?: string } {
   if (!custOpt) return { cleanOpt: undefined, attendees: undefined };
