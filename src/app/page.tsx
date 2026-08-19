@@ -1608,9 +1608,22 @@ export default function StoreFrontPage() {
 
       {/* --- FOOTER --- */}
       <footer className="mt-auto border-t border-slate-800/80 bg-slate-950 py-8 pb-24 md:pb-8">
-        <div className="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 space-y-2">
+        <div className="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 space-y-3">
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-slate-400 font-medium">
+            <a href="/about" className="hover:text-lime-400 transition flex items-center gap-1">
+              <span>عن المنصة والمنفّذ (Mohamed)</span>
+            </a>
+            <span className="text-slate-700">•</span>
+            <a href="/privacy" className="hover:text-lime-400 transition flex items-center gap-1">
+              <span>سياسة الخصوصية والشروط</span>
+            </a>
+            <span className="text-slate-700">•</span>
+            <a href="https://t.me/M7MED1573" target="_blank" rel="noopener noreferrer" className="hover:text-sky-400 transition text-sky-400 font-bold">
+              تليجرام: M7MED1573@
+            </a>
+          </div>
           <p>© 2026 {settings.store_name} - جميع الحقوق محفوظة للدفعة التاسعة.</p>
-          <p className="text-[11px] text-slate-600">نظام الدفع الفوري التلقائي المربوط ببوابة SMS & InstaPay</p>
+          <p className="text-[11px] text-slate-600">نظام المطابقة التلقائي المربوط ببوابة SMS & InstaPay | تنفيذ وتطوير Mohamed (M7MED)</p>
         </div>
       </footer>
 
