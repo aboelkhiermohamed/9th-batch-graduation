@@ -225,13 +225,16 @@ export default function CustomerProfilePage() {
 
           if (savedSess && savedSess.phone_number) {
             setCustomerSession(savedSess);
+            setFullNameInput(savedSess.full_name || '');
+            setEmailInput(savedSess.email || '');
+            setPhoneInput(savedSess.phone_number || '');
             return;
           }
 
-          let userPhone = gUser.phone || gUser.user_metadata?.phone || '';
-          let userFullName = gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google';
+          let userPhone = savedSess?.phone_number || gUser.phone || gUser.user_metadata?.phone || '';
+          let userFullName = savedSess?.full_name || gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google';
 
-          if (gUser.email) {
+          if (!userPhone && gUser.email) {
             try {
               const authRes = await fetch('/api/customer/auth', {
                 method: 'POST',

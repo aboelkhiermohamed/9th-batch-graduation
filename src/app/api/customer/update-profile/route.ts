@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, supabaseAdmin } from '@/lib/supabaseClient';
 import { isValidEgyptianPhone, normalizePhoneNumber } from '@/lib/smsParser';
 
 export async function PUT(req: Request) {
@@ -19,7 +19,9 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'رقم الموبايل غير صحيح! يجب أن يكون رقم موبايل مصري مكون من 11 رقماً يبدأ بـ (010, 011, 012, 015)' }, { status: 400 });
     }
 
-    if (supabase) {
+    const client = supabaseAdmin || supabase;
+
+    if (client) {
       try {
         const updatePayload: any = {
           full_name: cleanName,
@@ -29,23 +31,56 @@ export async function PUT(req: Request) {
           updatePayload.phone_number = targetPhone;
         }
 
-        let query = supabase.from('store_customers').update(updatePayload);
-        if (id) {
-          query = query.eq('id', id);
-        } else if (phone_number) {
-          query = query.eq('phone_number', phone_number.trim());
-        } else if (cleanEmail) {
-          query = query.eq('email', cleanEmail);
-        } else {
-          return NextResponse.json({ error: 'تعذر التعرف على الحساب المراد تحديثه' }, { status: 400 });
+        let updatedData: any = null;
+
+        if (cleanEmail) {
+          const { data } = await client
+            .from('store_customers')
+            .update(updatePayload)
+            .eq('email', cleanEmail)
+            .select('id, phone_number, full_name, email, created_at')
+            .maybeSingle();
+          if (data) updatedData = data;
         }
 
-        const { data, error } = await query.select('id, phone_number, full_name, email, created_at').single();
+        if (!updatedData && phone_number) {
+          const { data } = await client
+            .from('store_customers')
+            .update(updatePayload)
+            .eq('phone_number', phone_number.trim())
+            .select('id, phone_number, full_name, email, created_at')
+            .maybeSingle();
+          if (data) updatedData = data;
+        }
 
-        if (!error && data) {
+        if (!updatedData && id) {
+          const { data } = await client
+            .from('store_customers')
+            .update(updatePayload)
+            .eq('id', id)
+            .select('id, phone_number, full_name, email, created_at')
+            .maybeSingle();
+          if (data) updatedData = data;
+        }
+
+        // If no existing row found, insert new customer row
+        if (!updatedData) {
+          const { data: inserted } = await client
+            .from('store_customers')
+            .insert([{
+              phone_number: targetPhone || null,
+              full_name: cleanName,
+              email: cleanEmail || null
+            }])
+            .select('id, phone_number, full_name, email, created_at')
+            .maybeSingle();
+          if (inserted) updatedData = inserted;
+        }
+
+        if (updatedData) {
           return NextResponse.json({
             success: true,
-            customer: data,
+            customer: updatedData,
             message: 'تم تحديث البيانات الشخصية بنجاح'
           });
         }

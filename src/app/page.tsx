@@ -166,41 +166,55 @@ export default function StoreFrontPage() {
 
     if (window.location.hash && window.location.hash.includes('access_token=')) {
       if (supabase) {
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(async ({ data: { session } }) => {
           if (session?.user) {
             const gUser = session.user;
+            let userPhone = gUser.phone || gUser.user_metadata?.phone || '';
+            let userFullName = gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google';
+
+            // Check if customer already has a saved phone in localStorage or DB
+            const saved = localStorage.getItem('graduation_customer_session');
+            if (saved) {
+              try {
+                const parsed = JSON.parse(saved);
+                if (parsed.phone_number) userPhone = parsed.phone_number;
+                if (parsed.full_name) userFullName = parsed.full_name;
+              } catch (e) {}
+            }
+
+            if (!userPhone && gUser.email) {
+              try {
+                const authRes = await fetch('/api/customer/auth', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: gUser.email, full_name: userFullName })
+                });
+                if (authRes.ok) {
+                  const authData = await authRes.json();
+                  if (authData.customer && authData.customer.phone_number) {
+                    userPhone = authData.customer.phone_number;
+                    if (authData.customer.full_name) userFullName = authData.customer.full_name;
+                  }
+                }
+              } catch (e) {}
+            }
+
             const googleSess = {
               id: gUser.id,
-              full_name: gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google',
+              full_name: userFullName,
               email: gUser.email || '',
-              phone_number: gUser.phone || gUser.user_metadata?.phone || '',
+              phone_number: userPhone,
               created_at: gUser.created_at || new Date().toISOString()
             };
             localStorage.setItem('graduation_customer_session', JSON.stringify(googleSess));
+            setCustomerSession(googleSess);
+
+            // Clean hash from address bar
+            window.history.replaceState(null, '', window.location.pathname);
             router.push('/profile');
           }
         });
       }
-    }
-
-    if (supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          const gUser = session.user;
-          const googleSess = {
-            id: gUser.id,
-            full_name: gUser.user_metadata?.full_name || gUser.user_metadata?.name || gUser.email?.split('@')[0] || 'عميل Google',
-            email: gUser.email || '',
-            phone_number: gUser.phone || gUser.user_metadata?.phone || '',
-            created_at: gUser.created_at || new Date().toISOString()
-          };
-          localStorage.setItem('graduation_customer_session', JSON.stringify(googleSess));
-          router.push('/profile');
-        }
-      });
-      return () => {
-        subscription.unsubscribe();
-      };
     }
   }, [router]);
 
