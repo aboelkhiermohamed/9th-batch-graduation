@@ -725,6 +725,7 @@ export default function CheckoutPage() {
 
                 {/* Form Inputs */}
                 <form onSubmit={handlePlaceOrder} className="space-y-4 pt-2">
+                  {/* Customer Full Name */}
                   <div>
                     <label className="block text-xs font-bold text-slate-200 mb-1">
                       الاسم بالكامل <span className="text-rose-500">*</span>
@@ -732,43 +733,49 @@ export default function CheckoutPage() {
                     <input
                       type="text"
                       required
-                      placeholder="أدخل اسمك الثلاثي"
+                      placeholder="أدخل اسمك الثلاثي أو الرباعي لاستخدامه في التطريز والتسليم"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm"
+                      className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm"
                     />
                   </div>
 
+                  {/* Customer Account Phone Number */}
                   <div>
                     <label className="block text-xs font-bold text-slate-200 mb-1 flex items-center justify-between">
-                      <span>رقم موبايل العميل (الخاص بالحساب واستلام الطلب) <span className="text-rose-500">*</span></span>
-                      <span className="text-[10px] text-amber-400 font-semibold">ويرتبط بحسابك لمتابعة الطلب 🎓</span>
+                      <span>رقم موبايلك (الخاص بالحساب واستلام الطلب) <span className="text-rose-500">*</span></span>
+                      <span className="text-[10px] text-amber-400 font-semibold">يرتبط بحسابك لمتابعة الطلب والتسليم 🎓</span>
                     </label>
                     <input
                       type="tel"
                       required
-                      placeholder="010XXXXXXXX"
+                      placeholder="أدخل رقم موبايلك الشخصي (مثال: 01012345678)"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm font-mono"
+                      className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm font-mono"
                     />
                   </div>
 
-                  <div>
+                  {/* Sender Wallet Phone Number (Optional) */}
+                  <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-slate-200 mb-1 flex flex-wrap items-center justify-between gap-1">
-                      <span>رقم المحفظة المحوّل منها <span className="text-slate-400 font-normal">(في حالة تم التحويل من رقم آخر/صديق/والدك)</span></span>
+                      <span>رقم المحفظة المحوّل منها <span className="text-amber-400 font-normal">(أتركه فارغاً إذا كان نفس رقمك أعلاه)</span></span>
                       <span className="text-[10px] text-indigo-300 font-mono">Sender Wallet Phone</span>
                     </label>
                     <input
                       type="tel"
-                      placeholder="أدخل رقم المحفظة التي حولت منها (أو اتركه فارغاً إذا كان نفس رقمك)"
+                      placeholder="سيبه فارغ لو حولت من نفس رقمك، أو أدخل رقم المحفظة لو حولت من رقم والدك/صديقك"
                       value={senderPhone}
                       onChange={(e) => setSenderPhone(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm font-mono"
+                      className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm font-mono"
                     />
+                    <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                      💡 <strong className="text-amber-300">ملاحظة توضيحية:</strong> إذا قمت بالتحويل من محفظتك الشخصية (نفس رقم الموبايل المكتوب أعلاه)، <span className="text-emerald-400 font-bold">اترك هذا الحقل فارغاً</span>. أدخل رقماً هنا فقط إذا قمت بالتحويل من محفظة شخص آخر (مثل رقم والدك أو صديقك).
+                    </div>
                   </div>
 
-                  <div>
+                  {/* Transaction Ref / ID */}
+                  <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-slate-200 mb-1 flex flex-wrap items-center justify-between gap-1">
                       <span>الرقم المرجعي للمعاملة / رقم العملية <span className="text-rose-500 font-black">* (إجباري)</span></span>
                       <span className="text-[10px] text-amber-400 font-mono">Ref# / Transaction ID</span>
@@ -776,17 +783,20 @@ export default function CheckoutPage() {
                     <input
                       type="text"
                       required
-                      placeholder="أدخل الرقم المرجعي أو رقم العملية (مثال: Ref# 8554632e أو 123456789)"
+                      placeholder="أدخل الرقم المرجعي أو رقم العملية (مثال: 023452243574 أو Ref# 8554632e)"
                       value={transactionRef}
                       onChange={(e) => setTransactionRef(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-amber-500/60 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs sm:text-sm font-mono shadow-inner shadow-amber-500/5"
+                      className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-amber-500/60 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs sm:text-sm font-mono shadow-inner shadow-amber-500/5"
                     />
+                    <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                      📲 <strong className="text-amber-400">مكان الرقم المرجعي:</strong> هو الرقم المكون من أرقام/حروف والمكتوب في رسالة الـ SMS التي وصلتك من فودافون كاش أو إنستا باي فور إتمام التحويل.
+                    </div>
                   </div>
 
                   {/* Receipt Screenshot Upload */}
                   <div>
                     <label className="block text-xs font-bold text-slate-200 mb-1">
-                      رفع صورة إيصال التحويل / سكرين شوت الدفع 📸 <span className="text-slate-400 font-normal">(مستحسن لتأكيد فوري)</span>
+                      رفع صورة إيصال التحويل / سكرين شوت الدفع 📸 <span className="text-emerald-400 font-normal">(مستحسن للتأكيد الآلي الفوري)</span>
                     </label>
 
                     {receiptPreview ? (
@@ -796,7 +806,7 @@ export default function CheckoutPage() {
                           {isUploadingReceipt ? (
                             <p className="text-xs text-amber-400 font-bold animate-pulse">جاري رفع الإيصال لـ Supabase...</p>
                           ) : (
-                            <p className="text-xs text-emerald-400 font-bold">✅ تم مرفق صورة الإيصال جاهز للطلب</p>
+                            <p className="text-xs text-emerald-400 font-bold">✅ تم إرفاق صورة الإيصال بنجاح</p>
                           )}
                           <p className="text-[10px] text-slate-400 truncate">{receiptFile?.name}</p>
                         </div>
@@ -819,7 +829,7 @@ export default function CheckoutPage() {
                         <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-amber-400">
                           <Upload className="w-5 h-5" />
                         </div>
-                        <span className="text-xs text-slate-300 font-medium">اضغط لرفع صورة إيصال التحويل (معاينة فورية)</span>
+                        <span className="text-xs text-slate-300 font-medium">اضغط هنا لرفع صورة إيصال التحويل أو سكرين شوت الرسالة (معاينة فورية)</span>
                         <span className="text-[10px] text-slate-500">يقبل الصور بصيغة JPG, PNG</span>
                       </label>
                     )}
