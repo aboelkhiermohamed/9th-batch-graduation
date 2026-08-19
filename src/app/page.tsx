@@ -822,15 +822,15 @@ export default function StoreFrontPage() {
                       )}
                     </div>
 
-                    {/* Add to Cart Action */}
+                    {/* View Details Action */}
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => handleAddToCartDirect(product)}
-                        className="flex-1 py-3 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-95"
+                        onClick={() => handleOpenProductModal(product)}
+                        className="flex-1 py-3 px-4 rounded-xl gradient-purple-btn text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-95 transition-all hover:opacity-95"
                       >
-                        <Plus className="w-4 h-4" />
-                        <span>إضافة للسلة</span>
+                        <Eye className="w-4 h-4 text-amber-400" />
+                        <span>عرض تفاصيل المنتج</span>
                       </button>
                       <button
                         type="button"
