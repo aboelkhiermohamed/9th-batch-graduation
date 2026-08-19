@@ -662,14 +662,17 @@ export default function CustomerProfilePage() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm('هل أنت تأكد من تسجيل الخروج من حسابك؟')) {
       localStorage.removeItem('graduation_customer_session');
       localStorage.removeItem('graduation_profile_dismissed');
       if (supabase) {
-        supabase.auth.signOut();
+        try {
+          await supabase.auth.signOut();
+        } catch (e) {}
       }
       setCustomerSession(null);
+      setIsCompleteProfileOpen(false);
       router.push('/');
     }
   };

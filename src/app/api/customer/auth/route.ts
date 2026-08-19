@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, supabaseAdmin } from '@/lib/supabaseClient';
 
 export async function POST(req: Request) {
   try {
@@ -13,73 +13,92 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'يرجى إدخال رقم الموبايل أو البريد الإلكتروني' }, { status: 400 });
     }
 
-    if (supabase) {
+    const client = supabaseAdmin || supabase;
+
+    if (client) {
       try {
         if (cleanEmail) {
-          const { data: existingEmail } = await supabase
+          const { data: existingEmail } = await client
             .from('store_customers')
             .select('*')
             .eq('email', cleanEmail)
-            .single();
+            .maybeSingle();
 
           if (existingEmail) {
-            return NextResponse.json({
-              success: true,
-              customer: {
-                id: existingEmail.id,
-                phone_number: existingEmail.phone_number,
-                full_name: existingEmail.full_name,
-                email: existingEmail.email,
-                created_at: existingEmail.created_at
+            let needsUpdate = false;
+            const updatePayload: any = {};
+            if (cleanPhone && existingEmail.phone_number !== cleanPhone) {
+              updatePayload.phone_number = cleanPhone;
+              needsUpdate = true;
+            }
+            if (cleanName && existingEmail.full_name !== cleanName && cleanName !== 'عميل Google') {
+              updatePayload.full_name = cleanName;
+              needsUpdate = true;
+            }
+
+            if (needsUpdate) {
+              const { data: updated } = await client
+                .from('store_customers')
+                .update(updatePayload)
+                .eq('id', existingEmail.id)
+                .select()
+                .maybeSingle();
+              if (updated) {
+                return NextResponse.json({ success: true, customer: updated });
               }
-            });
+            }
+
+            return NextResponse.json({ success: true, customer: existingEmail });
           }
         }
 
         if (cleanPhone) {
-          const { data: existingPhone } = await supabase
+          const { data: existingPhone } = await client
             .from('store_customers')
             .select('*')
             .eq('phone_number', cleanPhone)
-            .single();
+            .maybeSingle();
 
           if (existingPhone) {
-            return NextResponse.json({
-              success: true,
-              customer: {
-                id: existingPhone.id,
-                phone_number: existingPhone.phone_number,
-                full_name: existingPhone.full_name,
-                email: existingPhone.email,
-                created_at: existingPhone.created_at
+            let needsUpdate = false;
+            const updatePayload: any = {};
+            if (cleanEmail && existingPhone.email !== cleanEmail) {
+              updatePayload.email = cleanEmail;
+              needsUpdate = true;
+            }
+            if (cleanName && existingPhone.full_name !== cleanName && cleanName !== 'عميل Google') {
+              updatePayload.full_name = cleanName;
+              needsUpdate = true;
+            }
+
+            if (needsUpdate) {
+              const { data: updated } = await client
+                .from('store_customers')
+                .update(updatePayload)
+                .eq('id', existingPhone.id)
+                .select()
+                .maybeSingle();
+              if (updated) {
+                return NextResponse.json({ success: true, customer: updated });
               }
-            });
+            }
+
+            return NextResponse.json({ success: true, customer: existingPhone });
           }
         }
 
-        if (cleanName && cleanPhone) {
-          const { data: inserted } = await supabase
-            .from('store_customers')
-            .insert([{
-              phone_number: cleanPhone,
-              full_name: cleanName,
-              email: cleanEmail || null
-            }])
-            .select()
-            .single();
+        const { data: inserted } = await client
+          .from('store_customers')
+          .insert([{
+            phone_number: cleanPhone || null,
+            full_name: cleanName || (cleanEmail ? cleanEmail.split('@')[0] : 'عميل المتجر'),
+            email: cleanEmail || null
+          }])
+          .select()
+          .single();
 
-          if (inserted) {
-            return NextResponse.json({
-              success: true,
-              customer: {
-                id: inserted.id,
-                phone_number: inserted.phone_number,
-                full_name: inserted.full_name,
-                email: inserted.email,
-                created_at: inserted.created_at
-              }
-            });
-          }
+        if (inserted) {
+          return NextResponse.json({ success: true, customer: inserted });
         }
       } catch (err: any) {
         console.warn('Supabase store_customers auth check error:', err.message);
