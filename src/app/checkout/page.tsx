@@ -759,18 +759,18 @@ export default function CheckoutPage() {
                   {/* Sender Wallet Phone Number (Optional) */}
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-slate-200 mb-1 flex flex-wrap items-center justify-between gap-1">
-                      <span>رقم المحفظة المحوّل منها <span className="text-amber-400 font-normal">(أتركه فارغاً إذا كان نفس رقمك أعلاه)</span></span>
+                      <span>رقم المحفظة المحوّل منها <span className="text-slate-400 font-normal">(في حالة التحويل من رقم آخر/والدك/صديقك)</span></span>
                       <span className="text-[10px] text-indigo-300 font-mono">Sender Wallet Phone</span>
                     </label>
                     <input
                       type="tel"
-                      placeholder="سيبه فارغ لو حولت من نفس رقمك، أو أدخل رقم المحفظة لو حولت من رقم والدك/صديقك"
+                      placeholder="أدخل رقم المحفظة في حالة التحويل من رقم مختلف عن رقمك"
                       value={senderPhone}
                       onChange={(e) => setSenderPhone(e.target.value)}
                       className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs sm:text-sm font-mono"
                     />
                     <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
-                      💡 <strong className="text-amber-300">ملاحظة توضيحية:</strong> إذا قمت بالتحويل من محفظتك الشخصية (نفس رقم الموبايل المكتوب أعلاه)، <span className="text-emerald-400 font-bold">اترك هذا الحقل فارغاً</span>. أدخل رقماً هنا فقط إذا قمت بالتحويل من محفظة شخص آخر (مثل رقم والدك أو صديقك).
+                      💡 <strong className="text-amber-300">ملاحظة توضيحية:</strong> يُكتب رقم المحفظة هنا فقط إذا قمت بالتحويل من محفظة شخص آخر (مثل رقم والدك أو صديقك).
                     </div>
                   </div>
 
