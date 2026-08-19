@@ -336,22 +336,38 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
-  // Periodic polling to keep orders list live updated (every 8 seconds)
+  // Periodic polling to keep orders & transactions list live updated (every 8 seconds)
   useEffect(() => {
     let interval: any;
     if (isAuthenticated) {
       interval = setInterval(() => {
-        fetchOrdersFromSupabase().then(res => {
-          if (res && res.length > 0) setOrders(res);
+        Promise.all([
+          fetchOrdersFromSupabase(),
+          fetch('/api/sms', { cache: 'no-store' }).then(r => r.ok ? r.json() : [])
+        ]).then(([ordRes, txRes]) => {
+          if (ordRes && ordRes.length > 0) setOrders(ordRes);
+          if (txRes && Array.isArray(txRes) && txRes.length > 0) setTransactions(txRes);
         });
       }, 8000);
     }
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
-  // Helper to resolve matched transaction for an order
+  // Helper to resolve matched transaction for an order (via ID or Ref#)
   const findMatchedTx = (o: Order) => {
-    return transactions.find(t => t.matched_order_id === o.id || (o.matched_transaction_id && t.id === o.matched_transaction_id));
+    const oRef = (o.transaction_ref || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    return transactions.find(t => {
+      if (t.matched_order_id === o.id || (o.matched_transaction_id && t.id === o.matched_transaction_id)) return true;
+      if (oRef && oRef.length >= 4) {
+        const tRef = (t.transaction_ref || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (tRef && (tRef === oRef || tRef.includes(oRef) || oRef.includes(tRef))) return true;
+        if (t.raw_sms) {
+          const rawClean = t.raw_sms.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (rawClean.includes(oRef)) return true;
+        }
+      }
+      return false;
+    });
   };
 
   // Dynamic helper to resolve confirmed line even for legacy/past matched orders

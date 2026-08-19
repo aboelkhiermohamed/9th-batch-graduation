@@ -910,7 +910,7 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
   try {
     const [{ data: dbOrders, error }, { data: dbTxs }] = await Promise.all([
       supabase.from('store_orders').select('*, store_order_items(*)').order('created_at', { ascending: false }),
-      supabase.from('store_transactions').select('matched_order_id, amount').not('matched_order_id', 'is', null)
+      supabase.from('store_transactions').select('*')
     ]);
 
     if (error) {
@@ -970,6 +970,33 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         if (match && match[1]) {
           confirmedLine = match[1];
           rawNotes = rawNotes.replace(/\[CONFIRMED_LINE:.*?\]/, '').trim();
+        }
+      }
+
+      if (!confirmedLine && dbTxs && Array.isArray(dbTxs)) {
+        const oRef = (o.transaction_ref || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const tx = dbTxs.find((t: any) => {
+          if (t.matched_order_id === o.id || (o.matched_transaction_id && t.id === o.matched_transaction_id)) return true;
+          if (oRef && oRef.length >= 4) {
+            const tRef = (t.transaction_ref || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (tRef && (tRef === oRef || tRef.includes(oRef) || oRef.includes(tRef))) return true;
+            if (t.raw_sms) {
+              const rawClean = t.raw_sms.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (rawClean.includes(oRef)) return true;
+            }
+          }
+          return false;
+        });
+
+        if (tx) {
+          if (tx.recipient_phone) {
+            confirmedLine = tx.recipient_phone;
+          } else if (tx.raw_sms) {
+            const match = tx.raw_sms.match(/(?:على رقم محفظتك|على محفظتك|محفظة|إلى رقم|إلى|خط)\s*(?:20)?(01[0125]\d{8})/i);
+            if (match && match[1]) confirmedLine = match[1];
+          }
+          if (!matchedDevName && tx.device_name) matchedDevName = tx.device_name;
+          if (!matchedDevId && tx.device_id) matchedDevId = tx.device_id;
         }
       }
 
