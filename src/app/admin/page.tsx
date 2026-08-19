@@ -129,6 +129,8 @@ export default function AdminDashboardPage() {
 
   // Full Order Details & SMS Modal State
   const [selectedOrderModal, setSelectedOrderModal] = useState<Order | null>(null);
+  const [selectedSmsModal, setSelectedSmsModal] = useState<IncomingTransaction | null>(null);
+  const [smsCopied, setSmsCopied] = useState(false);
 
   // Order Items Editing Modal State
   const [isEditOrderModalOpen, setIsEditOrderModalOpen] = useState(false);
@@ -4251,7 +4253,7 @@ export default function AdminDashboardPage() {
                       const isMatched = tx.status === 'matched' || Boolean(matchedOrder);
 
                       return (
-                        <tr key={tx.id} className="hover:bg-slate-800/40">
+                        <tr key={tx.id} className="hover:bg-slate-800/40 transition">
                           <td className="p-4 text-slate-400">
                             {new Date(tx.received_at).toLocaleString('ar-EG')}
                           </td>
@@ -4264,8 +4266,19 @@ export default function AdminDashboardPage() {
                           <td className="p-4 text-slate-300">
                             {tx.sender_phone || 'غير محدد'}
                           </td>
-                          <td className="p-4 text-[11px] text-slate-400 max-w-xs truncate font-sans">
-                            {tx.raw_sms}
+                          <td 
+                            onClick={() => setSelectedSmsModal(tx)}
+                            className="p-4 text-[11px] text-slate-300 font-sans cursor-pointer hover:bg-slate-800/80 transition rounded-xl group max-w-xs"
+                            title="اضغط لمعاينة نص الرسالة كاملاً 👁️"
+                          >
+                            <div className="flex items-center gap-1.5 justify-between">
+                              <span className="truncate max-w-[220px] text-slate-300 group-hover:text-amber-300 transition">
+                                {tx.raw_sms}
+                              </span>
+                              <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20 whitespace-nowrap font-sans font-bold group-hover:bg-amber-500/30 flex-shrink-0">
+                                عرض الرسالة بالكامل 👁️
+                              </span>
+                            </div>
                           </td>
                           <td className="p-4 font-sans">
                             {isMatched ? (
@@ -6221,6 +6234,84 @@ export default function AdminDashboardPage() {
                 className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition"
               >
                 إغلاق النافذة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* --- FULL SMS DETAILS POPUP MODAL --- */}
+      {selectedSmsModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 flex items-center justify-center">
+          <div className="relative w-full max-w-2xl glass-modal rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-700 space-y-6 text-right">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold">
+                  <MessageSquare className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">تفاصيل رسالة الـ SMS الواردة بالكامل 📩</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    تاريخ ووقت الوصول: {new Date(selectedSmsModal.received_at).toLocaleString('ar-EG')}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedSmsModal(null)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Quick Meta Info */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-0.5">
+                <span className="text-slate-400 text-[11px]">المبلغ المستخرج:</span>
+                <p className="font-mono font-bold text-amber-400 text-base">{selectedSmsModal.amount} EGP</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-0.5">
+                <span className="text-slate-400 text-[11px]">رقم المحفظة / الراسل:</span>
+                <p className="font-mono font-bold text-white text-sm">{selectedSmsModal.sender_phone || 'غير محدد'}</p>
+              </div>
+              <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 space-y-0.5 col-span-2 sm:col-span-1">
+                <span className="text-slate-400 text-[11px]">طريقة الدفع:</span>
+                <p className="font-bold text-emerald-400 text-sm">{selectedSmsModal.payment_method}</p>
+              </div>
+            </div>
+
+            {/* Full Raw SMS Text Block */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300">نص الرسالة الخام بالكامل (Raw SMS):</span>
+                <button
+                  onClick={() => {
+                    if (selectedSmsModal.raw_sms) {
+                      navigator.clipboard.writeText(selectedSmsModal.raw_sms);
+                      setSmsCopied(true);
+                      setTimeout(() => setSmsCopied(false), 2000);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold border border-slate-700 transition cursor-pointer"
+                >
+                  {smsCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{smsCopied ? 'تم نسخ النص! ✓' : 'نسخ الرسالة 📋'}</span>
+                </button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-amber-200 text-xs font-mono leading-relaxed whitespace-pre-wrap select-all shadow-inner border-amber-500/20">
+                {selectedSmsModal.raw_sms}
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setSelectedSmsModal(null)}
+                className="px-6 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition"
+              >
+                إغلاق النافذة ✖
               </button>
             </div>
           </div>
