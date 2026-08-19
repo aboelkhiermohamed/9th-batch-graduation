@@ -6,7 +6,9 @@ import {
   saveOrderToSupabase, 
   fetchOrdersFromSupabase, 
   updateOrderStatusInSupabase,
-  fetchSettingsFromSupabase
+  fetchSettingsFromSupabase,
+  clearOrdersInSupabase,
+  deleteOrderFromSupabase
 } from '@/lib/supabaseClient';
 import { matchOrderWithUnmatchedTransactions } from '@/lib/matchingEngine';
 import { isValidEgyptianPhone, normalizePhoneNumber } from '@/lib/smsParser';
@@ -203,4 +205,32 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const orderId = searchParams.get('id');
+
+    if (orderId) {
+      const success = await deleteOrderFromSupabase(orderId);
+      return NextResponse.json({
+        success,
+        message: success ? 'تم حذف الطلب بنجاح 🗑️' : 'فشل حذف الطلب من قاعدة البيانات'
+      });
+    }
+
+    const success = await clearOrdersInSupabase();
+    return NextResponse.json({
+      success,
+      message: success ? 'تم تصفير وحذف كافة الطلبات والمعاملات بنجاح من قاعدة البيانات 🧹' : 'حدث خطأ أثناء تصفير الطلبات'
+    });
+  } catch (err: any) {
+    console.error('Error in DELETE /api/orders:', err);
+    return NextResponse.json(
+      { error: 'فشل عملية الحذف', message: err.message },
+      { status: 500 }
+    );
+  }
+}
+
 

@@ -101,6 +101,8 @@ export default function AdminDashboardPage() {
   const [transactions, setTransactions] = useState<IncomingTransaction[]>([]);
   const [devices, setDevices] = useState<GatewayDevice[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPurgingOrders, setIsPurgingOrders] = useState(false);
+  const [isDeletingOrder, setIsDeletingOrder] = useState<string | null>(null);
 
   // Admin Users Management Form State
   const [isAddAdminOpen, setIsAddAdminOpen] = useState(false);
@@ -921,7 +923,7 @@ export default function AdminDashboardPage() {
   };
 
   const handlePurgeOrdersData = async () => {
-    if (!window.confirm('⚠️ تحذير عاجل: هل أنت متأكد من تصفير ومسح الطلبات والاختبارات الحالية؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+    if (!window.confirm('⚠️ تحذير عاجل: هل أنت متأكد من تصفير ومسح كافة الطلبات والمعاملات من قاعدة البيانات نهائياً؟ لا يمكن التراجع عن هذا الإجراء.')) return;
     const confirmName = window.prompt('اكتب كلمة "CONFIRM" لتأكيد تصفير البيانات:');
     if (confirmName !== 'CONFIRM') {
       alert('تم إلغاء العملية');
@@ -929,10 +931,46 @@ export default function AdminDashboardPage() {
     }
 
     try {
-      setOrders([]);
-      alert('تم تصفير وحذف الطلبات بنجاح 🧹');
+      setIsPurgingOrders(true);
+      const res = await fetch('/api/orders', { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setOrders([]);
+        setTransactions([]);
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.removeItem('grad_store_orders');
+          localStorage.removeItem('grad_store_transactions');
+        }
+        alert('تم تصفير وحذف كافة الطلبات والمعاملات بنجاح من قاعدة البيانات 🧹');
+      } else {
+        alert(data.error || data.message || 'حدث خطأ أثناء تصفير الطلبات في قاعدة البيانات');
+      }
     } catch (e: any) {
-      alert('حدث خطأ أثناء مسح البيانات');
+      alert('حدث خطأ أثناء الاتصال بالسيرفر لمسح البيانات');
+    } finally {
+      setIsPurgingOrders(false);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا الطلب نهائياً من قاعدة البيانات؟')) return;
+    try {
+      setIsDeletingOrder(orderId);
+      const res = await fetch(`/api/orders?id=${encodeURIComponent(orderId)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setOrders(prev => prev.filter(o => o.id !== orderId));
+        if (selectedOrderModal?.id === orderId) {
+          setSelectedOrderModal(null);
+        }
+        alert('تم حذف الطلب بنجاح 🗑️');
+      } else {
+        alert(data.error || data.message || 'فشل حذف الطلب');
+      }
+    } catch (e: any) {
+      alert('حدث خطأ أثناء الاتصال بالسيرفر لحذف الطلب');
+    } finally {
+      setIsDeletingOrder(null);
     }
   };
 
@@ -3941,10 +3979,15 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={handlePurgeOrdersData}
-                  className="px-4 py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 text-xs font-bold flex items-center gap-1.5 transition active:scale-95 flex-shrink-0"
+                  disabled={isPurgingOrders}
+                  className="px-4 py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/40 text-xs font-bold flex items-center gap-1.5 transition active:scale-95 flex-shrink-0 disabled:opacity-50"
                 >
-                  <Trash2 className="w-4 h-4" />
-                  <span>تصفير الطلبات 🧹</span>
+                  {isPurgingOrders ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  <span>{isPurgingOrders ? 'جاري تصفير الطلبات...' : 'تصفير الطلبات 🧹'}</span>
                 </button>
               </div>
             </div>
@@ -5699,9 +5742,20 @@ export default function AdminDashboardPage() {
                     handleUpdateOrderStatus(selectedOrderModal.id, 'cancelled');
                     setSelectedOrderModal(null);
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-rose-600/30 hover:bg-rose-600 text-rose-300 hover:text-white font-bold text-xs border border-rose-500/30 transition"
+                  className="px-3 py-1.5 rounded-xl bg-amber-600/30 hover:bg-amber-600 text-amber-300 hover:text-white font-bold text-xs border border-amber-500/30 transition"
                 >
                   إلغاء الطلب ❌
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteOrder(selectedOrderModal.id)}
+                  disabled={isDeletingOrder === selectedOrderModal.id}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-600 text-rose-400 hover:text-white font-bold text-xs border border-rose-500/40 transition flex items-center gap-1 disabled:opacity-50"
+                  title="حذف هذا الطلب نهائياً من قاعدة البيانات"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isDeletingOrder === selectedOrderModal.id ? 'جاري الحذف...' : 'حذف نهائي 🗑️'}</span>
                 </button>
               </div>
 

@@ -1697,5 +1697,41 @@ export function setMemoryDevices(devs: GatewayDevice[]) {
   syncLocalCache();
 }
 
+export async function clearOrdersInSupabase(): Promise<boolean> {
+  setMemoryOrders([]);
+  setMemoryTransactions([]);
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      localStorage.removeItem('grad_store_orders');
+      localStorage.removeItem('grad_store_transactions');
+    } catch (e) {}
+  }
+  try {
+    const client = supabaseAdmin || supabase;
+    await client.from('store_order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await client.from('store_orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await client.from('store_transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    return true;
+  } catch (err) {
+    console.error('Error purging orders in Supabase:', err);
+    return false;
+  }
+}
+
+export async function deleteOrderFromSupabase(orderId: string): Promise<boolean> {
+  const currentMem = getMemoryOrders();
+  setMemoryOrders(currentMem.filter(o => o.id !== orderId));
+  try {
+    const client = supabaseAdmin || supabase;
+    await client.from('store_order_items').delete().eq('order_id', orderId);
+    await client.from('store_orders').delete().eq('id', orderId);
+    return true;
+  } catch (err) {
+    console.error('Error deleting single order in Supabase:', err);
+    return false;
+  }
+}
+
+
 
 
