@@ -1121,14 +1121,21 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
       let effectivePaid = Math.max(paidAmount !== undefined ? paidAmount : 0, matchedTxSum);
       let finalStatus = o.status;
 
-      // Auto-reconcile: If paidAmount or matchedTxSum covers total_amount (allowing 5 EGP tolerance), clear pending difference
-      if (effectivePaid >= (orderTotal - 5) && orderTotal > 0) {
+      // Auto-reconcile: If paidAmount or matchedTxSum fully covers total_amount, clear pending difference
+      if (effectivePaid >= (orderTotal - 0.01) && orderTotal > 0) {
         isDiffPending = false;
         differenceAmount = 0;
         effectivePaid = Math.max(orderTotal, effectivePaid);
         paidAmount = effectivePaid;
         if (finalStatus === 'pending_difference' || finalStatus === 'pending') {
           finalStatus = 'auto_verified';
+        }
+      } else if (effectivePaid < (orderTotal - 0.01) && orderTotal > 0 && effectivePaid > 0) {
+        isDiffPending = true;
+        differenceAmount = Math.max(0, orderTotal - effectivePaid);
+        paidAmount = effectivePaid;
+        if (finalStatus === 'auto_verified' || finalStatus === 'pending') {
+          finalStatus = 'pending_difference';
         }
       }
 

@@ -126,8 +126,8 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
     const newPaidAmount = Math.max(prevPaid + Number(tx.amount || 0), sumTxsAmount);
     const totalOrderAmount = Number(matchedOrder.total_amount || 0);
 
-    // Determine if payment is complete (allow up to 5 EGP tolerance below total_amount for minor cash fees/rounding)
-    const isFullyPaid = newPaidAmount >= (totalOrderAmount - 5);
+    // Determine if payment is complete (must cover exact total_amount)
+    const isFullyPaid = newPaidAmount >= (totalOrderAmount - 0.01);
     const newStatus: OrderStatus = isFullyPaid ? 'auto_verified' : 'pending_difference';
     const remainingDiff = isFullyPaid ? 0 : Math.max(0, totalOrderAmount - newPaidAmount);
     const isDiffPending = !isFullyPaid;
@@ -276,7 +276,7 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
       const sumTxsAmount = orderMatchedTxs.reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
       const paidAmount = Math.max(prevPaid + Number(matchedTx.amount || 0), sumTxsAmount);
-      const isFullyPaid = paidAmount >= (orderTotal - 5);
+      const isFullyPaid = paidAmount >= (orderTotal - 0.01);
       const newStatus: OrderStatus = isFullyPaid ? 'auto_verified' : 'pending_difference';
       const remainingDiff = isFullyPaid ? 0 : Math.max(0, orderTotal - paidAmount);
 
