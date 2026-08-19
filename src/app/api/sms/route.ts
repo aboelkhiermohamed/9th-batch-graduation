@@ -57,7 +57,21 @@ export async function POST(req: NextRequest) {
 
     const sender = body.sender || body.from || body.address || 'Vodafone';
     const messageText = body.message || body.rawMessage || body.text || body.body || body.sms || '';
-    const receivedAt = body.receivedAt || body.timestamp || new Date().toISOString();
+    let receivedAt = new Date().toISOString();
+    if (body.receivedAt || body.timestamp) {
+      const rawTime = body.receivedAt || body.timestamp;
+      if (typeof rawTime === 'number') {
+        const d = new Date(rawTime < 1e11 ? rawTime * 1000 : rawTime);
+        if (!isNaN(d.getTime()) && d.getFullYear() >= 2024) receivedAt = d.toISOString();
+      } else if (typeof rawTime === 'string' && /^\d+$/.test(rawTime.trim())) {
+        const num = Number(rawTime.trim());
+        const d = new Date(num < 1e11 ? num * 1000 : num);
+        if (!isNaN(d.getTime()) && d.getFullYear() >= 2024) receivedAt = d.toISOString();
+      } else if (typeof rawTime === 'string') {
+        const d = new Date(rawTime);
+        if (!isNaN(d.getTime()) && d.getFullYear() >= 2024) receivedAt = d.toISOString();
+      }
+    }
 
     const headerDevId = req.headers.get('x-device-id') || req.headers.get('X-Device-Id');
     const devId = headerDevId || body.deviceId || body.device_id || body.androidId || ((body.phone_number || body.phone) ? 'dev-' + (body.phone_number || body.phone).replace(/[^0-9]/g, '') : 'dev-android-gateway');

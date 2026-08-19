@@ -76,6 +76,38 @@ function formatUsername(userStr?: string): string {
   return clean.startsWith('@') ? clean : `@${clean}`;
 }
 
+function formatEgyptDateTime(dateStr: string | Date | number | undefined): string {
+  if (!dateStr) return '—';
+  try {
+    let d: Date;
+    if (typeof dateStr === 'number') {
+      d = new Date(dateStr < 1e11 ? dateStr * 1000 : dateStr);
+    } else if (typeof dateStr === 'string' && /^\d+$/.test(dateStr.trim())) {
+      const num = Number(dateStr.trim());
+      d = new Date(num < 1e11 ? num * 1000 : num);
+    } else {
+      d = new Date(dateStr);
+    }
+
+    if (isNaN(d.getTime()) || d.getFullYear() < 2024) {
+      d = new Date();
+    }
+
+    return d.toLocaleString('ar-EG', {
+      timeZone: 'Africa/Cairo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  } catch (e) {
+    return '—';
+  }
+}
+
 export default function AdminDashboardPage() {
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -4254,8 +4286,8 @@ export default function AdminDashboardPage() {
 
                       return (
                         <tr key={tx.id} className="hover:bg-slate-800/40 transition">
-                          <td className="p-4 text-slate-400">
-                            {new Date(tx.received_at).toLocaleString('ar-EG')}
+                          <td className="p-4 text-slate-400 font-mono text-[11px]">
+                            {formatEgyptDateTime(tx.received_at)}
                           </td>
                           <td className="p-4 font-sans font-bold text-white">
                             {tx.payment_method}
@@ -5318,7 +5350,7 @@ export default function AdminDashboardPage() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    تاريخ التسجيل: {new Date(selectedOrderModal.created_at).toLocaleString('ar-EG')}
+                    تاريخ التسجيل: {formatEgyptDateTime(selectedOrderModal.created_at)}
                   </p>
                 </div>
               </div>
@@ -5716,7 +5748,7 @@ export default function AdminDashboardPage() {
                             <option value="">اختر رسالة SMS غير مطابقة لربطها...</option>
                             {transactions.filter(t => t.status === 'unmatched').map(t => (
                               <option key={t.id} value={t.id}>
-                                {new Date(t.received_at).toLocaleTimeString('ar-EG')} - {t.amount} ج.م - {t.raw_sms.slice(0, 45)}...
+                                {formatEgyptDateTime(t.received_at)} - {t.amount} ج.م - {t.raw_sms.slice(0, 45)}...
                               </option>
                             ))}
                           </select>
@@ -6252,7 +6284,7 @@ export default function AdminDashboardPage() {
                 <div>
                   <h3 className="text-lg font-bold text-white">تفاصيل رسالة الـ SMS الواردة بالكامل 📩</h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    تاريخ ووقت الوصول: {new Date(selectedSmsModal.received_at).toLocaleString('ar-EG')}
+                    تاريخ ووقت الوصول: {formatEgyptDateTime(selectedSmsModal.received_at)}
                   </p>
                 </div>
               </div>
