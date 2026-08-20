@@ -2794,7 +2794,7 @@ export default function AdminDashboardPage() {
                                 <span>مؤكد يدوياً</span>
                               </span>
                               <p className="text-[10px] text-slate-400 font-mono">
-                                بواسطة {(order.verified_by && order.verified_by !== 'أدمن المتجر') ? order.verified_by : (currentAdmin?.display_name || 'محمد ابو الخير')}
+                                بواسطة {order.verified_by || 'أدمن المتجر'}
                               </p>
                             </div>
                           )}
@@ -5812,7 +5812,7 @@ export default function AdminDashboardPage() {
                     <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 space-y-2">
                       <div className="flex items-center gap-2 text-cyan-300 text-xs font-bold">
                         <UserCheck className="w-4 h-4 text-cyan-400" />
-                        <span>تم تأكيد هذا الطلب يدوياً بواسطة: <strong className="text-white underline">{(selectedOrderModal.verified_by && selectedOrderModal.verified_by !== 'أدمن المتجر') ? selectedOrderModal.verified_by : (currentAdmin?.display_name || 'محمد ابو الخير')}</strong></span>
+                        <span>تم تأكيد هذا الطلب يدوياً بواسطة: <strong className="text-white underline">{selectedOrderModal.verified_by || 'أدمن المتجر'}</strong></span>
                       </div>
 
                       {/* Option to manually associate an unmatched transaction */}
