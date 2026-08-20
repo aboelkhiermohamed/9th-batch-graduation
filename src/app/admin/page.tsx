@@ -5584,7 +5584,9 @@ export default function AdminDashboardPage() {
                   </p>
                   {(() => {
                     const matchedTx = findMatchedTransaction(selectedOrderModal);
-                    const paid = Number(selectedOrderModal.paid_amount || matchedTx?.amount || 0);
+                    const matchedTxsForModal = transactions.filter(t => t.matched_order_id === selectedOrderModal.id || t.id === selectedOrderModal.matched_transaction_id);
+                    const matchedTxsSum = matchedTxsForModal.reduce((s, t) => s + Number(t.amount || 0), 0);
+                    const paid = matchedTxsSum > 0 ? matchedTxsSum : (matchedTx ? Number(matchedTx.amount || 0) : Number(selectedOrderModal.paid_amount || 0));
                     const total = Number(selectedOrderModal.total_amount || 0);
                     const excess = paid - total;
 

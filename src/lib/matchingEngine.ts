@@ -122,13 +122,13 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
     }
     if (!confirmedLine) confirmedLine = tx.device_name || undefined;
     
-    // Accumulate total paid amount for this order from all matched transactions
+    // Accumulate total paid amount for this order from all matched transactions without double counting
     const allTxs = await fetchTransactionsFromSupabase();
-    const orderMatchedTxs = allTxs.filter(t => t.matched_order_id === matchedOrder!.id || t.id === tx.id);
-    const sumTxsAmount = orderMatchedTxs.reduce((acc, t) => acc + Number(t.amount || 0), 0);
+    const orderMatchedTxsMap = new Map<string, IncomingTransaction>();
+    allTxs.filter(t => t.matched_order_id === matchedOrder!.id || t.id === tx.id).forEach(t => orderMatchedTxsMap.set(t.id, t));
+    const sumTxsAmount = Array.from(orderMatchedTxsMap.values()).reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
-    const prevPaid = Number(matchedOrder.paid_amount || 0);
-    const newPaidAmount = Math.max(prevPaid + Number(tx.amount || 0), sumTxsAmount);
+    const newPaidAmount = Math.max(sumTxsAmount, Number(tx.amount || 0));
     const totalOrderAmount = Number(matchedOrder.total_amount || 0);
 
     // Determine if payment is complete (must cover exact total_amount)
@@ -280,12 +280,13 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
       const orderTotal = Number(newOrder.total_amount || 0);
       const prevPaid = Number(newOrder.paid_amount || 0);
 
-      // Sum all transactions matched to this order plus newly matchedTx
+      // Sum all transactions matched to this order plus newly matchedTx without double counting
       const allTxs = await fetchTransactionsFromSupabase();
-      const orderMatchedTxs = allTxs.filter(t => t.matched_order_id === newOrder.id || t.id === matchedTx!.id);
-      const sumTxsAmount = orderMatchedTxs.reduce((acc, t) => acc + Number(t.amount || 0), 0);
+      const orderMatchedTxsMap = new Map<string, IncomingTransaction>();
+      allTxs.filter(t => t.matched_order_id === newOrder.id || t.id === matchedTx!.id).forEach(t => orderMatchedTxsMap.set(t.id, t));
+      const sumTxsAmount = Array.from(orderMatchedTxsMap.values()).reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
-      const paidAmount = Math.max(prevPaid + Number(matchedTx.amount || 0), sumTxsAmount);
+      const paidAmount = Math.max(sumTxsAmount, Number(matchedTx.amount || 0));
       const isFullyPaid = paidAmount >= (orderTotal - 0.01);
       const newStatus: OrderStatus = isFullyPaid ? 'auto_verified' : 'pending_difference';
       const remainingDiff = isFullyPaid ? 0 : Math.max(0, orderTotal - paidAmount);
