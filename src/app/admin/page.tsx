@@ -177,6 +177,7 @@ export default function AdminDashboardPage() {
 
   // Receipt Image Preview Modal State
   const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
+  const [isUploadingAttendeePhoto, setIsUploadingAttendeePhoto] = useState(false);
 
   // Full Order Details & SMS Modal State
   const [selectedOrderModal, setSelectedOrderModal] = useState<Order | null>(null);
@@ -875,6 +876,51 @@ export default function AdminDashboardPage() {
       }
     } catch (err) {
       alert('فشل تحديث الحالة');
+    }
+  };
+
+  // Helper to replace/update attendee photo URL directly from admin panel
+  const handleUpdateAttendeePhoto = async (orderId: string, itemIdx: number, attendeeIdx: number, newFile: File) => {
+    try {
+      setIsUploadingAttendeePhoto(true);
+      const photoUrl = await uploadProductImage(newFile);
+
+      const targetOrder = orders.find(o => o.id === orderId);
+      if (!targetOrder || !targetOrder.items) return;
+
+      const updatedItems = targetOrder.items.map((item, idx) => {
+        if (idx === itemIdx) {
+          const attendees = [...(item.attendees || [])];
+          if (attendees[attendeeIdx]) {
+            attendees[attendeeIdx] = {
+              ...attendees[attendeeIdx],
+              photo_url: photoUrl
+            };
+          }
+          return {
+            ...item,
+            attendees
+          };
+        }
+        return item;
+      });
+
+      const updatedOrder: Order = {
+        ...targetOrder,
+        items: updatedItems,
+        updated_at: new Date().toISOString()
+      };
+
+      await updateOrderInSupabase(updatedOrder);
+      setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+      if (selectedOrderModal && selectedOrderModal.id === orderId) {
+        setSelectedOrderModal(updatedOrder);
+      }
+      alert('تم تغيير وتحديث صورة الحاضر بنجاح! 📸🎉');
+    } catch (err) {
+      alert('فشل تغيير صورة الحاضر');
+    } finally {
+      setIsUploadingAttendeePhoto(false);
     }
   };
 
