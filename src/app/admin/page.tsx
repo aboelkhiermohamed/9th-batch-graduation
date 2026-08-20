@@ -5743,8 +5743,63 @@ export default function AdminDashboardPage() {
                                   {attendeesList.map((att: any, aIdx: number) => (
                                     <div key={aIdx} className="p-2.5 rounded-xl bg-slate-950/80 border border-indigo-500/20 text-xs text-slate-200 space-y-0.5">
                                       <span className="text-[10px] text-amber-400 font-mono block font-bold">التذكرة {aIdx + 1}:</span>
-                                      <div className="font-bold text-white">👤 {att.name}</div>
+                                      <div className="font-bold text-white flex items-center justify-between">
+                                        <span>👤 {att.name}</span>
+                                        {att.gender && (
+                                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                                            (att.gender === 'female' || att.gender === 'أنثى' || att.gender === 'بنت')
+                                              ? 'bg-pink-500/20 text-pink-300 border-pink-500/30'
+                                              : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                                          }`}>
+                                            {att.gender}
+                                          </span>
+                                        )}
+                                      </div>
                                       {att.phone && <div className="text-[11px] text-slate-400 font-mono">📱 {att.phone}</div>}
+
+                                      <div className="flex items-center gap-2.5 pt-2">
+                                        {att.photo_url ? (
+                                          <a href={att.photo_url} target="_blank" rel="noreferrer" title="معاينة الصورة المكبرة">
+                                            <img src={att.photo_url} alt={att.name} className="w-10 h-10 rounded-xl object-cover border border-amber-500/50 hover:scale-105 transition" />
+                                          </a>
+                                        ) : (
+                                          <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500">
+                                            <User className="w-5 h-5" />
+                                          </div>
+                                        )}
+
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          {att.photo_url && (
+                                            <a
+                                              href={att.photo_url}
+                                              download={`${(att.name || 'حاضر').trim().replace(/[/\\?%*:|"<>]/g, '-')}_#${selectedOrderModal.order_code}.jpg`}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-1 rounded-lg border border-emerald-500/30 transition"
+                                            >
+                                              <Download className="w-3 h-3" />
+                                              <span>تحميل</span>
+                                            </a>
+                                          )}
+
+                                          <label className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-1 rounded-lg border border-amber-500/30 cursor-pointer transition">
+                                            <Camera className="w-3 h-3" />
+                                            <span>{att.photo_url ? 'تعديل/استبدال الصورة' : 'رفع صورة شخصية'}</span>
+                                            <input
+                                              type="file"
+                                              accept="image/*"
+                                              className="hidden"
+                                              disabled={isUploadingAttendeePhoto}
+                                              onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                  handleUpdateAttendeePhoto(selectedOrderModal.id, idx, aIdx, file);
+                                                }
+                                              }}
+                                            />
+                                          </label>
+                                        </div>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
