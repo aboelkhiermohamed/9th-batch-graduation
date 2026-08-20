@@ -77,13 +77,16 @@ function formatUsername(userStr?: string): string {
 }
 
 function formatEgyptDateTime(dateStr: string | Date | number | undefined, rawSmsText?: string): string {
+  // 1. Try extracting exact timestamp from SMS body text
   if (rawSmsText) {
-    const match = rawSmsText.match(/تاريخ\s*(?:العملية|المعاملة)?:\s*(\d{1,2}:\d{2}\s*[\d\s\-\/\.]+)/i);
-    if (match && match[1]) {
-      return match[1].trim();
+    const match = rawSmsText.match(/تاريخ\s*(?:العملية|المعاملة)?:\s*(\d{1,2}):(\d{2})\s*(\d{2})[-/](\d{2})[-/](\d{2})/i);
+    if (match) {
+      const [, hh, mm, p1, p2, p3] = match;
+      return `${p1}-${p2}-${p3} ${hh.padStart(2, '0')}:${mm.padStart(2, '0')}`;
     }
   }
 
+  // 2. Format fallback date to uniform YY-MM-DD HH:MM in Cairo time
   if (!dateStr) return '—';
   try {
     let d: Date;
@@ -96,20 +99,29 @@ function formatEgyptDateTime(dateStr: string | Date | number | undefined, rawSms
       d = new Date(dateStr);
     }
 
-    if (isNaN(d.getTime()) || d.getFullYear() < 2024) {
-      d = new Date();
-    }
+    if (isNaN(d.getTime())) return '—';
 
-    return d.toLocaleString('ar-EG', {
+    const options: Intl.DateTimeFormatOptions = {
       timeZone: 'Africa/Cairo',
-      year: 'numeric',
+      year: '2-digit',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit',
-      hour12: true
+      hour12: false
+    };
+
+    const parts = new Intl.DateTimeFormat('en-GB', options).formatToParts(d);
+    let yy = '', mo = '', dd = '', hh = '', mm = '';
+    parts.forEach(p => {
+      if (p.type === 'year') yy = p.value;
+      if (p.type === 'month') mo = p.value;
+      if (p.type === 'day') dd = p.value;
+      if (p.type === 'hour') hh = p.value;
+      if (p.type === 'minute') mm = p.value;
     });
+
+    return `${yy}-${mo}-${dd} ${hh}:${mm}`;
   } catch (e) {
     return '—';
   }
