@@ -406,6 +406,80 @@ export default function AdminDashboardPage() {
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
+  // Helper to match an order with its SMS incoming transaction
+  function findMatchedTransaction(order: Order): IncomingTransaction | null {
+    if (!order) return null;
+
+    // 1. Direct matched_transaction_id match
+    if (order.matched_transaction_id) {
+      const found = transactions.find(t => t.id === order.matched_transaction_id);
+      if (found) return found;
+    }
+
+    // 2. Match by matched_order_id on transaction (by UUID id or order_code)
+    const byOrderId = transactions.find(t => 
+      t.matched_order_id && (t.matched_order_id === order.id || t.matched_order_id === order.order_code)
+    );
+    if (byOrderId) return byOrderId;
+
+    // 3. Match by transaction_ref / الرقم المرجعي
+    if (order.transaction_ref && order.transaction_ref.trim()) {
+      const cleanRef = order.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanRef.length >= 4) {
+        const byRef = transactions.find(t => {
+          const tRef = t.transaction_ref ? t.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+          const rawClean = t.raw_sms ? t.raw_sms.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+          return (tRef && (tRef === cleanRef || tRef.includes(cleanRef) || cleanRef.includes(tRef))) ||
+                 (rawClean && rawClean.includes(cleanRef));
+        });
+        if (byRef) return byRef;
+      }
+    }
+
+    // 4. Match by Phone Number (Customer Phone OR Sender Wallet Phone OR Attendee Phones) & Amount
+    const attendeePhones = order.items?.flatMap(item => item.attendees?.map(a => a.phone) || []) || [];
+    const phoneCandidates = [
+      order.customer_phone,
+      order.sender_phone,
+      ...attendeePhones
+    ].filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim()));
+
+    for (const rawPhone of phoneCandidates) {
+      const cleanPhone = rawPhone.replace(/[^0-9]/g, '').slice(-7);
+      if (cleanPhone.length >= 7) {
+        const byPhone = transactions.find(t => {
+          const sPhone = (t.sender_phone || '').replace(/[^0-9]/g, '');
+          const rawSMS = t.raw_sms || '';
+          const phoneMatch = (sPhone && sPhone.endsWith(cleanPhone)) || rawSMS.includes(cleanPhone);
+
+          const targetAmount = Number(order.total_amount || 0);
+          const txAmount = Number(t.amount || 0);
+          const amountDiff = Math.abs(targetAmount - txAmount);
+
+          // Amount match: exact match, cash fee tolerance (up to 25 EGP), or if tx amount is 0 / order already verified
+          const amountMatch = amountDiff < 1 || (txAmount >= targetAmount && (txAmount - targetAmount) <= 25) || txAmount === 0 || order.status === 'auto_verified' || order.status === 'manual_verified';
+
+          return phoneMatch && amountMatch;
+        });
+        if (byPhone) return byPhone;
+      }
+    }
+
+    // 5. Match by order_code appearing in SMS text
+    if (order.order_code) {
+      const cleanCode = order.order_code.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanCode.length >= 3) {
+        const byCode = transactions.find(t => {
+          const rawClean = (t.raw_sms || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          return rawClean.includes(cleanCode);
+        });
+        if (byCode) return byCode;
+      }
+    }
+
+    return null;
+  }
+
   // Helper to resolve matched transaction for an order (via ID or Ref#)
   const findMatchedTx = (o: Order) => {
     return findMatchedTransaction(o);
@@ -687,79 +761,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Helper to match an order with its SMS incoming transaction
-  const findMatchedTransaction = (order: Order): IncomingTransaction | null => {
-    if (!order) return null;
 
-    // 1. Direct matched_transaction_id match
-    if (order.matched_transaction_id) {
-      const found = transactions.find(t => t.id === order.matched_transaction_id);
-      if (found) return found;
-    }
-
-    // 2. Match by matched_order_id on transaction (by UUID id or order_code)
-    const byOrderId = transactions.find(t => 
-      t.matched_order_id && (t.matched_order_id === order.id || t.matched_order_id === order.order_code)
-    );
-    if (byOrderId) return byOrderId;
-
-    // 3. Match by transaction_ref / الرقم المرجعي
-    if (order.transaction_ref && order.transaction_ref.trim()) {
-      const cleanRef = order.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (cleanRef.length >= 4) {
-        const byRef = transactions.find(t => {
-          const tRef = t.transaction_ref ? t.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-          const rawClean = t.raw_sms ? t.raw_sms.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-          return (tRef && (tRef === cleanRef || tRef.includes(cleanRef) || cleanRef.includes(tRef))) ||
-                 (rawClean && rawClean.includes(cleanRef));
-        });
-        if (byRef) return byRef;
-      }
-    }
-
-    // 4. Match by Phone Number (Customer Phone OR Sender Wallet Phone OR Attendee Phones) & Amount
-    const attendeePhones = order.items?.flatMap(item => item.attendees?.map(a => a.phone) || []) || [];
-    const phoneCandidates = [
-      order.customer_phone,
-      order.sender_phone,
-      ...attendeePhones
-    ].filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim()));
-
-    for (const rawPhone of phoneCandidates) {
-      const cleanPhone = rawPhone.replace(/[^0-9]/g, '').slice(-7);
-      if (cleanPhone.length >= 7) {
-        const byPhone = transactions.find(t => {
-          const sPhone = (t.sender_phone || '').replace(/[^0-9]/g, '');
-          const rawSMS = t.raw_sms || '';
-          const phoneMatch = (sPhone && sPhone.endsWith(cleanPhone)) || rawSMS.includes(cleanPhone);
-
-          const targetAmount = Number(order.total_amount || 0);
-          const txAmount = Number(t.amount || 0);
-          const amountDiff = Math.abs(targetAmount - txAmount);
-
-          // Amount match: exact match, cash fee tolerance (up to 25 EGP), or if tx amount is 0 / order already verified
-          const amountMatch = amountDiff < 1 || (txAmount >= targetAmount && (txAmount - targetAmount) <= 25) || txAmount === 0 || order.status === 'auto_verified' || order.status === 'manual_verified';
-
-          return phoneMatch && amountMatch;
-        });
-        if (byPhone) return byPhone;
-      }
-    }
-
-    // 5. Match by order_code appearing in SMS text
-    if (order.order_code) {
-      const cleanCode = order.order_code.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (cleanCode.length >= 3) {
-        const byCode = transactions.find(t => {
-          const rawClean = (t.raw_sms || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          return rawClean.includes(cleanCode);
-        });
-        if (byCode) return byCode;
-      }
-    }
-
-    return null;
-  };
 
   // Helper to infer or resolve effective order items using product catalog prices
   const getOrderEffectiveItems = (order: Order | null) => {
