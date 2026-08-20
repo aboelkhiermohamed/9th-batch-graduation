@@ -378,12 +378,24 @@ export default function AdminDashboardPage() {
 
   // Check login on load
   useEffect(() => {
-    const savedAuth = sessionStorage.getItem('admin_authenticated');
-    const savedProfile = sessionStorage.getItem('admin_profile');
+    const savedAuth = sessionStorage.getItem('admin_authenticated') || localStorage.getItem('admin_authenticated');
+    const savedProfile = sessionStorage.getItem('admin_profile') || localStorage.getItem('admin_profile');
     if (savedAuth === 'true') {
       setIsAuthenticated(true);
       if (savedProfile) {
         try { setCurrentAdmin(JSON.parse(savedProfile)); } catch(e) {}
+      } else {
+        const defaultAdmin = {
+          id: 'super-admin-mohamed',
+          username: 'mohamedahmed077m@gmail.com',
+          display_name: 'محمد ابو الخير (Super Admin)',
+          role: 'superadmin'
+        };
+        setCurrentAdmin(defaultAdmin);
+        try {
+          sessionStorage.setItem('admin_profile', JSON.stringify(defaultAdmin));
+          localStorage.setItem('admin_profile', JSON.stringify(defaultAdmin));
+        } catch(e) {}
       }
       fetchAllData();
     }
@@ -616,16 +628,32 @@ export default function AdminDashboardPage() {
       if (res.ok && data.success && data.admin) {
         setIsAuthenticated(true);
         setCurrentAdmin(data.admin);
-        sessionStorage.setItem('admin_authenticated', 'true');
-        sessionStorage.setItem('admin_profile', JSON.stringify(data.admin));
+        try {
+          sessionStorage.setItem('admin_authenticated', 'true');
+          localStorage.setItem('admin_authenticated', 'true');
+          sessionStorage.setItem('admin_profile', JSON.stringify(data.admin));
+          localStorage.setItem('admin_profile', JSON.stringify(data.admin));
+        } catch(e) {}
         fetchAllData();
       } else {
         setAuthError(data.error || 'اسم المستخدم أو كلمة المرور غير صحيحة');
       }
     } catch (err: any) {
       if (password === '19312@Mo' || password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+        const defaultAdmin = {
+          id: 'super-admin-mohamed',
+          username: username || 'mohamedahmed077m@gmail.com',
+          display_name: 'محمد ابو الخير (Super Admin)',
+          role: 'superadmin'
+        };
         setIsAuthenticated(true);
-        sessionStorage.setItem('admin_authenticated', 'true');
+        setCurrentAdmin(defaultAdmin);
+        try {
+          sessionStorage.setItem('admin_authenticated', 'true');
+          localStorage.setItem('admin_authenticated', 'true');
+          sessionStorage.setItem('admin_profile', JSON.stringify(defaultAdmin));
+          localStorage.setItem('admin_profile', JSON.stringify(defaultAdmin));
+        } catch(e) {}
         fetchAllData();
       } else {
         setAuthError('تعذر الاتصال بالسيرفر لتسجيل الدخول');
@@ -814,7 +842,7 @@ export default function AdminDashboardPage() {
   // Update order status
   const handleUpdateOrderStatus = async (orderId: string, status: string, matchedTxId?: string) => {
     try {
-      const adminName = currentAdmin?.display_name || currentAdmin?.username || 'أدمن المتجر';
+      const adminName = currentAdmin?.display_name || currentAdmin?.username || 'محمد ابو الخير (Super Admin)';
       const res = await fetch('/api/orders', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -2766,7 +2794,7 @@ export default function AdminDashboardPage() {
                                 <span>مؤكد يدوياً</span>
                               </span>
                               <p className="text-[10px] text-slate-400 font-mono">
-                                بواسطة {order.verified_by || 'أدمن المتجر'}
+                                بواسطة {(order.verified_by && order.verified_by !== 'أدمن المتجر') ? order.verified_by : (currentAdmin?.display_name || 'محمد ابو الخير')}
                               </p>
                             </div>
                           )}
@@ -5784,7 +5812,7 @@ export default function AdminDashboardPage() {
                     <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 space-y-2">
                       <div className="flex items-center gap-2 text-cyan-300 text-xs font-bold">
                         <UserCheck className="w-4 h-4 text-cyan-400" />
-                        <span>تم تأكيد هذا الطلب يدوياً بواسطة: <strong className="text-white underline">{selectedOrderModal.verified_by || 'أدمن المتجر'}</strong></span>
+                        <span>تم تأكيد هذا الطلب يدوياً بواسطة: <strong className="text-white underline">{(selectedOrderModal.verified_by && selectedOrderModal.verified_by !== 'أدمن المتجر') ? selectedOrderModal.verified_by : (currentAdmin?.display_name || 'محمد ابو الخير')}</strong></span>
                       </div>
 
                       {/* Option to manually associate an unmatched transaction */}
