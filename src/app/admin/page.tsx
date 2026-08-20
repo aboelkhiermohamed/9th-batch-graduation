@@ -78,23 +78,9 @@ function formatUsername(userStr?: string): string {
 
 function formatEgyptDateTime(dateStr: string | Date | number | undefined, rawSmsText?: string): string {
   if (rawSmsText) {
-    const match = rawSmsText.match(/تاريخ\s*(?:العملية|المعاملة)?:\s*(\d{1,2}):(\d{2})\s*(\d{2})[-/](\d{2})[-/](\d{2})/i);
-    if (match) {
-      const [, hh, mm, yy, mo, dd] = match;
-      const fullYear = Number(yy) < 100 ? 2000 + Number(yy) : Number(yy);
-      const isoDateStr = `${fullYear}-${mo.padStart(2, '0')}-${dd.padStart(2, '0')}T${hh.padStart(2, '0')}:${mm.padStart(2, '0')}:00.000Z`;
-      const testD = new Date(isoDateStr);
-      if (!isNaN(testD.getTime())) {
-        return testD.toLocaleString('ar-EG', {
-          timeZone: 'Africa/Cairo',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        });
-      }
+    const match = rawSmsText.match(/تاريخ\s*(?:العملية|المعاملة)?:\s*(\d{1,2}:\d{2}\s*[\d\s\-\/\.]+)/i);
+    if (match && match[1]) {
+      return match[1].trim();
     }
   }
 
