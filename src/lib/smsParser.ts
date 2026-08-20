@@ -8,6 +8,7 @@ export interface ParsedSMS {
   senderName?: string;
   recipientPhone?: string;
   transactionRef?: string;
+  transactionDate?: string;
   error?: string;
 }
 
@@ -133,6 +134,19 @@ export function parsePaymentSMS(sender: string, message: string): ParsedSMS {
     }
   }
 
+  // Extract Transaction Date/Time from SMS body e.g. "تاريخ العملية: 22:25 26-08-19"
+  let transactionDate: string | undefined = undefined;
+  const dateMatch = text.match(/تاريخ\s*(?:العملية|المعاملة)?:\s*(\d{1,2}):(\d{2})\s*(\d{2})[-/](\d{2})[-/](\d{2})/i);
+  if (dateMatch) {
+    const [, hh, mm, yy, mo, dd] = dateMatch;
+    const fullYear = Number(yy) < 100 ? 2000 + Number(yy) : Number(yy);
+    const isoDateStr = `${fullYear}-${mo.padStart(2, '0')}-${dd.padStart(2, '0')}T${hh.padStart(2, '0')}:${mm.padStart(2, '0')}:00.000Z`;
+    const testD = new Date(isoDateStr);
+    if (!isNaN(testD.getTime())) {
+      transactionDate = testD.toISOString();
+    }
+  }
+
   if (amount <= 0) {
     return {
       success: false,
@@ -148,6 +162,7 @@ export function parsePaymentSMS(sender: string, message: string): ParsedSMS {
     amount,
     senderPhone,
     recipientPhone,
-    transactionRef
+    transactionRef,
+    transactionDate
   };
 }

@@ -110,6 +110,10 @@ export async function POST(req: NextRequest) {
     const senderName = body.senderName || parsed.senderName;
     const transactionRef = body.transactionReference || parsed.transactionRef;
 
+    if (parsed.transactionDate && (!body.receivedAt || body.receivedAt === receivedAt) && (!body.timestamp || body.timestamp === receivedAt)) {
+      receivedAt = parsed.transactionDate;
+    }
+
     const transactionId = 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
     const newTx: IncomingTransaction = {
       id: transactionId,
