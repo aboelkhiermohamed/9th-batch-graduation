@@ -910,7 +910,7 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
   try {
     const [{ data: dbOrders, error }, { data: dbTxs }] = await Promise.all([
       supabase.from('store_orders').select('*, store_order_items(*)').order('created_at', { ascending: false }),
-      supabase.from('store_transactions').select('id, matched_order_id, amount, transaction_ref, raw_sms, recipient_phone, device_name, device_id')
+      supabase.from('store_transactions').select('*')
     ]);
 
     if (error) {
@@ -921,6 +921,11 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
     if (!dbOrders || dbOrders.length === 0) {
       setMemoryOrders([]);
       return [];
+    }
+
+    // Auto-trigger background cleanup if huge Base64 data URLs exist in Postgres
+    if (dbOrders.some((o: any) => (o.receipt_url && o.receipt_url.startsWith('data:')) || (o.notes && o.notes.includes('data:image')))) {
+      cleanupBase64InSupabase().catch(() => {});
     }
 
     // Build map of sum of matched transaction amounts per order ID & order_code
@@ -994,14 +999,14 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         });
 
         if (tx) {
-          if (tx.recipient_phone) {
-            confirmedLine = tx.recipient_phone;
+          if ((tx as any).recipient_phone) {
+            confirmedLine = (tx as any).recipient_phone;
           } else if (tx.raw_sms) {
             const match = tx.raw_sms.match(/(?:على رقم محفظتك|على محفظتك|محفظة|إلى رقم|إلى|خط)\s*(?:20)?(01[0125]\d{8})/i);
             if (match && match[1]) confirmedLine = match[1];
           }
-          if (!matchedDevName && tx.device_name) matchedDevName = tx.device_name;
-          if (!matchedDevId && tx.device_id) matchedDevId = tx.device_id;
+          if (!matchedDevName && (tx as any).device_name) matchedDevName = (tx as any).device_name;
+          if (!matchedDevId && (tx as any).device_id) matchedDevId = (tx as any).device_id;
         }
       }
 

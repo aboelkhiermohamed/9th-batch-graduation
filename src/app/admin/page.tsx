@@ -402,7 +402,7 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
-  // Periodic polling to keep orders & transactions list live updated (every 8 seconds)
+  // Periodic polling to keep orders & transactions list live updated (every 30 seconds)
   useEffect(() => {
     let interval: any;
     if (isAuthenticated) {
@@ -414,7 +414,7 @@ export default function AdminDashboardPage() {
           if (ordRes && ordRes.length > 0) setOrders(ordRes);
           if (txRes && Array.isArray(txRes) && txRes.length > 0) setTransactions(txRes);
         });
-      }, 8000);
+      }, 30000);
     }
     return () => clearInterval(interval);
   }, [isAuthenticated]);
