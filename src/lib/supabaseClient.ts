@@ -821,7 +821,7 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
 
     // Insert items into store_order_items
     if (order.items && order.items.length > 0) {
-      const productsList = await fetchProductsFromSupabase();
+      const productsList = getMemoryProducts();
       const firstValidProdUuid = productsList.find(p => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id))?.id || 'a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6';
 
       const itemsPayload = order.items.map((item) => {
@@ -910,7 +910,7 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
   try {
     const [{ data: dbOrders, error }, { data: dbTxs }] = await Promise.all([
       supabase.from('store_orders').select('*, store_order_items(*)').order('created_at', { ascending: false }),
-      supabase.from('store_transactions').select('*')
+      supabase.from('store_transactions').select('id, matched_order_id, amount, transaction_ref, raw_sms, recipient_phone, device_name, device_id')
     ]);
 
     if (error) {
@@ -944,6 +944,11 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
     const fetchedOrders: Order[] = dbOrders.map((o: any) => {
       let rawNotes = o.notes || '';
       let extractedReceiptUrl = o.receipt_url || undefined;
+
+      // Sanitize raw notes if it contains huge base64 data URLs to prevent regex CPU lag
+      if (rawNotes.includes('data:image')) {
+        rawNotes = rawNotes.replace(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/g, '');
+      }
       let verifiedBy = o.verified_by || undefined;
       let confirmedLine = o.confirmed_line || undefined;
       let matchedDevName = o.matched_device_name || undefined;
@@ -1762,6 +1767,52 @@ export async function deleteOrderFromSupabase(orderId: string): Promise<boolean>
   } catch (err) {
     console.error('Error deleting single order in Supabase:', err);
     return false;
+  }
+}
+
+export async function cleanupBase64InSupabase(): Promise<{ success: boolean; cleanedCount: number }> {
+  try {
+    const client = supabaseAdmin || supabase;
+    const { data: rows, error } = await client
+      .from('store_orders')
+      .select('id, receipt_url, notes');
+
+    if (error || !rows) return { success: false, cleanedCount: 0 };
+
+    let cleanedCount = 0;
+    for (const r of rows) {
+      let needsUpdate = false;
+      let newReceiptUrl = r.receipt_url;
+      let newNotes = r.notes;
+
+      if (newReceiptUrl && newReceiptUrl.startsWith('data:') && newReceiptUrl.length > 500) {
+        newReceiptUrl = null;
+        needsUpdate = true;
+      }
+
+      if (newNotes && newNotes.includes('data:image')) {
+        newNotes = newNotes.replace(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/g, '[IMAGE_REMOVED]');
+        needsUpdate = true;
+      }
+
+      if (newNotes && newNotes.includes('[RECEIPT_URL:data:')) {
+        newNotes = newNotes.replace(/\[RECEIPT_URL:data:[\s\S]*?\]/g, '');
+        needsUpdate = true;
+      }
+
+      if (needsUpdate) {
+        await client
+          .from('store_orders')
+          .update({ receipt_url: newReceiptUrl, notes: newNotes })
+          .eq('id', r.id);
+        cleanedCount++;
+      }
+    }
+
+    return { success: true, cleanedCount };
+  } catch (err) {
+    console.error('Error cleaning Base64 in Supabase:', err);
+    return { success: false, cleanedCount: 0 };
   }
 }
 

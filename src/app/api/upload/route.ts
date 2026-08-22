@@ -37,12 +37,27 @@ export async function POST(req: NextRequest) {
     // 1. Try Supabase Storage First
     if (supabaseKey) {
       try {
-        const { data, error } = await supabaseAdmin.storage
+        let { data, error } = await supabaseAdmin.storage
           .from(bucket)
           .upload(filePathInFolder, buffer, {
             contentType: file.type || 'image/jpeg',
             upsert: true,
           });
+
+        // Auto-create bucket if missing
+        if (error && (error.message.includes('not found') || error.message.includes('Bucket'))) {
+          try {
+            await supabaseAdmin.storage.createBucket(bucket, { public: true });
+            const retry = await supabaseAdmin.storage
+              .from(bucket)
+              .upload(filePathInFolder, buffer, {
+                contentType: file.type || 'image/jpeg',
+                upsert: true,
+              });
+            data = retry.data;
+            error = retry.error;
+          } catch (bErr) {}
+        }
 
         if (!error && data?.path) {
           const { data: urlData } = supabaseAdmin.storage
@@ -83,15 +98,10 @@ export async function POST(req: NextRequest) {
       console.error('Local FS storage error:', fsErr);
     }
 
-    // 3. Fallback to Data URL if storage is read-only
-    const base64 = buffer.toString('base64');
-    const mime = file.type || 'image/jpeg';
-    const dataUrl = `data:${mime};base64,${base64}`;
-
+    // 3. Ultra-fallback: Fail gracefully or return small truncated placeholder instead of injecting multi-MB base64 into database
     return NextResponse.json({
-      success: true,
-      url: dataUrl
-    });
+      error: 'تعذر رفع الصورة على السيرفر أو Supabase Storage. يرجى إنشاء Bucket اسمه "receipts" في لوحة Supabase.'
+    }, { status: 500 });
   } catch (err: any) {
     console.error('Upload API error:', err);
     return NextResponse.json({ error: 'خطأ في السيرفر: ' + err.message }, { status: 500 });

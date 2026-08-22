@@ -59,7 +59,7 @@ import {
   X
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
-import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase, parseAttendeesAndCleanOpt, clearOrdersInSupabase, deleteOrderFromSupabase } from '@/lib/supabaseClient';
+import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase, parseAttendeesAndCleanOpt, clearOrdersInSupabase, deleteOrderFromSupabase, cleanupBase64InSupabase } from '@/lib/supabaseClient';
 import { normalizePhoneNumber, isValidEgyptianPhone } from '@/lib/smsParser';
 
 function generateUUID() {
@@ -1168,6 +1168,27 @@ export default function AdminDashboardPage() {
       alert('حدث خطأ أثناء الاتصال بالسيرفر لمسح البيانات');
     } finally {
       setIsPurgingOrders(false);
+    }
+  };
+
+  const [isCleaningBase64, setIsCleaningBase64] = useState(false);
+
+  const handleCleanupBase64 = async () => {
+    if (!window.confirm('هل تريد تنظيف وإزالة نصوص الصور القديمة (Base64) من قاعدة البيانات لتسريع التحميل والحفاظ على استقرار الداتا بيز؟')) return;
+    try {
+      setIsCleaningBase64(true);
+      const res = await cleanupBase64InSupabase();
+      if (res.success) {
+        alert(`تم تنظيف وحذف الصور القديمة الضخمة من ${res.cleanedCount} طلب بنجاح وتسريع القاعدة 🚀`);
+        const freshOrders = await fetchOrdersFromSupabase();
+        setOrders(freshOrders);
+      } else {
+        alert('لم يتم العثور على سجلات تحتاج تنظيف');
+      }
+    } catch (e: any) {
+      alert('حدث خطأ أثناء التنظيف');
+    } finally {
+      setIsCleaningBase64(false);
     }
   };
 
@@ -4185,6 +4206,26 @@ export default function AdminDashboardPage() {
                   <h3 className="text-base font-bold text-white">منطقة الإجراءات الحساسة (Danger Zone)</h3>
                   <p className="text-xs text-slate-400">تصفير الطلبات وحذف البيانات المؤقتة بأمان للاختبارات</p>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-950 border border-amber-500/30">
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-amber-300">تسريع الداتا بيز وتنظيف صور Base64 القديمة 🚀</p>
+                  <p className="text-[11px] text-slate-400">يقوم بإزالة نصوص الصور الضخمة المسببة لبطء تحميل الطلبات وتخفيض حجم الداتا بيز من 25MB إلى 300KB.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCleanupBase64}
+                  disabled={isCleaningBase64}
+                  className="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition active:scale-95 flex-shrink-0 disabled:opacity-50"
+                >
+                  {isCleaningBase64 ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  <span>{isCleaningBase64 ? 'جاري التنظيف...' : 'ضغط وتسريع الداتا بيز ⚡'}</span>
+                </button>
               </div>
 
               <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-950 border border-rose-500/20">
