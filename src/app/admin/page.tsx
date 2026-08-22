@@ -1011,6 +1011,32 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
+
+  const handleUploadReceiptForOrder = async (order: Order, file: File) => {
+    if (!file) return;
+    try {
+      setIsUploadingReceipt(true);
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('bucket', 'receipts');
+      fd.append('folder', 'manual');
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || 'فشل رفع الصورة');
+
+      const updatedOrder = { ...order, receipt_url: data.url };
+      await updateOrderInSupabase(updatedOrder);
+      setOrders(prev => prev.map(o => o.id === order.id ? updatedOrder : o));
+      setSelectedOrderModal(updatedOrder);
+      alert('تم تحديث صورة الإيصال بنجاح 📸');
+    } catch (e: any) {
+      alert('خطأ أثناء رفع الصورة: ' + (e.message || 'Error'));
+    } finally {
+      setIsUploadingReceipt(false);
+    }
+  };
+
   // Upload a single image file to Supabase Storage products bucket
   const uploadProductImage = async (file: File): Promise<string> => {
     const fd = new FormData();
@@ -6090,38 +6116,91 @@ export default function AdminDashboardPage() {
                 <span>صورة إيصال الدفع / الاسكرين المرفق من العميل 📸</span>
               </h4>
 
-              {selectedOrderModal.receipt_url ? (
+              {selectedOrderModal.receipt_url && selectedOrderModal.receipt_url !== '[IMAGE_REMOVED]' ? (
                 <div className="p-4 bg-slate-900 rounded-2xl border border-indigo-500/40 space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs text-emerald-400 font-bold flex items-center gap-1">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      <span>تم إرفاق صورة إيصال التحويل بواسطة العميل أثناء تسجيل الطلب</span>
+                      <span>صورة الإيصال المرفقة للطلب</span>
                     </span>
-                    <button
-                      onClick={() => setViewingReceiptUrl(selectedOrderModal.receipt_url!)}
-                      className="px-3 py-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white text-xs font-bold border border-indigo-500/40 transition flex items-center gap-1"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>معاينة مكبّرة 🔍</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <label className="px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer flex items-center gap-1">
+                        <Upload className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{isUploadingReceipt ? 'جاري الرفع...' : 'تحديث الصورة 📤'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={isUploadingReceipt}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadReceiptForOrder(selectedOrderModal, file);
+                          }}
+                        />
+                      </label>
+                      <button
+                        onClick={() => setViewingReceiptUrl(selectedOrderModal.receipt_url!)}
+                        className="px-3 py-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white text-xs font-bold border border-indigo-500/40 transition flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>معاينة مكبّرة 🔍</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* DIRECT EMBEDDED IMAGE PREVIEW */}
-                  <div className="relative group bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-center max-h-[320px] overflow-hidden">
+                  <div className="relative group bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex flex-col items-center justify-center max-h-[320px] overflow-hidden">
                     <img
                       src={selectedOrderModal.receipt_url}
                       alt="إيصال التحويل المرفق من العميل"
                       className="max-h-[300px] w-auto object-contain rounded-lg shadow-md cursor-pointer group-hover:scale-[1.02] transition-transform"
                       onClick={() => setViewingReceiptUrl(selectedOrderModal.receipt_url!)}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallbackDiv = e.currentTarget.parentElement?.querySelector('.img-fallback');
+                        if (fallbackDiv) (fallbackDiv as HTMLElement).style.display = 'flex';
+                      }}
                     />
+                    <div className="img-fallback hidden flex-col items-center justify-center p-6 text-center text-slate-400 space-y-2">
+                      <AlertCircle className="w-8 h-8 text-amber-400" />
+                      <p className="text-xs font-bold text-slate-300">رابط الصورة السابق غير متاح أو تم تنظيفه لتسريع القاعدة</p>
+                      <label className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-md">
+                        <Upload className="w-4 h-4" />
+                        <span>رفع صورة إيصال جديدة الآن 📤</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={isUploadingReceipt}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadReceiptForOrder(selectedOrderModal, file);
+                          }}
+                        />
+                      </label>
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 text-slate-400 text-xs flex items-center justify-between">
+                <div className="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 text-slate-400 text-xs flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <Info className="w-4 h-4 text-slate-500" />
-                    <span>لم يقم العميل برفع صورة إيصال (تم اعتماد رقم المتابعة والمرجعي أو الـ SMS تلقائياً)</span>
+                    <Info className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                    <span>لا توجد صورة إيصال متاحة للطلب (أو تم اعتماد الـ SMS تلقائياً)</span>
                   </div>
+                  <label className="px-3.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition cursor-pointer flex items-center gap-1.5">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{isUploadingReceipt ? 'جاري الرفع...' : 'إرفاق صورة إيصال جديدة 📤'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={isUploadingReceipt}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadReceiptForOrder(selectedOrderModal, file);
+                      }}
+                    />
+                  </label>
                 </div>
               )}
             </div>
