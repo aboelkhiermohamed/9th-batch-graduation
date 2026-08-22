@@ -127,6 +127,55 @@ function formatEgyptDateTime(dateStr: string | Date | number | undefined, rawSms
   }
 }
 
+function DebouncedSearchInput({
+  value,
+  onChange,
+  placeholder = 'ابحث بكود الطلب، الاسم، الموبايل، Ref#...'
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+}) {
+  const [localVal, setLocalVal] = useState(value);
+
+  useEffect(() => {
+    setLocalVal(value);
+  }, [value]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      onChange(localVal);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [localVal, onChange]);
+
+  return (
+    <div className="w-full xl:w-80 flex items-center gap-2 bg-slate-950 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-slate-800 focus-within:border-amber-500/50 transition">
+      <Search className="w-4 h-4 text-slate-500 flex-shrink-0" />
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={localVal}
+        onChange={(e) => setLocalVal(e.target.value)}
+        className="bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none w-full"
+      />
+      {localVal && (
+        <button
+          type="button"
+          onClick={() => {
+            setLocalVal('');
+            onChange('');
+          }}
+          className="text-slate-500 hover:text-slate-300 text-xs px-1"
+          title="مسح البحث"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboardPage() {
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -2572,26 +2621,11 @@ export default function AdminDashboardPage() {
             {/* Filters Bar & PDF Export Button */}
             <div className="space-y-2">
               <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
-                {/* Search Bar */}
-                <div className="w-full xl:w-80 flex items-center gap-2 bg-slate-950 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-slate-800 focus-within:border-amber-500/50 transition">
-                  <Search className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="ابحث بكود الطلب، الاسم، الموبايل، Ref#..."
-                    value={orderSearch}
-                    onChange={(e) => setOrderSearch(e.target.value)}
-                    className="bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none w-full"
-                  />
-                  {orderSearch && (
-                    <button
-                      onClick={() => setOrderSearch('')}
-                      className="text-slate-500 hover:text-slate-300 text-xs px-1"
-                      title="مسح البحث"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
+                {/* Search Bar with Isolated Instant Typing State */}
+                <DebouncedSearchInput
+                  value={orderSearch}
+                  onChange={setOrderSearch}
+                />
 
                 {/* Filters Group */}
                 <div className="flex flex-wrap items-center gap-2 flex-1 justify-start xl:justify-end">
