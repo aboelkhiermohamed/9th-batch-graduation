@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import JSZip from 'jszip';
 import { 
   ShieldCheck, 
@@ -357,9 +357,16 @@ export default function AdminDashboardPage() {
 
   // Search & Filter & Dynamic Origin URL
   const [orderSearch, setOrderSearch] = useState('');
+  const deferredOrderSearch = useDeferredValue(orderSearch);
+  const [visibleCount, setVisibleCount] = useState(50);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [lineFilter, setLineFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
+
+  // Reset pagination when search query or filters change
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [orderSearch, statusFilter, lineFilter, paymentFilter]);
   const [ticketStatusFilter, setTicketStatusFilter] = useState<'verified_only' | 'all'>('verified_only');
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedBaseUrl, setCopiedBaseUrl] = useState(false);
@@ -585,10 +592,10 @@ export default function AdminDashboardPage() {
            targetNum.includes(line);
   };
 
-  // Memoized Filtered orders list to render search & modals at instant 60fps speed
+  // Memoized Filtered orders list using useDeferredValue to prevent input lag
   const filteredOrders = useMemo(() => {
     if (!orders || orders.length === 0) return [];
-    const searchLower = orderSearch.trim().toLowerCase();
+    const searchLower = deferredOrderSearch.trim().toLowerCase();
 
     return orders.filter(o => {
       const matchSearch = !searchLower || 
@@ -618,7 +625,7 @@ export default function AdminDashboardPage() {
 
       return matchSearch && matchStatus && matchLine && matchPayment;
     });
-  }, [orders, transactions, orderSearch, statusFilter, lineFilter, paymentFilter, orderMatchedTxMap, devices]);
+  }, [orders, transactions, deferredOrderSearch, statusFilter, lineFilter, paymentFilter, orderMatchedTxMap, devices]);
 
   // Periodic poll for devices when gateway tab is active (Every 10 seconds)
   useEffect(() => {
@@ -2946,6 +2953,17 @@ export default function AdminDashboardPage() {
                   )}
                 </tbody>
               </table>
+              {filteredOrders.length > visibleCount && (
+                <div className="p-4 bg-slate-950/80 border-t border-slate-800 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount(prev => prev + 50)}
+                    className="px-6 py-2.5 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition active:scale-95 shadow-md"
+                  >
+                    عرض المزيد من الطلبات ({filteredOrders.length - visibleCount}+ طلب إضافي) ⏬
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
