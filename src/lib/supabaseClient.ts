@@ -950,7 +950,49 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
       let rawNotes = o.notes || '';
       let extractedReceiptUrl = o.receipt_url || undefined;
 
-      // Sanitize raw notes if it contains huge base64 data URLs to prevent regex CPU lag
+      // 1. Extract embedded items from notes FIRST before any string sanitization
+      let extractedItemsFromNotes: any[] | undefined = undefined;
+      if (rawNotes.includes('[ITEMS_META_B64:')) {
+        const b64Match = rawNotes.match(/\[ITEMS_META_B64:([A-Za-z0-9+/=]+)\]/);
+        if (b64Match && b64Match[1]) {
+          const decoded = decodeProdMeta(b64Match[1]);
+          if (decoded && Array.isArray(decoded)) {
+            extractedItemsFromNotes = decoded;
+          }
+        }
+      }
+
+      if (!extractedItemsFromNotes && rawNotes.includes('[ITEMS_META:')) {
+        const startIdx = rawNotes.indexOf('[ITEMS_META:');
+        if (startIdx !== -1) {
+          const rest = rawNotes.substring(startIdx + 12);
+          const trimmedRest = rest.trim();
+          const firstChar = trimmedRest[0];
+          if (firstChar === '[' || firstChar === '{') {
+            let depth = 0;
+            let jsonEnd = -1;
+            const startPos = rest.indexOf(firstChar);
+            for (let i = startPos; i < rest.length; i++) {
+              if (rest[i] === '[' || rest[i] === '{') depth++;
+              else if (rest[i] === ']' || rest[i] === '}') {
+                depth--;
+                if (depth === 0) {
+                  jsonEnd = i;
+                  break;
+                }
+              }
+            }
+            if (jsonEnd !== -1) {
+              const jsonStr = rest.substring(startPos, jsonEnd + 1);
+              try {
+                extractedItemsFromNotes = JSON.parse(jsonStr);
+              } catch (e) {}
+            }
+          }
+        }
+      }
+
+      // 2. Sanitize standalone base64 data URLs from notes
       if (rawNotes.includes('data:image')) {
         rawNotes = rawNotes.replace(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/g, '');
       }
@@ -1037,49 +1079,14 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         }
       }
 
-      let extractedItemsFromNotes: any[] | undefined = undefined;
-
       if (rawNotes.includes('[ITEMS_META_B64:')) {
-        const b64Match = rawNotes.match(/\[ITEMS_META_B64:([A-Za-z0-9+/=]+)\]/);
-        if (b64Match && b64Match[1]) {
-          const decoded = decodeProdMeta(b64Match[1]);
-          if (decoded && Array.isArray(decoded)) {
-            extractedItemsFromNotes = decoded;
-          }
-        }
         const b64Idx = rawNotes.indexOf('[ITEMS_META_B64:');
         if (b64Idx !== -1) rawNotes = rawNotes.substring(0, b64Idx).trim();
       }
 
       if (rawNotes.includes('[ITEMS_META:')) {
         const startIdx = rawNotes.indexOf('[ITEMS_META:');
-        if (startIdx !== -1) {
-          const rest = rawNotes.substring(startIdx + 12);
-          const trimmedRest = rest.trim();
-          const firstChar = trimmedRest[0];
-          if (firstChar === '[' || firstChar === '{') {
-            let depth = 0;
-            let jsonEnd = -1;
-            const startPos = rest.indexOf(firstChar);
-            for (let i = startPos; i < rest.length; i++) {
-              if (rest[i] === '[' || rest[i] === '{') depth++;
-              else if (rest[i] === ']' || rest[i] === '}') {
-                depth--;
-                if (depth === 0) {
-                  jsonEnd = i;
-                  break;
-                }
-              }
-            }
-            if (jsonEnd !== -1) {
-              const jsonStr = rest.substring(startPos, jsonEnd + 1);
-              try {
-                extractedItemsFromNotes = JSON.parse(jsonStr);
-              } catch (e) {}
-            }
-          }
-          rawNotes = rawNotes.substring(0, startIdx).trim();
-        }
+        if (startIdx !== -1) rawNotes = rawNotes.substring(0, startIdx).trim();
       }
 
       if (rawNotes.includes('ITEMS_META')) {
