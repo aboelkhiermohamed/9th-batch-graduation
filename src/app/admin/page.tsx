@@ -127,7 +127,7 @@ function formatEgyptDateTime(dateStr: string | Date | number | undefined, rawSms
   }
 }
 
-function DebouncedSearchInput({
+function ExplicitSearchInput({
   value,
   onChange,
   placeholder = 'ابحث بكود الطلب، الاسم، الموبايل، Ref#...'
@@ -142,22 +142,26 @@ function DebouncedSearchInput({
     setLocalVal(value);
   }, [value]);
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      onChange(localVal);
-    }, 250);
-    return () => clearTimeout(handler);
-  }, [localVal, onChange]);
+  const handleTriggerSearch = () => {
+    onChange(localVal);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTriggerSearch();
+    }
+  };
 
   return (
-    <div className="w-full xl:w-80 flex items-center gap-2 bg-slate-950 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-slate-800 focus-within:border-amber-500/50 transition">
-      <Search className="w-4 h-4 text-slate-500 flex-shrink-0" />
+    <div className="w-full xl:w-96 flex items-center gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800 focus-within:border-amber-500/50 transition">
       <input
         type="text"
         placeholder={placeholder}
         value={localVal}
         onChange={(e) => setLocalVal(e.target.value)}
-        className="bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none w-full"
+        onKeyDown={handleKeyDown}
+        className="bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none w-full px-2"
       />
       {localVal && (
         <button
@@ -166,12 +170,21 @@ function DebouncedSearchInput({
             setLocalVal('');
             onChange('');
           }}
-          className="text-slate-500 hover:text-slate-300 text-xs px-1"
+          className="text-slate-500 hover:text-slate-300 text-xs px-1.5"
           title="مسح البحث"
         >
           ✕
         </button>
       )}
+      <button
+        type="button"
+        onClick={handleTriggerSearch}
+        className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 flex-shrink-0 shadow-md"
+        title="اضغط للبحث أو اضغط Enter"
+      >
+        <Search className="w-3.5 h-3.5" />
+        <span>بحث</span>
+      </button>
     </div>
   );
 }
@@ -2621,8 +2634,8 @@ export default function AdminDashboardPage() {
             {/* Filters Bar & PDF Export Button */}
             <div className="space-y-2">
               <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 p-3 sm:p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
-                {/* Search Bar with Isolated Instant Typing State */}
-                <DebouncedSearchInput
+                {/* Search Bar with Explicit Enter / Button Trigger */}
+                <ExplicitSearchInput
                   value={orderSearch}
                   onChange={setOrderSearch}
                 />
