@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import JSZip from 'jszip';
 import { 
   ShieldCheck, 
@@ -493,9 +493,23 @@ export default function AdminDashboardPage() {
     return null;
   }
 
-  // Helper to resolve matched transaction for an order (via ID or Ref#)
+  // Fast memoized Transaction Map to eliminate N*M loop scanning on every render/search/click
+  const orderMatchedTxMap = useMemo(() => {
+    const map = new Map<string, IncomingTransaction>();
+    if (!orders || orders.length === 0 || !transactions || transactions.length === 0) return map;
+
+    orders.forEach(order => {
+      const match = findMatchedTransaction(order);
+      if (match) map.set(order.id, match);
+    });
+
+    return map;
+  }, [orders, transactions]);
+
+  // Helper to resolve matched transaction for an order (via fast O(1) Map lookup)
   const findMatchedTx = (o: Order) => {
-    return findMatchedTransaction(o);
+    if (!o || !o.id) return null;
+    return orderMatchedTxMap.get(o.id) || findMatchedTransaction(o);
   };
 
   // Dynamic helper to resolve confirmed line even for legacy/past matched orders
@@ -571,36 +585,40 @@ export default function AdminDashboardPage() {
            targetNum.includes(line);
   };
 
-  // Filtered orders list
-  const filteredOrders = orders.filter(o => {
+  // Memoized Filtered orders list to render search & modals at instant 60fps speed
+  const filteredOrders = useMemo(() => {
+    if (!orders || orders.length === 0) return [];
     const searchLower = orderSearch.trim().toLowerCase();
-    const matchSearch = !searchLower || 
-      (o.order_code && o.order_code.toLowerCase().includes(searchLower)) ||
-      (o.customer_name && o.customer_name.toLowerCase().includes(searchLower)) ||
-      (o.customer_phone && o.customer_phone.includes(searchLower)) ||
-      (o.transaction_ref && o.transaction_ref.toLowerCase().includes(searchLower)) ||
-      (o.sender_phone && o.sender_phone.includes(searchLower)) ||
-      (o.notes && o.notes.toLowerCase().includes(searchLower)) ||
-      (o.items && o.items.some(item => 
-        (item.product_title && item.product_title.toLowerCase().includes(searchLower)) ||
-        (item.custom_text && item.custom_text.toLowerCase().includes(searchLower)) ||
-        (item.selected_size && item.selected_size.toLowerCase().includes(searchLower))
-      ));
 
-    const matchStatus = statusFilter === 'all' || 
-      (statusFilter === 'all_pending' ? (o.status === 'pending' || o.status === 'pending_difference') :
-      statusFilter === 'all_verified' ? (o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered') :
-      o.status === statusFilter);
+    return orders.filter(o => {
+      const matchSearch = !searchLower || 
+        (o.order_code && o.order_code.toLowerCase().includes(searchLower)) ||
+        (o.customer_name && o.customer_name.toLowerCase().includes(searchLower)) ||
+        (o.customer_phone && o.customer_phone.includes(searchLower)) ||
+        (o.transaction_ref && o.transaction_ref.toLowerCase().includes(searchLower)) ||
+        (o.sender_phone && o.sender_phone.includes(searchLower)) ||
+        (o.notes && o.notes.toLowerCase().includes(searchLower)) ||
+        (o.items && o.items.some(item => 
+          (item.product_title && item.product_title.toLowerCase().includes(searchLower)) ||
+          (item.custom_text && item.custom_text.toLowerCase().includes(searchLower)) ||
+          (item.selected_size && item.selected_size.toLowerCase().includes(searchLower))
+        ));
 
-    const effectiveLine = getEffectiveConfirmedLine(o);
-    const matchLine = lineFilter === 'all' ||
-      (lineFilter === 'manual' ? Boolean(!effectiveLine && o.verified_by) :
-      isOrderMatchedToLine(o, lineFilter));
+      const matchStatus = statusFilter === 'all' || 
+        (statusFilter === 'all_pending' ? (o.status === 'pending' || o.status === 'pending_difference') :
+        statusFilter === 'all_verified' ? (o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered') :
+        o.status === statusFilter);
 
-    const matchPayment = paymentFilter === 'all' || o.payment_method === paymentFilter;
+      const effectiveLine = getEffectiveConfirmedLine(o);
+      const matchLine = lineFilter === 'all' ||
+        (lineFilter === 'manual' ? Boolean(!effectiveLine && o.verified_by) :
+        isOrderMatchedToLine(o, lineFilter));
 
-    return matchSearch && matchStatus && matchLine && matchPayment;
-  });
+      const matchPayment = paymentFilter === 'all' || o.payment_method === paymentFilter;
+
+      return matchSearch && matchStatus && matchLine && matchPayment;
+    });
+  }, [orders, transactions, orderSearch, statusFilter, lineFilter, paymentFilter, orderMatchedTxMap, devices]);
 
   // Periodic poll for devices when gateway tab is active (Every 10 seconds)
   useEffect(() => {
