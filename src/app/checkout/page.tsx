@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthModal from '@/components/AuthModal';
 import { isValidEgyptianPhone, normalizePhoneNumber } from '@/lib/smsParser';
@@ -41,6 +41,16 @@ const fireConfetti = (options?: any) => {
   });
 };
 
+function shuffleArray<T>(array: T[]): T[] {
+  if (!array || array.length <= 1) return array ? [...array] : [];
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
 
@@ -66,6 +76,21 @@ export default function CheckoutPage() {
 
   // Submitted Order Result State
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+
+  // Randomize / Shuffle wallet lines and InstaPay accounts on each page load for balanced load distribution
+  const shuffledVodaNums = useMemo(() => {
+    const nums = settings.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0
+      ? settings.vodafone_cash_numbers
+      : ['01015339426'];
+    return shuffleArray(nums);
+  }, [settings.vodafone_cash_numbers]);
+
+  const shuffledInstaAccounts = useMemo(() => {
+    const accs = settings.instapay_ipas && settings.instapay_ipas.length > 0
+      ? settings.instapay_ipas
+      : [settings.instapay_ipa || '9thbatch@instapay'];
+    return shuffleArray(accs);
+  }, [settings.instapay_ipas, settings.instapay_ipa]);
 
   // Load cart & settings from localStorage and API
   useEffect(() => {
@@ -604,12 +629,8 @@ export default function CheckoutPage() {
                 {(() => {
                   const isVodaEnabled = Boolean(settings.vodafone_cash_enabled);
                   const isInstaEnabled = Boolean(settings.instapay_enabled);
-                  const vodaNums = settings.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0
-                    ? settings.vodafone_cash_numbers
-                    : ['01015339426'];
-                  const instaAccounts = settings.instapay_ipas && settings.instapay_ipas.length > 0
-                    ? settings.instapay_ipas
-                    : [settings.instapay_ipa || '9thbatch@instapay'];
+                  const vodaNums = shuffledVodaNums;
+                  const instaAccounts = shuffledInstaAccounts;
 
                   if (!isVodaEnabled && !isInstaEnabled) {
                     return (
@@ -667,9 +688,10 @@ export default function CheckoutPage() {
 
                           <div className="space-y-2">
                             {vodaNums.map((num, idx) => {
-                              const lineLabel = settings.line_labels?.[num] || `خط ${idx + 1}`;
+                              const origIdx = (settings.vodafone_cash_numbers || []).indexOf(num);
+                              const lineLabel = settings.line_labels?.[num] || `خط ${origIdx >= 0 ? origIdx + 1 : idx + 1}`;
                               return (
-                                <div key={idx} className="flex flex-col xs:flex-row items-stretch xs:items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                <div key={num} className="flex flex-col xs:flex-row items-stretch xs:items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
                                   <div className="flex items-center gap-2.5 min-w-0">
                                     <span className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 font-bold text-xs border border-rose-500/30 flex-shrink-0">
                                       {lineLabel}
@@ -680,11 +702,11 @@ export default function CheckoutPage() {
                                   </div>
                                   <button
                                     type="button"
-                                    onClick={() => handleCopy(num, `voda-${idx}`)}
+                                    onClick={() => handleCopy(num, `voda-${num}`)}
                                     className="w-full xs:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition flex-shrink-0"
                                   >
-                                    {copiedText === `voda-${idx}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                    <span>{copiedText === `voda-${idx}` ? 'تم النسخ' : 'نسخ الرقم'}</span>
+                                    {copiedText === `voda-${num}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                    <span>{copiedText === `voda-${num}` ? 'تم النسخ' : 'نسخ الرقم'}</span>
                                   </button>
                                 </div>
                               );
@@ -702,17 +724,17 @@ export default function CheckoutPage() {
 
                           <div className="space-y-2">
                             {instaAccounts.map((acc, idx) => (
-                              <div key={idx} className="flex flex-wrap xs:flex-nowrap items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                              <div key={acc} className="flex flex-wrap xs:flex-nowrap items-center justify-between gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
                                 <span className="text-sm sm:text-base font-mono font-bold text-white truncate dir-ltr select-all">
                                   {acc}
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={() => handleCopy(acc, `insta-${idx}`)}
+                                  onClick={() => handleCopy(acc, `insta-${acc}`)}
                                   className="w-full xs:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition flex-shrink-0"
                                 >
-                                  {copiedText === `insta-${idx}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                  <span>{copiedText === `insta-${idx}` ? 'تم النسخ' : 'نسخ الحساب'}</span>
+                                  {copiedText === `insta-${acc}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                  <span>{copiedText === `insta-${acc}` ? 'تم النسخ' : 'نسخ الحساب'}</span>
                                 </button>
                               </div>
                             ))}

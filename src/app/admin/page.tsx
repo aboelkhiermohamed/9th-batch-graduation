@@ -59,7 +59,7 @@ import {
   X
 } from 'lucide-react';
 import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
-import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase, parseAttendeesAndCleanOpt, clearOrdersInSupabase, deleteOrderFromSupabase, cleanupBase64InSupabase } from '@/lib/supabaseClient';
+import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase, parseAttendeesAndCleanOpt, clearOrdersInSupabase, deleteOrderFromSupabase, cleanupBase64InSupabase, decodeProdMeta } from '@/lib/supabaseClient';
 import { normalizePhoneNumber, isValidEgyptianPhone } from '@/lib/smsParser';
 
 function generateUUID() {
@@ -141,6 +141,13 @@ function ExplicitSearchInput({
   useEffect(() => {
     setLocalVal(value);
   }, [value]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onChange(localVal);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [localVal, onChange]);
 
   const handleTriggerSearch = () => {
     onChange(localVal);
@@ -562,27 +569,11 @@ export default function AdminDashboardPage() {
     return null;
   }
 
-  // Fast memoized Transaction Map to eliminate N*M loop scanning on every render/search/click
-  const orderMatchedTxMap = useMemo(() => {
-    const map = new Map<string, IncomingTransaction>();
-    if (!orders || orders.length === 0 || !transactions || transactions.length === 0) return map;
+  // Fast memoized Map caching pre-computed transaction matches, effective lines, and search strings per order
+  const orderMetaMap = useMemo(() => {
+    const map = new Map<string, { matchedTx: IncomingTransaction | null; effectiveLine: string | undefined; searchableText: string }>();
+    if (!orders || orders.length === 0) return map;
 
-    orders.forEach(order => {
-      const match = findMatchedTransaction(order);
-      if (match) map.set(order.id, match);
-    });
-
-    return map;
-  }, [orders, transactions]);
-
-  // Helper to resolve matched transaction for an order (via fast O(1) Map lookup)
-  const findMatchedTx = (o: Order) => {
-    if (!o || !o.id) return null;
-    return orderMatchedTxMap.get(o.id) || findMatchedTransaction(o);
-  };
-
-  // Dynamic helper to resolve confirmed line even for legacy/past matched orders
-  const getEffectiveConfirmedLine = (o: Order) => {
     const extractPhoneFromText = (str: string | undefined): string | undefined => {
       if (!str) return undefined;
       const normDigits = str.replace(/[^0-9]/g, '');
@@ -603,47 +594,87 @@ export default function AdminDashboardPage() {
       return undefined;
     };
 
-    if (o.confirmed_line) {
-      const p = extractPhoneFromText(o.confirmed_line);
-      if (p) return p;
-    }
-    if (o.notes && o.notes.includes('[CONFIRMED_LINE:')) {
-      const match = o.notes.match(/\[CONFIRMED_LINE:\s*(.*?)\]/);
-      if (match && match[1]) {
-        const p = extractPhoneFromText(match[1]);
-        if (p) return p;
+    orders.forEach(order => {
+      const matchedTx = findMatchedTransaction(order);
+
+      let effectiveLine: string | undefined = undefined;
+      if (order.confirmed_line) {
+        effectiveLine = extractPhoneFromText(order.confirmed_line);
       }
-    }
-    const tx = findMatchedTx(o);
-    if (tx) {
-      if (tx.recipient_phone) {
-        const p = extractPhoneFromText(tx.recipient_phone);
-        if (p) return p;
+      if (!effectiveLine && order.notes && order.notes.includes('[CONFIRMED_LINE:')) {
+        const match = order.notes.match(/\[CONFIRMED_LINE:\s*(.*?)\]/);
+        if (match && match[1]) {
+          effectiveLine = extractPhoneFromText(match[1]);
+        }
       }
-      if (tx.raw_sms) {
-        const p = extractPhoneFromText(tx.raw_sms);
-        if (p) return p;
+      if (!effectiveLine && matchedTx) {
+        if (matchedTx.recipient_phone) {
+          effectiveLine = extractPhoneFromText(matchedTx.recipient_phone);
+        } else if (matchedTx.raw_sms) {
+          effectiveLine = extractPhoneFromText(matchedTx.raw_sms);
+        } else if (matchedTx.device_name) {
+          effectiveLine = extractPhoneFromText(matchedTx.device_name);
+        }
       }
-      if (tx.device_name) {
-        const p = extractPhoneFromText(tx.device_name);
-        if (p) return p;
+      if (!effectiveLine && (order.matched_device_id || order.matched_device_name)) {
+        const dev = devices.find(d => 
+          (order.matched_device_id && d.id === order.matched_device_id) ||
+          (order.matched_device_name && d.device_name === order.matched_device_name)
+        );
+        if (dev && dev.phone_number) {
+          effectiveLine = extractPhoneFromText(dev.phone_number);
+        }
       }
-    }
-    if (o.matched_device_id || o.matched_device_name) {
-      const dev = devices.find(d => 
-        (o.matched_device_id && d.id === o.matched_device_id) ||
-        (o.matched_device_name && d.device_name === o.matched_device_name)
-      );
-      if (dev && dev.phone_number) {
-        const p = extractPhoneFromText(dev.phone_number);
-        if (p) return p;
+      if (!effectiveLine) {
+        effectiveLine = order.confirmed_line || undefined;
       }
-    }
-    return o.confirmed_line || undefined;
+
+      // Build unified searchable text once
+      const parts: string[] = [
+        order.order_code || '',
+        order.customer_name || '',
+        order.customer_phone || '',
+        order.transaction_ref || '',
+        order.sender_phone || '',
+        order.notes || ''
+      ];
+      if (order.items && order.items.length > 0) {
+        order.items.forEach(item => {
+          if (item.product_title) parts.push(item.product_title);
+          if (item.custom_text) parts.push(item.custom_text);
+          if (item.selected_size) parts.push(item.selected_size);
+          if (item.customization_option) parts.push(item.customization_option);
+          if (item.attendees && Array.isArray(item.attendees)) {
+            item.attendees.forEach((a: any) => {
+              if (a.name) parts.push(a.name);
+              if (a.phone) parts.push(a.phone);
+            });
+          }
+        });
+      }
+
+      map.set(order.id, {
+        matchedTx,
+        effectiveLine,
+        searchableText: parts.join(' ').toLowerCase()
+      });
+    });
+
+    return map;
+  }, [orders, transactions, devices]);
+
+  // Fast O(1) lookups
+  const findMatchedTx = (o: Order | null) => {
+    if (!o || !o.id) return null;
+    return orderMetaMap.get(o.id)?.matchedTx || null;
   };
 
-  const isOrderMatchedToLine = (o: Order, targetNum: string) => {
-    const line = getEffectiveConfirmedLine(o);
+  const getEffectiveConfirmedLine = (o: Order | null) => {
+    if (!o || !o.id) return undefined;
+    return orderMetaMap.get(o.id)?.effectiveLine;
+  };
+
+  const isOrderMatchedToLine = (line: string | undefined, targetNum: string) => {
     if (!line) return false;
     const cleanLine = normalizePhoneNumber(line) || line.replace(/[^0-9]/g, '');
     const cleanTarget = normalizePhoneNumber(targetNum) || targetNum.replace(/[^0-9]/g, '');
@@ -654,40 +685,35 @@ export default function AdminDashboardPage() {
            targetNum.includes(line);
   };
 
-  // Memoized Filtered orders list using useDeferredValue to prevent input lag
+  // Ultra-fast Memoized Filtered orders list using pre-indexed searchableText
   const filteredOrders = useMemo(() => {
     if (!orders || orders.length === 0) return [];
     const searchLower = deferredOrderSearch.trim().toLowerCase();
 
     return orders.filter(o => {
-      const matchSearch = !searchLower || 
-        (o.order_code && o.order_code.toLowerCase().includes(searchLower)) ||
-        (o.customer_name && o.customer_name.toLowerCase().includes(searchLower)) ||
-        (o.customer_phone && o.customer_phone.includes(searchLower)) ||
-        (o.transaction_ref && o.transaction_ref.toLowerCase().includes(searchLower)) ||
-        (o.sender_phone && o.sender_phone.includes(searchLower)) ||
-        (o.notes && o.notes.toLowerCase().includes(searchLower)) ||
-        (o.items && o.items.some(item => 
-          (item.product_title && item.product_title.toLowerCase().includes(searchLower)) ||
-          (item.custom_text && item.custom_text.toLowerCase().includes(searchLower)) ||
-          (item.selected_size && item.selected_size.toLowerCase().includes(searchLower))
-        ));
+      const meta = orderMetaMap.get(o.id);
+      const matchSearch = !searchLower || (meta ? meta.searchableText.includes(searchLower) : false);
 
       const matchStatus = statusFilter === 'all' || 
         (statusFilter === 'all_pending' ? (o.status === 'pending' || o.status === 'pending_difference') :
         statusFilter === 'all_verified' ? (o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered') :
         o.status === statusFilter);
 
-      const effectiveLine = getEffectiveConfirmedLine(o);
+      const effectiveLine = meta?.effectiveLine;
       const matchLine = lineFilter === 'all' ||
         (lineFilter === 'manual' ? Boolean(!effectiveLine && o.verified_by) :
-        isOrderMatchedToLine(o, lineFilter));
+        isOrderMatchedToLine(effectiveLine, lineFilter));
 
       const matchPayment = paymentFilter === 'all' || o.payment_method === paymentFilter;
 
       return matchSearch && matchStatus && matchLine && matchPayment;
     });
-  }, [orders, transactions, deferredOrderSearch, statusFilter, lineFilter, paymentFilter, orderMatchedTxMap, devices]);
+  }, [orders, deferredOrderSearch, statusFilter, lineFilter, paymentFilter, orderMetaMap]);
+
+  // Paginated orders array to render max visibleCount items in DOM for 60FPS UI performance
+  const displayOrders = useMemo(() => {
+    return filteredOrders.slice(0, visibleCount);
+  }, [filteredOrders, visibleCount]);
 
   // Periodic poll for devices when gateway tab is active (Every 10 seconds)
   useEffect(() => {
@@ -886,6 +912,17 @@ export default function AdminDashboardPage() {
       return order.items;
     }
 
+    // Try decoding items embedded in notes
+    if (order.notes && order.notes.includes('[ITEMS_META_B64:')) {
+      const b64Match = order.notes.match(/\[ITEMS_META_B64:([A-Za-z0-9+/=]+)\]/);
+      if (b64Match && b64Match[1]) {
+        const decoded = decodeProdMeta(b64Match[1]);
+        if (decoded && Array.isArray(decoded) && decoded.length > 0) {
+          return decoded;
+        }
+      }
+    }
+
     const amount = Number(order.total_amount || 0);
 
     // 1. Single direct product price match
@@ -921,7 +958,7 @@ export default function AdminDashboardPage() {
       id: `fallback-${order.id}`,
       order_id: order.id,
       product_id: 'unknown',
-      product_title: `طلب منتج تخرج بقيمة (${amount} ج.م)`,
+      product_title: `طلب بقيمة (${amount} ج.م) - يتطلب تحديد المنتج ⚠️`,
       quantity: 1,
       unit_price: amount
     }];
@@ -2718,7 +2755,7 @@ export default function AdminDashboardPage() {
                   >
                     <option value="all" className="bg-slate-900 text-slate-100">📱 كافة الخطوط ({orders.length})</option>
                     {settings.vodafone_cash_numbers.map((num, idx) => {
-                      const count = orders.filter(o => isOrderMatchedToLine(o, num)).length;
+                      const count = orders.filter(o => isOrderMatchedToLine(getEffectiveConfirmedLine(o), num)).length;
                       return (
                         <option key={idx} value={num} className="bg-slate-900 text-amber-300">
                           {settings.line_labels?.[num] || `خط ${idx + 1}`} ({num}) [{count}]
@@ -2810,7 +2847,7 @@ export default function AdminDashboardPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredOrders.map(order => (
+                    displayOrders.map(order => (
                       <tr 
                         key={order.id} 
                         onClick={() => setSelectedOrderModal(order)}

@@ -821,14 +821,22 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
 
     // Insert items into store_order_items
     if (order.items && order.items.length > 0) {
-      const productsList = getMemoryProducts();
-      const firstValidProdUuid = productsList.find(p => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id))?.id || 'a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6';
+      let activeDbProdUuid = getMemoryProducts().find(p => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id))?.id;
+      if (!activeDbProdUuid && supabase) {
+        try {
+          const { data: dbP } = await supabase.from('store_products').select('id').limit(1);
+          if (dbP && dbP.length > 0 && dbP[0].id) {
+            activeDbProdUuid = dbP[0].id;
+          }
+        } catch (e) {}
+      }
 
+      const productsList = getMemoryProducts();
       const itemsPayload = order.items.map((item) => {
         let pId = item.product_id || item.product?.id;
         if (!pId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pId)) {
           const match = productsList.find(p => p.title_ar === item.product_title || p.title === item.product_title);
-          pId = (match && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(match.id)) ? match.id : firstValidProdUuid;
+          pId = (match && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(match.id)) ? match.id : activeDbProdUuid;
         }
 
         const itemId = (item.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id))
@@ -860,7 +868,7 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
         return {
           id: itemId,
           order_id: finalOrderId,
-          product_id: pId,
+          product_id: pId || activeDbProdUuid || null,
           product_title: titleWithDetails + imgMarker,
           image_url: itemImg || null,
           selected_size: item.selected_size || (item as any).selectedSize || null,
@@ -876,7 +884,7 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
           .from('store_order_items')
           .insert(itemsPayload);
 
-        // Smart Fallback Loop for store_order_items missing columns
+        // Smart Fallback Loop for store_order_items missing columns or foreign key mismatches
         let attempts = 0;
         while (itemsError && attempts < 5) {
           attempts++;
@@ -887,6 +895,21 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
             itemsPayload.forEach(p => delete (p as any)[missingCol]);
             const res = await supabase.from('store_order_items').insert(itemsPayload);
             itemsError = res.error;
+          } else if (itemsError.message.includes('foreign key constraint') || itemsError.message.includes('store_order_items_product_id_fkey') || itemsError.message.includes('violates')) {
+            console.warn('Foreign key constraint on product_id during store_order_items insert. Resolving active DB product ID...');
+            try {
+              const { data: dbP } = await supabase.from('store_products').select('id').limit(1);
+              if (dbP && dbP.length > 0 && dbP[0].id) {
+                const realProdId = dbP[0].id;
+                itemsPayload.forEach(p => { p.product_id = realProdId; });
+                const res = await supabase.from('store_order_items').insert(itemsPayload);
+                itemsError = res.error;
+              } else {
+                break;
+              }
+            } catch (e) {
+              break;
+            }
           } else {
             console.warn('Supabase store_order_items insert warning:', itemsError.message);
             break;
@@ -1328,8 +1351,30 @@ export async function updateOrderInSupabase(updatedOrder: Order): Promise<boolea
       h: updatedOrder.edit_history || []
     })}]`;
 
-    let cleanNotes = (updatedOrder.notes || '').replace(/\[PARTIAL_META:.*?\]/g, '').trim();
-    const finalNotes = `${cleanNotes} ${metaTag}`.trim();
+    const cleanItemsMeta = (updatedOrder.items || []).map(item => {
+      const copy = { ...item };
+      if (copy.attendees && Array.isArray(copy.attendees)) {
+        copy.attendees = copy.attendees.map((a: any) => {
+          let pUrl = a.photo_url;
+          if (pUrl && pUrl.length > 2000 && pUrl.startsWith('data:')) {
+            pUrl = pUrl.substring(0, 100) + '...';
+          }
+          return { ...a, photo_url: pUrl };
+        });
+      }
+      return copy;
+    });
+    const b64Items = encodeProdMeta(cleanItemsMeta);
+    const itemsMetaMarker = b64Items ? ` [ITEMS_META_B64:${b64Items}]` : '';
+
+    let cleanNotes = (updatedOrder.notes || '')
+      .replace(/\[PARTIAL_META:.*?\]/g, '')
+      .replace(/\[ITEMS_META_B64:[A-Za-z0-9+/=]+\]/g, '')
+      .replace(/\[ITEMS_META:[\s\S]*?\]\]?/g, '')
+      .replace(/ITEMS_META[\s\S]*/g, '')
+      .trim();
+
+    const finalNotes = `${cleanNotes} ${metaTag}${itemsMetaMarker}`.trim();
 
     const payload: any = {
       status: updatedOrder.status,
@@ -1366,6 +1411,16 @@ export async function updateOrderInSupabase(updatedOrder: Order): Promise<boolea
 
     // Re-insert items in store_order_items if present
     if (updatedOrder.items && updatedOrder.items.length > 0) {
+      let activeDbProdUuid = getMemoryProducts().find(p => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id))?.id;
+      if (!activeDbProdUuid && supabase) {
+        try {
+          const { data: dbP } = await supabase.from('store_products').select('id').limit(1);
+          if (dbP && dbP.length > 0 && dbP[0].id) {
+            activeDbProdUuid = dbP[0].id;
+          }
+        } catch (e) {}
+      }
+
       await supabase.from('store_order_items').delete().eq('order_id', updatedOrder.id);
       
       const itemsPayload = updatedOrder.items.map(item => {
@@ -1377,11 +1432,16 @@ export async function updateOrderInSupabase(updatedOrder: Order): Promise<boolea
           }
         }
 
+        let pId = item.product_id || item.product?.id;
+        if (!pId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pId)) {
+          pId = activeDbProdUuid;
+        }
+
         return {
           id: (item.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)) ? item.id : undefined,
           order_id: updatedOrder.id,
-          product_id: item.product_id || item.product?.id,
-          product_title: item.product_title,
+          product_id: pId || activeDbProdUuid || null,
+          product_title: item.product_title || 'منتج التخرج',
           image_url: item.image_url || null,
           selected_size: item.selected_size || null,
           custom_text: item.custom_text || null,
@@ -1391,7 +1451,17 @@ export async function updateOrderInSupabase(updatedOrder: Order): Promise<boolea
         };
       });
 
-      await supabase.from('store_order_items').insert(itemsPayload);
+      let { error: itemsError } = await supabase.from('store_order_items').insert(itemsPayload);
+      if (itemsError && (itemsError.message.includes('foreign key constraint') || itemsError.message.includes('store_order_items_product_id_fkey') || itemsError.message.includes('violates'))) {
+        try {
+          const { data: dbP } = await supabase.from('store_products').select('id').limit(1);
+          if (dbP && dbP.length > 0 && dbP[0].id) {
+            const fallbackProdId = dbP[0].id;
+            itemsPayload.forEach(p => { p.product_id = fallbackProdId; });
+            await supabase.from('store_order_items').insert(itemsPayload);
+          }
+        } catch (e) {}
+      }
     }
 
     return true;

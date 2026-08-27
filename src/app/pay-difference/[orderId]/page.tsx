@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Order, StoreSettings } from '@/types';
 import { fetchOrdersFromSupabase, fetchSettingsFromSupabase, updateOrderInSupabase } from '@/lib/supabaseClient';
@@ -19,6 +19,16 @@ import {
   FileCheck,
   Package
 } from 'lucide-react';
+
+function shuffleArray<T>(array: T[]): T[] {
+  if (!array || array.length <= 1) return array ? [...array] : [];
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 export default function PayDifferencePage() {
   const params = useParams();
@@ -170,9 +180,12 @@ export default function PayDifferencePage() {
   const vodaFee = Math.ceil(rawVodaFee);
   const finalPayableDiff = paymentMethod === 'vodafone_cash' ? (remainingBalance + vodaFee) : remainingBalance;
 
-  const vodaNums = settings?.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0
-    ? settings.vodafone_cash_numbers
-    : ['01015339426'];
+  const vodaNums = useMemo(() => {
+    const raw = settings?.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0
+      ? settings.vodafone_cash_numbers
+      : ['01015339426'];
+    return shuffleArray(raw);
+  }, [settings?.vodafone_cash_numbers]);
 
   if (isSubmitted) {
     return (
@@ -317,19 +330,28 @@ export default function PayDifferencePage() {
               </div>
 
               <div className="space-y-2">
-                {vodaNums.map((num, idx) => (
-                  <div key={idx} className="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-800">
-                    <span className="font-mono text-base font-bold text-white dir-ltr">{num}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(num, `num-${idx}`)}
-                      className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1"
-                    >
-                      {copiedText === `num-${idx}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedText === `num-${idx}` ? 'تم النسخ' : 'نسخ'}</span>
-                    </button>
-                  </div>
-                ))}
+                {vodaNums.map((num, idx) => {
+                  const origIdx = (settings?.vodafone_cash_numbers || []).indexOf(num);
+                  const lineLabel = settings?.line_labels?.[num] || `خط ${origIdx >= 0 ? origIdx + 1 : idx + 1}`;
+                  return (
+                    <div key={num} className="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 font-bold text-[11px] border border-rose-500/30">
+                          {lineLabel}
+                        </span>
+                        <span className="font-mono text-base font-bold text-white dir-ltr">{num}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(num, `num-${num}`)}
+                        className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1"
+                      >
+                        {copiedText === `num-${num}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedText === `num-${num}` ? 'تم النسخ' : 'نسخ'}</span>
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
