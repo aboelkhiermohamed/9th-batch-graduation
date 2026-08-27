@@ -165,6 +165,7 @@ export async function GET(req: NextRequest) {
 
   if (phone && phone.trim()) {
     const rawQuery = phone.trim().toLowerCase();
+    const cleanQuery = rawQuery.replace(/^#/, '').trim();
     const cleanPhone = normalizePhoneNumber(rawQuery);
     const digitsOnly = rawQuery.replace(/[^0-9]/g, '');
     const queryDigits = cleanPhone || digitsOnly;
@@ -177,7 +178,7 @@ export async function GET(req: NextRequest) {
       const ref = (o.transaction_ref || '').toLowerCase();
       const oCode = (o.order_code || '').toLowerCase();
 
-      if (oCode === rawQuery || ref === rawQuery) return true;
+      if (oCode === rawQuery || oCode === cleanQuery || `#${oCode}` === rawQuery || ref === rawQuery || ref === cleanQuery || oCode.includes(cleanQuery)) return true;
       if (queryDigits.length >= 6) {
         return p1.includes(queryDigits) || p2.includes(queryDigits) || 
                rawP1.includes(queryDigits) || rawP2.includes(queryDigits) ||

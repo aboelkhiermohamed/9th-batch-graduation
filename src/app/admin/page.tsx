@@ -632,9 +632,11 @@ export default function AdminDashboardPage() {
       // Build unified searchable text once
       const parts: string[] = [
         order.order_code || '',
+        order.order_code ? `#${order.order_code}` : '',
         order.customer_name || '',
         order.customer_phone || '',
         order.transaction_ref || '',
+        order.transaction_ref ? `#${order.transaction_ref}` : '',
         order.sender_phone || '',
         order.notes || ''
       ];
@@ -688,11 +690,12 @@ export default function AdminDashboardPage() {
   // Ultra-fast Memoized Filtered orders list using pre-indexed searchableText
   const filteredOrders = useMemo(() => {
     if (!orders || orders.length === 0) return [];
-    const searchLower = deferredOrderSearch.trim().toLowerCase();
+    const rawSearch = deferredOrderSearch.trim().toLowerCase();
+    const cleanSearch = rawSearch.replace(/^#/, '').trim();
 
     return orders.filter(o => {
       const meta = orderMetaMap.get(o.id);
-      const matchSearch = !searchLower || (meta ? meta.searchableText.includes(searchLower) : false);
+      const matchSearch = !rawSearch || (meta ? (meta.searchableText.includes(rawSearch) || (cleanSearch ? meta.searchableText.includes(cleanSearch) : false)) : false);
 
       const matchStatus = statusFilter === 'all' || 
         (statusFilter === 'all_pending' ? (o.status === 'pending' || o.status === 'pending_difference') :

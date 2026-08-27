@@ -230,10 +230,11 @@ export default function OrdersHistory({
     // Search query filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
-      const codeMatch = order.order_code.toLowerCase().includes(q);
+      const qClean = q.replace(/^#/, '').trim();
+      const codeMatch = order.order_code.toLowerCase().includes(q) || (qClean ? order.order_code.toLowerCase().includes(qClean) : false);
       const nameMatch = order.customer_name.toLowerCase().includes(q);
-      const phoneMatch = order.customer_phone.includes(q);
-      const refMatch = (order.transaction_ref || '').toLowerCase().includes(q);
+      const phoneMatch = order.customer_phone.includes(q) || (qClean ? order.customer_phone.includes(qClean) : false);
+      const refMatch = (order.transaction_ref || '').toLowerCase().includes(q) || (qClean ? (order.transaction_ref || '').toLowerCase().includes(qClean) : false);
       const itemMatch = order.items?.some(i => i.product_title.toLowerCase().includes(q));
 
       return codeMatch || nameMatch || phoneMatch || refMatch || itemMatch;
