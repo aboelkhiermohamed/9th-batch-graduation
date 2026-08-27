@@ -611,32 +611,32 @@ export default function OrdersHistory({
 
                     {/* Direct Contact Support for this Order */}
                     {(() => {
-                      const handleHeaderTelegramSupport = (e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        const tgGroupUrl = 'https://t.me/+6VnJtWv5mvpmYjJk';
-                        const itemsList = (order.items || []).map(i => `${i.product_title} × ${i.quantity}${i.selected_size ? ` (${i.selected_size})` : ''}`).join('، ');
-                        const messageText = `مرحباً إدارة المتجر 👋\nأريد الاستفسار بخصوص الطلب الخاص بي:\n\n📋 كود الطلب: #${order.order_code}\n👤 اسم العميل: ${order.customer_name}\n📱 رقم الموبايل: ${order.customer_phone}\n💳 طريقة الدفع: ${order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}\n💰 إجمالي المبلغ: ${order.total_amount} ج.م\n📌 الرقم المرجعي: ${order.transaction_ref || '—'}\n🛒 تفاصيل المنتجات: ${itemsList || 'طلب تخرج'}`;
+                      const tgGroupUrl = 'https://t.me/+6VnJtWv5mvpmYjJk';
+                      const itemsList = (order.items || []).map(i => `${i.product_title} × ${i.quantity}${i.selected_size ? ` (${i.selected_size})` : ''}`).join('، ');
+                      const messageText = `مرحباً إدارة المتجر 👋\nأريد الاستفسار بخصوص الطلب الخاص بي:\n\n📋 كود الطلب: #${order.order_code}\n👤 اسم العميل: ${order.customer_name}\n📱 رقم الموبايل: ${order.customer_phone}\n💳 طريقة الدفع: ${order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}\n💰 إجمالي المبلغ: ${order.total_amount} ج.م\n📌 الرقم المرجعي: ${order.transaction_ref || '—'}\n🛒 تفاصيل المنتجات: ${itemsList || 'طلب تخرج'}`;
 
+                      const handleCopyHeaderDetails = (e: React.MouseEvent) => {
+                        e.stopPropagation();
                         try {
                           if (navigator.clipboard) {
                             navigator.clipboard.writeText(messageText);
                           }
                         } catch(err) {}
-                        alert('تم نسخ تفاصيل طلبك تلقائياً! 📋\nسيتم فتح جروب التليجرام الآن، قم بعمل لصق (Paste) للرسالة داخل الجروب.');
-                        window.open(tgGroupUrl, '_blank');
                       };
 
                       return (
-                        <button
-                          type="button"
-                          onClick={handleHeaderTelegramSupport}
+                        <a
+                          href={tgGroupUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={handleCopyHeaderDetails}
                           className="px-3 py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
                           title="الانضمام والدخول لجروب التليجرام"
                         >
                           <Send className="w-3.5 h-3.5 text-sky-400" />
                           <span className="hidden sm:inline">تواصل مع الدعم 💬</span>
                           <span className="sm:hidden">دعم 💬</span>
-                        </button>
+                        </a>
                       );
                     })()}
 
@@ -953,30 +953,30 @@ export default function OrdersHistory({
 
                       {/* Contact Support Button */}
                       {(() => {
-                        const handleTelegramSupport = () => {
-                          const tgGroupUrl = 'https://t.me/+6VnJtWv5mvpmYjJk';
-                          const itemsList = (order.items || []).map(i => `${i.product_title} × ${i.quantity}${i.selected_size ? ` (${i.selected_size})` : ''}`).join('، ');
-                          const messageText = `مرحباً إدارة المتجر 👋\nأريد الاستفسار بخصوص الطلب الخاص بي:\n\n📋 كود الطلب: #${order.order_code}\n👤 اسم العميل: ${order.customer_name}\n📱 رقم الموبايل: ${order.customer_phone}\n💳 طريقة الدفع: ${order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}\n💰 إجمالي المبلغ: ${order.total_amount} ج.م\n📌 الرقم المرجعي: ${order.transaction_ref || '—'}\n🛒 تفاصيل المنتجات: ${itemsList || 'طلب تخرج'}`;
+                        const tgGroupUrl = 'https://t.me/+6VnJtWv5mvpmYjJk';
+                        const itemsList = (order.items || []).map(i => `${i.product_title} × ${i.quantity}${i.selected_size ? ` (${i.selected_size})` : ''}`).join('، ');
+                        const messageText = `مرحباً إدارة المتجر 👋\nأريد الاستفسار بخصوص الطلب الخاص بي:\n\n📋 كود الطلب: #${order.order_code}\n👤 اسم العميل: ${order.customer_name}\n📱 رقم الموبايل: ${order.customer_phone}\n💳 طريقة الدفع: ${order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}\n💰 إجمالي المبلغ: ${order.total_amount} ج.م\n📌 الرقم المرجعي: ${order.transaction_ref || '—'}\n🛒 تفاصيل المنتجات: ${itemsList || 'طلب تخرج'}`;
 
+                        const handleCopyDetails = () => {
                           try {
                             if (navigator.clipboard) {
                               navigator.clipboard.writeText(messageText);
                             }
                           } catch(e) {}
-                          alert('تم نسخ تفاصيل طلبك تلقائياً! 📋\nسيتم فتح جروب التليجرام الآن، قم بعمل لصق (Paste) للرسالة داخل الجروب.');
-                          window.open(tgGroupUrl, '_blank');
                         };
 
                         return (
-                          <button
-                            type="button"
-                            onClick={handleTelegramSupport}
+                          <a
+                            href={tgGroupUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={handleCopyDetails}
                             className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center justify-center gap-2"
                           >
                             <Send className="w-3.5 h-3.5 text-sky-400" />
                             <span>الدخول لجروب التليجرام والدعم</span>
                             <ArrowUpRight className="w-3.5 h-3.5 text-sky-400" />
-                          </button>
+                          </a>
                         );
                       })()}
                     </div>
