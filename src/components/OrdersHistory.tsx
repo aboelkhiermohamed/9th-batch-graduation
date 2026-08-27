@@ -28,7 +28,8 @@ import {
   Layers,
   ArrowUpRight,
   AlertCircle,
-  Ticket
+  Ticket,
+  Send
 } from 'lucide-react';
 import { Order, OrderItem, EventAttendee } from '@/types';
 
@@ -943,20 +944,21 @@ export default function OrdersHistory({
 
                       {/* Contact Support Button */}
                       {(() => {
-                        const targetPhone = (supportPhone || '01555583154').replace(/[^0-9]/g, '');
-                        const cleanPhone = targetPhone.startsWith('20') ? targetPhone : `20${targetPhone.replace(/^0+/, '')}`;
-                        const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(`مرحباً، أريد الاستفسار عن كود الطلب #${order.order_code} الخاص بي (${order.customer_name})`)}`;
+                        const tgGroupUrl = 'https://t.me/+6VnJtWv5mvpmYjJk';
+                        const itemsList = (order.items || []).map(i => `${i.product_title} × ${i.quantity}${i.selected_size ? ` (${i.selected_size})` : ''}`).join('، ');
+                        const messageText = `مرحباً إدارة المتجر 👋\nأريد الاستفسار بخصوص الطلب الخاص بي:\n\n📋 كود الطلب: #${order.order_code}\n👤 اسم العميل: ${order.customer_name}\n📱 رقم الموبايل: ${order.customer_phone}\n💳 طريقة الدفع: ${order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}\n💰 إجمالي المبلغ: ${order.total_amount} ج.م\n📌 الرقم المرجعي: ${order.transaction_ref || '—'}\n🛒 تفاصيل المنتجات: ${itemsList || 'طلب تخرج'}\n\nجروب الدعم الفني: ${tgGroupUrl}`;
+                        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(tgGroupUrl)}&text=${encodeURIComponent(messageText)}`;
 
                         return (
                           <a
-                            href={waUrl}
+                            href={shareUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center justify-center gap-2"
+                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center justify-center gap-2"
                           >
-                            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>تواصل مع الدعم عبر الواتساب</span>
-                            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
+                            <Send className="w-3.5 h-3.5 text-sky-400" />
+                            <span>تواصل مع الدعم ع التليجرام</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 text-sky-400" />
                           </a>
                         );
                       })()}

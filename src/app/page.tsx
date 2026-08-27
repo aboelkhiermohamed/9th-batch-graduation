@@ -1632,8 +1632,8 @@ export default function StoreFrontPage() {
               <span>سياسة الخصوصية والشروط</span>
             </a>
             <span className="text-slate-700">•</span>
-            <a href="https://t.me/M7MED1573" target="_blank" rel="noopener noreferrer" className="hover:text-sky-400 transition text-sky-400 font-bold">
-              تليجرام: M7MED1573@
+            <a href="https://t.me/+6VnJtWv5mvpmYjJk" target="_blank" rel="noopener noreferrer" className="hover:text-sky-300 transition text-sky-400 font-bold flex items-center gap-1">
+              <span>💬 جروب الدعم ع التليجرام</span>
             </a>
           </div>
           <p>© 2026 {settings.store_name} - جميع الحقوق محفوظة للدفعة التاسعة.</p>

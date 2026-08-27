@@ -491,18 +491,19 @@ export default function CheckoutPage() {
               <span>متابعة وتتبع حالة الطلب 🔍</span>
             </button>
             {(() => {
-              const rawSupport = (settings.support_phone || '01555583154').replace(/[^0-9]/g, '');
-              const cleanSupport = rawSupport.startsWith('20') ? rawSupport : `20${rawSupport.replace(/^0+/, '')}`;
-              const waUrl = `https://wa.me/${cleanSupport}?text=${encodeURIComponent(`مرحباً إدارة المتجر، قمت بإنشاء الطلب رقم #${createdOrder.order_code} (${createdOrder.customer_name}) وأريد الاستفسار/التواصل بخصوص الطلب`)}`;
+              const tgGroupUrl = 'https://t.me/+6VnJtWv5mvpmYjJk';
+              const itemsList = (createdOrder.items || []).map(i => `${i.product_title} × ${i.quantity}${i.selected_size ? ` (مقاس ${i.selected_size})` : ''}`).join('، ');
+              const messageText = `مرحباً إدارة المتجر 👋\nقمت بإنشاء الطلب وأريد الاستفسار/التواصل معكم:\n\n📋 كود الطلب: #${createdOrder.order_code}\n👤 اسم العميل: ${createdOrder.customer_name}\n📱 رقم الموبايل: ${createdOrder.customer_phone}\n💳 طريقة الدفع: ${createdOrder.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}\n💰 إجمالي المبلغ: ${createdOrder.total_amount} ج.م\n📌 الرقم المرجعي: ${createdOrder.transaction_ref || '—'}\n🛒 تفاصيل المنتجات: ${itemsList || 'طلب تخرج'}\n\nجروب الدعم الفني: ${tgGroupUrl}`;
+              const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(tgGroupUrl)}&text=${encodeURIComponent(messageText)}`;
               return (
                 <a
-                  href={waUrl}
+                  href={shareUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-5 py-3.5 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-xs sm:text-sm border border-emerald-500/40 flex items-center justify-center gap-2 transition"
+                  className="px-5 py-3.5 rounded-2xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 font-bold text-xs sm:text-sm border border-sky-500/40 flex items-center justify-center gap-2 transition"
                 >
-                  <MessageSquare className="w-4 h-4 text-emerald-400" />
-                  <span>تواصل مع الإدارة (واتساب) 💬</span>
+                  <Send className="w-4 h-4 text-sky-400" />
+                  <span>تواصل مع الدعم ع التليجرام 💬</span>
                 </a>
               );
             })()}
