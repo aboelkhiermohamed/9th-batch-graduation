@@ -57,6 +57,17 @@ export default function OrdersHistory({
   const [localOrders, setLocalOrders] = useState<Order[]>(orders);
   const [copiedTelegramOrderId, setCopiedTelegramOrderId] = useState<string | null>(null);
 
+  // Telegram Support Modal State
+  const [telegramModalData, setTelegramModalData] = useState<{
+    orderCode: string;
+    customerName: string;
+    phone: string;
+    total: number;
+    messageText: string;
+    groupUrl: string;
+  } | null>(null);
+  const [isCopiedInModal, setIsCopiedInModal] = useState(false);
+
   // Attendees Edit Modal State
   const [editingAttendeesTarget, setEditingAttendeesTarget] = useState<{
     order: Order;
@@ -435,47 +446,79 @@ export default function OrdersHistory({
         </button>
       </div>
 
-      {/* 2. SUMMARY KPI BAR */}
+      {/* 2. SUMMARY KPI BAR - REDESIGNED & ULTRA CLEAR */}
       {orders.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/90 space-y-1">
-            <span className="text-xs text-slate-400 block font-medium">إجمالي الطلبات</span>
-            <div className="flex items-center justify-between">
-              <span className="text-xl font-extrabold text-white font-mono">{totalOrdersCount}</span>
-              <div className="p-2 rounded-xl bg-slate-900 text-slate-400">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          {/* Total Orders Card */}
+          <div className="p-4 rounded-3xl bg-slate-950 border border-slate-800/90 hover:border-indigo-500/40 transition-all duration-300 shadow-lg relative overflow-hidden group">
+            <div className="absolute -left-4 -top-4 w-16 h-16 bg-indigo-500/10 rounded-full blur-xl group-hover:bg-indigo-500/20 transition"></div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-400">إجمالي الطلبات</span>
+              <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                 <ShoppingBag className="w-4 h-4" />
               </div>
             </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-2xl font-black text-white font-mono">{totalOrdersCount}</span>
+              <span className="text-[11px] font-bold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-lg border border-indigo-500/20">
+                طلب مسجل
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1 font-medium">سجل طلبات حسابك الحالي</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/90 space-y-1">
-            <span className="text-xs text-slate-400 block font-medium">طلبات مؤكدة</span>
-            <div className="flex items-center justify-between">
-              <span className="text-xl font-extrabold text-emerald-400 font-mono">{verifiedCount}</span>
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+          {/* Confirmed Orders Card */}
+          <div className="p-4 rounded-3xl bg-slate-950 border border-slate-800/90 hover:border-emerald-500/40 transition-all duration-300 shadow-lg relative overflow-hidden group">
+            <div className="absolute -left-4 -top-4 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition"></div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-emerald-400">طلبات مؤكدة</span>
+              <div className="p-2.5 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                 <CheckCircle2 className="w-4 h-4" />
               </div>
             </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-2xl font-black text-emerald-400 font-mono">{verifiedCount}</span>
+              <span className="text-[11px] font-bold text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+                مقبول 🟢
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1 font-medium">تم تأكيد الدفع بنجاح</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/90 space-y-1">
-            <span className="text-xs text-slate-400 block font-medium">قيد التحقق</span>
-            <div className="flex items-center justify-between">
-              <span className="text-xl font-extrabold text-amber-400 font-mono">{pendingCount}</span>
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
-                <Clock className="w-4 h-4 animate-spin" />
+          {/* Pending Verification Card */}
+          <div className="p-4 rounded-3xl bg-slate-950 border border-amber-500/30 hover:border-amber-500/60 transition-all duration-300 shadow-lg shadow-amber-500/5 relative overflow-hidden group">
+            <div className="absolute -left-4 -top-4 w-16 h-16 bg-amber-500/15 rounded-full blur-xl group-hover:bg-amber-500/25 transition"></div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-amber-400">قيد التحقق</span>
+              <div className="p-2.5 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse">
+                <Clock className="w-4 h-4" />
               </div>
             </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-2xl font-black text-amber-400 font-mono">{pendingCount}</span>
+              <span className="text-[11px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-lg border border-amber-500/30 animate-pulse">
+                تحت المراجعة ⏳
+              </span>
+            </div>
+            <p className="text-[11px] text-amber-500/80 mt-1 font-medium">جاري التحقق التلقائي من التحويل</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/90 space-y-1">
-            <span className="text-xs text-slate-400 block font-medium">إجمالي المدفوعات</span>
-            <div className="flex items-center justify-between">
-              <span className="text-lg font-extrabold text-amber-300 font-mono">{totalSpent} ج.م</span>
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+          {/* Total Payments Card */}
+          <div className="p-4 rounded-3xl bg-slate-950 border border-slate-800/90 hover:border-cyan-500/40 transition-all duration-300 shadow-lg relative overflow-hidden group">
+            <div className="absolute -left-4 -top-4 w-16 h-16 bg-cyan-500/10 rounded-full blur-xl group-hover:bg-cyan-500/20 transition"></div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-400">إجمالي المدفوعات</span>
+              <div className="p-2.5 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                 <CreditCard className="w-4 h-4" />
               </div>
             </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-xl font-black text-cyan-300 font-mono">{totalSpent} <span className="text-xs font-sans text-slate-400">ج.م</span></span>
+              <span className="text-[11px] font-bold text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded-lg border border-cyan-500/20">
+                المجموع 💳
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1 font-medium">إجمالي قيم المشتريات المسجلة</p>
           </div>
         </div>
       )}
@@ -616,40 +659,36 @@ export default function OrdersHistory({
                       const itemsList = (order.items || []).map(i => `${i.product_title} × ${i.quantity}${i.selected_size ? ` (${i.selected_size})` : ''}`).join('، ');
                       const messageText = `مرحباً إدارة المتجر 👋\nأريد الاستفسار بخصوص الطلب الخاص بي:\n\n📋 كود الطلب: #${order.order_code}\n👤 اسم العميل: ${order.customer_name}\n📱 رقم الموبايل: ${order.customer_phone}\n💳 طريقة الدفع: ${order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}\n💰 إجمالي المبلغ: ${order.total_amount} ج.م\n📌 الرقم المرجعي: ${order.transaction_ref || '—'}\n🛒 تفاصيل المنتجات: ${itemsList || 'طلب تخرج'}`;
 
-                      const handleCopyHeaderDetails = (e: React.MouseEvent) => {
+                      const handleSupportClick = (e: React.MouseEvent) => {
                         e.stopPropagation();
                         try {
                           if (navigator.clipboard) {
                             navigator.clipboard.writeText(messageText);
                           }
                         } catch(err) {}
+                        setTelegramModalData({
+                          orderCode: order.order_code,
+                          customerName: order.customer_name,
+                          phone: order.customer_phone,
+                          total: order.total_amount,
+                          messageText,
+                          groupUrl: tgGroupUrl
+                        });
                         setCopiedTelegramOrderId(order.id);
                         setTimeout(() => setCopiedTelegramOrderId(null), 4000);
                       };
 
                       return (
-                        <a
-                          href={tgGroupUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={handleCopyHeaderDetails}
+                        <button
+                          type="button"
+                          onClick={handleSupportClick}
                           className="px-3 py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
                           title="الانضمام والدخول لجروب التليجرام"
                         >
-                          {copiedTelegramOrderId === order.id ? (
-                            <span className="text-emerald-300 font-bold flex items-center gap-1 animate-pulse">
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              <span className="hidden sm:inline">تم نسخ التفاصيل! 📋</span>
-                              <span className="sm:hidden">تم النسخ 📋</span>
-                            </span>
-                          ) : (
-                            <>
-                              <Send className="w-3.5 h-3.5 text-sky-400" />
-                              <span className="hidden sm:inline">تواصل مع الدعم 💬</span>
-                              <span className="sm:hidden">دعم 💬</span>
-                            </>
-                          )}
-                        </a>
+                          <Send className="w-3.5 h-3.5 text-sky-400" />
+                          <span className="hidden sm:inline">تواصل مع الدعم 💬</span>
+                          <span className="sm:hidden">دعم 💬</span>
+                        </button>
                       );
                     })()}
 
@@ -970,37 +1009,34 @@ export default function OrdersHistory({
                         const itemsList = (order.items || []).map(i => `${i.product_title} × ${i.quantity}${i.selected_size ? ` (${i.selected_size})` : ''}`).join('، ');
                         const messageText = `مرحباً إدارة المتجر 👋\nأريد الاستفسار بخصوص الطلب الخاص بي:\n\n📋 كود الطلب: #${order.order_code}\n👤 اسم العميل: ${order.customer_name}\n📱 رقم الموبايل: ${order.customer_phone}\n💳 طريقة الدفع: ${order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}\n💰 إجمالي المبلغ: ${order.total_amount} ج.م\n📌 الرقم المرجعي: ${order.transaction_ref || '—'}\n🛒 تفاصيل المنتجات: ${itemsList || 'طلب تخرج'}`;
 
-                        const handleCopyDetails = () => {
+                        const handleSupportClick = () => {
                           try {
                             if (navigator.clipboard) {
                               navigator.clipboard.writeText(messageText);
                             }
                           } catch(e) {}
+                          setTelegramModalData({
+                            orderCode: order.order_code,
+                            customerName: order.customer_name,
+                            phone: order.customer_phone,
+                            total: order.total_amount,
+                            messageText,
+                            groupUrl: tgGroupUrl
+                          });
                           setCopiedTelegramOrderId(order.id);
                           setTimeout(() => setCopiedTelegramOrderId(null), 4000);
                         };
 
                         return (
-                          <a
-                            href={tgGroupUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={handleCopyDetails}
-                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center justify-center gap-2"
+                          <button
+                            type="button"
+                            onClick={handleSupportClick}
+                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm"
                           >
-                            {copiedTelegramOrderId === order.id ? (
-                              <span className="text-emerald-300 font-bold flex items-center gap-1.5 animate-pulse">
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                <span>تم نسخ تفاصيل الطلب! 📋</span>
-                              </span>
-                            ) : (
-                              <>
-                                <Send className="w-3.5 h-3.5 text-sky-400" />
-                                <span>الدخول لجروب التليجرام والدعم</span>
-                                <ArrowUpRight className="w-3.5 h-3.5 text-sky-400" />
-                              </>
-                            )}
-                          </a>
+                            <Send className="w-3.5 h-3.5 text-sky-400" />
+                            <span>الدخول لجروب التليجرام والدعم</span>
+                            <ArrowUpRight className="w-3.5 h-3.5 text-sky-400" />
+                          </button>
                         );
                       })()}
                     </div>
@@ -1198,11 +1234,104 @@ export default function OrdersHistory({
 
       {/* 7. TELEGRAM COPIED TOAST BANNER */}
       {copiedTelegramOrderId && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-emerald-500/50 text-emerald-300 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-5">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[99990] bg-slate-900 border border-emerald-500/50 text-emerald-300 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-5">
           <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0">
             <CheckCircle2 className="w-4 h-4" />
           </div>
           <span>تم نسخ تفاصيل طلبك تلقائياً! قم بعمل لصق (Paste) داخل الجروب 💬</span>
+        </div>
+      )}
+
+      {/* 8. TELEGRAM SUPPORT & COPY CONFIRMATION MODAL */}
+      {telegramModalData && (
+        <div className="fixed inset-0 z-[99999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-sky-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl shadow-sky-500/10 space-y-5 relative">
+            <button
+              onClick={() => setTelegramModalData(null)}
+              className="absolute left-4 top-4 p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-sky-500/15 border border-sky-500/30 text-sky-400">
+                <Send className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <span>تم نسخ تفاصيل الطلب! 📋</span>
+                </h3>
+                <p className="text-xs text-sky-300 font-mono font-bold">كود الطلب: #{telegramModalData.orderCode}</p>
+              </div>
+            </div>
+
+            {/* Success Alert Box */}
+            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+              <p>
+                تم نسخ كافة بيانات طلبك تلقائياً إلى حافظة جهازك (Clipboard). عند فتح الجروب قم بعمل <strong>(Paste / لصق)</strong> في المحادثة.
+              </p>
+            </div>
+
+            {/* Message Preview Box */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-400 block">معاينة الرسالة المنسوخة:</label>
+              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 font-mono whitespace-pre-wrap max-h-40 overflow-y-auto scrollbar-thin">
+                {telegramModalData.messageText}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-2 flex flex-col gap-2.5">
+              <a
+                href={telegramModalData.groupUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setTelegramModalData(null)}
+                className="w-full py-3.5 px-4 rounded-2xl bg-sky-500 hover:bg-sky-400 active:scale-98 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20 transition"
+              >
+                <Send className="w-4 h-4" />
+                <span>فتح جروب التليجرام واللصق الآن 🚀</span>
+              </a>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(telegramModalData.messageText);
+                      }
+                    } catch(e) {}
+                    setIsCopiedInModal(true);
+                    setTimeout(() => setIsCopiedInModal(false), 2000);
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center justify-center gap-1.5"
+                >
+                  {isCopiedInModal ? (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>تم النسخ مجدداً 📋</span>
+                    </span>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-slate-400" />
+                      <span>إعادة نسخ الرسالة 📋</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTelegramModalData(null)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold transition"
+                >
+                  إغلاق
+                </button>
+              </div>
+            </div>
+
+          </div>
         </div>
       )}
 
