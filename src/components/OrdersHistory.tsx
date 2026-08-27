@@ -55,6 +55,7 @@ export default function OrdersHistory({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'pending' | 'ready' | 'delivered'>('all');
   const [localOrders, setLocalOrders] = useState<Order[]>(orders);
+  const [copiedTelegramOrderId, setCopiedTelegramOrderId] = useState<string | null>(null);
 
   // Attendees Edit Modal State
   const [editingAttendeesTarget, setEditingAttendeesTarget] = useState<{
@@ -622,6 +623,8 @@ export default function OrdersHistory({
                             navigator.clipboard.writeText(messageText);
                           }
                         } catch(err) {}
+                        setCopiedTelegramOrderId(order.id);
+                        setTimeout(() => setCopiedTelegramOrderId(null), 4000);
                       };
 
                       return (
@@ -633,9 +636,19 @@ export default function OrdersHistory({
                           className="px-3 py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
                           title="الانضمام والدخول لجروب التليجرام"
                         >
-                          <Send className="w-3.5 h-3.5 text-sky-400" />
-                          <span className="hidden sm:inline">تواصل مع الدعم 💬</span>
-                          <span className="sm:hidden">دعم 💬</span>
+                          {copiedTelegramOrderId === order.id ? (
+                            <span className="text-emerald-300 font-bold flex items-center gap-1 animate-pulse">
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="hidden sm:inline">تم نسخ التفاصيل! 📋</span>
+                              <span className="sm:hidden">تم النسخ 📋</span>
+                            </span>
+                          ) : (
+                            <>
+                              <Send className="w-3.5 h-3.5 text-sky-400" />
+                              <span className="hidden sm:inline">تواصل مع الدعم 💬</span>
+                              <span className="sm:hidden">دعم 💬</span>
+                            </>
+                          )}
                         </a>
                       );
                     })()}
@@ -963,6 +976,8 @@ export default function OrdersHistory({
                               navigator.clipboard.writeText(messageText);
                             }
                           } catch(e) {}
+                          setCopiedTelegramOrderId(order.id);
+                          setTimeout(() => setCopiedTelegramOrderId(null), 4000);
                         };
 
                         return (
@@ -973,9 +988,18 @@ export default function OrdersHistory({
                             onClick={handleCopyDetails}
                             className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center justify-center gap-2"
                           >
-                            <Send className="w-3.5 h-3.5 text-sky-400" />
-                            <span>الدخول لجروب التليجرام والدعم</span>
-                            <ArrowUpRight className="w-3.5 h-3.5 text-sky-400" />
+                            {copiedTelegramOrderId === order.id ? (
+                              <span className="text-emerald-300 font-bold flex items-center gap-1.5 animate-pulse">
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>تم نسخ تفاصيل الطلب! 📋</span>
+                              </span>
+                            ) : (
+                              <>
+                                <Send className="w-3.5 h-3.5 text-sky-400" />
+                                <span>الدخول لجروب التليجرام والدعم</span>
+                                <ArrowUpRight className="w-3.5 h-3.5 text-sky-400" />
+                              </>
+                            )}
                           </a>
                         );
                       })()}
@@ -1169,6 +1193,16 @@ export default function OrdersHistory({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 7. TELEGRAM COPIED TOAST BANNER */}
+      {copiedTelegramOrderId && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-emerald-500/50 text-emerald-300 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-5">
+          <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+          <span>تم نسخ تفاصيل طلبك تلقائياً! قم بعمل لصق (Paste) داخل الجروب 💬</span>
         </div>
       )}
 

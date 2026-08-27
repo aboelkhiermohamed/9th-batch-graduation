@@ -58,6 +58,7 @@ export default function CheckoutPage() {
   const [settings, setSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isTgCopied, setIsTgCopied] = useState(false);
 
   // Form State
   const [customerSession, setCustomerSession] = useState<{ phone_number: string; full_name: string } | null>(null);
@@ -501,6 +502,8 @@ export default function CheckoutPage() {
                     navigator.clipboard.writeText(messageText);
                   }
                 } catch(e) {}
+                setIsTgCopied(true);
+                setTimeout(() => setIsTgCopied(false), 4000);
               };
 
               return (
@@ -511,8 +514,17 @@ export default function CheckoutPage() {
                   onClick={handleCopyDetails}
                   className="px-5 py-3.5 rounded-2xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 font-bold text-xs sm:text-sm border border-sky-500/40 flex items-center justify-center gap-2 transition"
                 >
-                  <Send className="w-4 h-4 text-sky-400" />
-                  <span>انضمام والدخول لجروب التليجرام 💬</span>
+                  {isTgCopied ? (
+                    <span className="text-emerald-300 font-bold flex items-center gap-1.5 animate-pulse">
+                      <Check className="w-4 h-4 text-emerald-400" />
+                      <span>تم نسخ تفاصيل الطلب! 📋</span>
+                    </span>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 text-sky-400" />
+                      <span>انضمام والدخول لجروب التليجرام 💬</span>
+                    </>
+                  )}
                 </a>
               );
             })()}
@@ -523,6 +535,16 @@ export default function CheckoutPage() {
               العودة للمتجر
             </button>
           </div>
+
+          {/* TELEGRAM COPIED TOAST BANNER */}
+          {isTgCopied && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-emerald-500/50 text-emerald-300 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-5">
+              <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <span>تم نسخ تفاصيل طلبك تلقائياً! قم بعمل لصق (Paste) داخل الجروب 💬</span>
+            </div>
+          )}
         </div>
       </div>
     );
