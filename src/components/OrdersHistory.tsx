@@ -703,12 +703,12 @@ export default function OrdersHistory({
                         <button
                           type="button"
                           onClick={handleSupportClick}
-                          className="px-3 py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-                          title="الانضمام والدخول لجروب التليجرام"
+                          className="px-4 py-2 rounded-2xl bg-gradient-to-r from-sky-400 via-sky-500 to-blue-600 hover:from-sky-300 hover:to-blue-500 text-slate-950 font-black text-xs transition flex items-center gap-2 shadow-lg shadow-sky-500/25 active:scale-95 border border-sky-200/50"
+                          title="تواصل مباشر مع الدعم الفني ع التليجرام"
                         >
-                          <Send className="w-3.5 h-3.5 text-sky-400" />
+                          <Send className="w-4 h-4 fill-slate-950 text-slate-950" />
                           <span className="hidden sm:inline">تواصل مع الدعم 💬</span>
-                          <span className="sm:hidden">دعم 💬</span>
+                          <span className="sm:hidden">تواصل معنا 💬</span>
                         </button>
                       );
                     })()}
@@ -1052,11 +1052,11 @@ export default function OrdersHistory({
                           <button
                             type="button"
                             onClick={handleSupportClick}
-                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm"
+                            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-gradient-to-r from-sky-400 via-sky-500 to-blue-600 hover:from-sky-300 hover:to-blue-500 text-slate-950 font-black text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-sky-500/25 active:scale-95 border border-sky-200/50"
                           >
-                            <Send className="w-3.5 h-3.5 text-sky-400" />
-                            <span>الدخول لجروب التليجرام والدعم</span>
-                            <ArrowUpRight className="w-3.5 h-3.5 text-sky-400" />
+                            <Send className="w-4 h-4 fill-slate-950 text-slate-950" />
+                            <span>الدخول لجروب التليجرام والدعم 🚀</span>
+                            <ArrowUpRight className="w-4 h-4 text-slate-950" />
                           </button>
                         );
                       })()}
