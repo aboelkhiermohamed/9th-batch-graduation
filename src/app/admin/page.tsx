@@ -5852,7 +5852,7 @@ export default function AdminDashboardPage() {
                         difference_amount: 0,
                         is_difference_pending: false,
                         status: 'manual_verified',
-                        verified_by: currentAdmin?.display_name || 'Admin',
+                        verified_by: currentAdmin?.display_name || currentAdmin?.username || 'محمد ابو الخير (Super Admin)',
                         verified_at: new Date().toISOString(),
                         updated_at: new Date().toISOString()
                       };

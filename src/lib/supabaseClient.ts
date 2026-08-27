@@ -1302,6 +1302,11 @@ export async function updateOrderStatusInSupabase(
       if (status === 'auto_verified' || status === 'manual_verified') {
         target.verified_at = target.verified_at || new Date().toISOString();
       }
+      if (verifiedBy) {
+        let cleanN = (target.notes || '').replace(/\[VERIFIED_BY:.*?\]/g, '').trim();
+        target.notes = `${cleanN} [VERIFIED_BY:${verifiedBy}]`.trim();
+        payload.notes = target.notes;
+      }
       target.updated_at = new Date().toISOString();
       setMemoryOrders(memOrders);
     }
@@ -1367,14 +1372,16 @@ export async function updateOrderInSupabase(updatedOrder: Order): Promise<boolea
     const b64Items = encodeProdMeta(cleanItemsMeta);
     const itemsMetaMarker = b64Items ? ` [ITEMS_META_B64:${b64Items}]` : '';
 
+    const verifiedMarker = updatedOrder.verified_by ? ` [VERIFIED_BY:${updatedOrder.verified_by}]` : '';
     let cleanNotes = (updatedOrder.notes || '')
       .replace(/\[PARTIAL_META:.*?\]/g, '')
       .replace(/\[ITEMS_META_B64:[A-Za-z0-9+/=]+\]/g, '')
       .replace(/\[ITEMS_META:[\s\S]*?\]\]?/g, '')
+      .replace(/\[VERIFIED_BY:.*?\]/g, '')
       .replace(/ITEMS_META[\s\S]*/g, '')
       .trim();
 
-    const finalNotes = `${cleanNotes} ${metaTag}${itemsMetaMarker}`.trim();
+    const finalNotes = `${cleanNotes} ${metaTag}${itemsMetaMarker}${verifiedMarker}`.trim();
 
     const payload: any = {
       status: updatedOrder.status,
