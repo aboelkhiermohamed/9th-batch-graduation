@@ -611,23 +611,32 @@ export default function OrdersHistory({
 
                     {/* Direct Contact Support for this Order */}
                     {(() => {
-                      const targetPhone = (supportPhone || '01555583154').replace(/[^0-9]/g, '');
-                      const cleanPhone = targetPhone.startsWith('20') ? targetPhone : `20${targetPhone.replace(/^0+/, '')}`;
-                      const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(`مرحباً إدارة المتجر، لدي استفسار/مشكلة بخصوص الطلب رقم #${order.order_code} (اسم العميل: ${order.customer_name})`)}`;
+                      const handleHeaderTelegramSupport = (e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        const tgGroupUrl = 'https://t.me/+6VnJtWv5mvpmYjJk';
+                        const itemsList = (order.items || []).map(i => `${i.product_title} × ${i.quantity}${i.selected_size ? ` (${i.selected_size})` : ''}`).join('، ');
+                        const messageText = `مرحباً إدارة المتجر 👋\nأريد الاستفسار بخصوص الطلب الخاص بي:\n\n📋 كود الطلب: #${order.order_code}\n👤 اسم العميل: ${order.customer_name}\n📱 رقم الموبايل: ${order.customer_phone}\n💳 طريقة الدفع: ${order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}\n💰 إجمالي المبلغ: ${order.total_amount} ج.م\n📌 الرقم المرجعي: ${order.transaction_ref || '—'}\n🛒 تفاصيل المنتجات: ${itemsList || 'طلب تخرج'}`;
+
+                        try {
+                          if (navigator.clipboard) {
+                            navigator.clipboard.writeText(messageText);
+                          }
+                        } catch(err) {}
+                        alert('تم نسخ تفاصيل طلبك تلقائياً! 📋\nسيتم فتح جروب التليجرام الآن، قم بعمل لصق (Paste) للرسالة داخل الجروب.');
+                        window.open(tgGroupUrl, '_blank');
+                      };
 
                       return (
-                        <a
-                          href={waUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-                          title="الإبلاغ عن مشكلة أو التواصل مع الدعم بخصوص هذا الطلب"
+                        <button
+                          type="button"
+                          onClick={handleHeaderTelegramSupport}
+                          className="px-3 py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                          title="الانضمام والدخول لجروب التليجرام"
                         >
-                          <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                          <Send className="w-3.5 h-3.5 text-sky-400" />
                           <span className="hidden sm:inline">تواصل مع الدعم 💬</span>
                           <span className="sm:hidden">دعم 💬</span>
-                        </a>
+                        </button>
                       );
                     })()}
 
