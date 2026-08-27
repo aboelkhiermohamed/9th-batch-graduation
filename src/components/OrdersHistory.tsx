@@ -944,22 +944,30 @@ export default function OrdersHistory({
 
                       {/* Contact Support Button */}
                       {(() => {
-                        const tgGroupUrl = 'https://t.me/+6VnJtWv5mvpmYjJk';
-                        const itemsList = (order.items || []).map(i => `${i.product_title} × ${i.quantity}${i.selected_size ? ` (${i.selected_size})` : ''}`).join('، ');
-                        const messageText = `مرحباً إدارة المتجر 👋\nأريد الاستفسار بخصوص الطلب الخاص بي:\n\n📋 كود الطلب: #${order.order_code}\n👤 اسم العميل: ${order.customer_name}\n📱 رقم الموبايل: ${order.customer_phone}\n💳 طريقة الدفع: ${order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}\n💰 إجمالي المبلغ: ${order.total_amount} ج.م\n📌 الرقم المرجعي: ${order.transaction_ref || '—'}\n🛒 تفاصيل المنتجات: ${itemsList || 'طلب تخرج'}\n\nجروب الدعم الفني: ${tgGroupUrl}`;
-                        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(tgGroupUrl)}&text=${encodeURIComponent(messageText)}`;
+                        const handleTelegramSupport = () => {
+                          const tgGroupUrl = 'https://t.me/+6VnJtWv5mvpmYjJk';
+                          const itemsList = (order.items || []).map(i => `${i.product_title} × ${i.quantity}${i.selected_size ? ` (${i.selected_size})` : ''}`).join('، ');
+                          const messageText = `مرحباً إدارة المتجر 👋\nأريد الاستفسار بخصوص الطلب الخاص بي:\n\n📋 كود الطلب: #${order.order_code}\n👤 اسم العميل: ${order.customer_name}\n📱 رقم الموبايل: ${order.customer_phone}\n💳 طريقة الدفع: ${order.payment_method === 'vodafone_cash' ? 'فودافون كاش' : 'InstaPay'}\n💰 إجمالي المبلغ: ${order.total_amount} ج.م\n📌 الرقم المرجعي: ${order.transaction_ref || '—'}\n🛒 تفاصيل المنتجات: ${itemsList || 'طلب تخرج'}`;
+
+                          try {
+                            if (navigator.clipboard) {
+                              navigator.clipboard.writeText(messageText);
+                            }
+                          } catch(e) {}
+                          alert('تم نسخ تفاصيل طلبك تلقائياً! 📋\nسيتم فتح جروب التليجرام الآن، قم بعمل لصق (Paste) للرسالة داخل الجروب.');
+                          window.open(tgGroupUrl, '_blank');
+                        };
 
                         return (
-                          <a
-                            href={shareUrl}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            type="button"
+                            onClick={handleTelegramSupport}
                             className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-bold transition flex items-center justify-center gap-2"
                           >
                             <Send className="w-3.5 h-3.5 text-sky-400" />
-                            <span>تواصل مع الدعم ع التليجرام</span>
+                            <span>الدخول لجروب التليجرام والدعم</span>
                             <ArrowUpRight className="w-3.5 h-3.5 text-sky-400" />
-                          </a>
+                          </button>
                         );
                       })()}
                     </div>
