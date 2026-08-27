@@ -308,9 +308,9 @@ export default function OrdersHistory({
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold animate-pulse">
-            <Clock className="w-3.5 h-3.5 text-amber-400" />
-            <span>جاري التحقق التلقائي...</span>
+          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-sm shadow-amber-500/10">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>تم التسجيل • جاري مراجعة التحويل ⏳</span>
           </span>
         );
     }
@@ -446,79 +446,100 @@ export default function OrdersHistory({
         </button>
       </div>
 
-      {/* 2. SUMMARY KPI BAR - REDESIGNED & ULTRA CLEAR */}
+      {/* 2. SUMMARY KPI BAR - REASSURING & CRYSTAL CLEAR REDESIGN */}
       {orders.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-          {/* Total Orders Card */}
-          <div className="p-4 rounded-3xl bg-slate-950 border border-slate-800/90 hover:border-indigo-500/40 transition-all duration-300 shadow-lg relative overflow-hidden group">
-            <div className="absolute -left-4 -top-4 w-16 h-16 bg-indigo-500/10 rounded-full blur-xl group-hover:bg-indigo-500/20 transition"></div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400">إجمالي الطلبات</span>
-              <div className="p-2.5 rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                <ShoppingBag className="w-4 h-4" />
+        <div className="space-y-3.5">
+          {/* Active Pending Order Reassurance Banner if any */}
+          {pendingCount > 0 && (
+            <div className="p-4 rounded-3xl bg-amber-500/10 border border-amber-500/30 flex items-start sm:items-center justify-between gap-3 shadow-lg shadow-amber-500/5">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse flex-shrink-0">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-extrabold text-amber-300 flex items-center gap-2">
+                    <span>طلبك مسجل ومحجوز بنجاح! 🟢 (جاري مطابقة رقم التحويل)</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    النظام يقوم بمطابقة تحويلك التلقائي الآن خلال دقائق. طلبك محفوظ في المتجر ولا تحتاج لإعادة الطلب.
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-white font-mono">{totalOrdersCount}</span>
-              <span className="text-[11px] font-bold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-lg border border-indigo-500/20">
-                طلب مسجل
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1 font-medium">سجل طلبات حسابك الحالي</p>
-          </div>
+          )}
 
-          {/* Confirmed Orders Card */}
-          <div className="p-4 rounded-3xl bg-slate-950 border border-slate-800/90 hover:border-emerald-500/40 transition-all duration-300 shadow-lg relative overflow-hidden group">
-            <div className="absolute -left-4 -top-4 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition"></div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-emerald-400">طلبات مؤكدة</span>
-              <div className="p-2.5 rounded-2xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                <CheckCircle2 className="w-4 h-4" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+            {/* Total Orders Card */}
+            <div className="p-4 rounded-3xl bg-slate-950 border border-slate-800/90 hover:border-indigo-500/40 transition-all duration-300 shadow-lg relative overflow-hidden group">
+              <div className="absolute -left-4 -top-4 w-16 h-16 bg-indigo-500/10 rounded-full blur-xl group-hover:bg-indigo-500/20 transition"></div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-300">📦 الطلبات المسجلة</span>
+                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
               </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-2xl font-black text-white font-mono">{totalOrdersCount}</span>
+                <span className="text-[11px] font-bold text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-lg border border-indigo-500/20">
+                  طلب مسجل
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1 font-medium">إجمالي عدد طلباتك بالحساب</p>
             </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-emerald-400 font-mono">{verifiedCount}</span>
-              <span className="text-[11px] font-bold text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-lg border border-emerald-500/30">
-                مقبول 🟢
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1 font-medium">تم تأكيد الدفع بنجاح</p>
-          </div>
 
-          {/* Pending Verification Card */}
-          <div className="p-4 rounded-3xl bg-slate-950 border border-amber-500/30 hover:border-amber-500/60 transition-all duration-300 shadow-lg shadow-amber-500/5 relative overflow-hidden group">
-            <div className="absolute -left-4 -top-4 w-16 h-16 bg-amber-500/15 rounded-full blur-xl group-hover:bg-amber-500/25 transition"></div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-amber-400">قيد التحقق</span>
-              <div className="p-2.5 rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse">
-                <Clock className="w-4 h-4" />
+            {/* Pending Verification Card */}
+            <div className="p-4 rounded-3xl bg-slate-950 border border-amber-500/40 hover:border-amber-500/70 transition-all duration-300 shadow-lg shadow-amber-500/5 relative overflow-hidden group">
+              <div className="absolute -left-4 -top-4 w-16 h-16 bg-amber-500/15 rounded-full blur-xl group-hover:bg-amber-500/25 transition"></div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-amber-400">⏳ قيد التأكيد التلقائي</span>
+                <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse">
+                  <Clock className="w-4 h-4" />
+                </div>
               </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-2xl font-black text-amber-400 font-mono">{pendingCount}</span>
+                <span className="text-[11px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-lg border border-amber-500/30">
+                  {pendingCount > 0 ? 'جاري التحقق ⏳' : 'لا يوجد'}
+                </span>
+              </div>
+              <p className="text-[10px] text-amber-500/90 mt-1 font-medium">محفوظة وجاري مراجعة الإيداع</p>
             </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-2xl font-black text-amber-400 font-mono">{pendingCount}</span>
-              <span className="text-[11px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-lg border border-amber-500/30 animate-pulse">
-                تحت المراجعة ⏳
-              </span>
-            </div>
-            <p className="text-[11px] text-amber-500/80 mt-1 font-medium">جاري التحقق التلقائي من التحويل</p>
-          </div>
 
-          {/* Total Payments Card */}
-          <div className="p-4 rounded-3xl bg-slate-950 border border-slate-800/90 hover:border-cyan-500/40 transition-all duration-300 shadow-lg relative overflow-hidden group">
-            <div className="absolute -left-4 -top-4 w-16 h-16 bg-cyan-500/10 rounded-full blur-xl group-hover:bg-cyan-500/20 transition"></div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400">إجمالي المدفوعات</span>
-              <div className="p-2.5 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                <CreditCard className="w-4 h-4" />
+            {/* Confirmed Orders Card */}
+            <div className="p-4 rounded-3xl bg-slate-950 border border-slate-800/90 hover:border-emerald-500/40 transition-all duration-300 shadow-lg relative overflow-hidden group">
+              <div className="absolute -left-4 -top-4 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition"></div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-emerald-400">✅ طلبات تم تأكيدها</span>
+                <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
               </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-2xl font-black text-emerald-400 font-mono">{verifiedCount}</span>
+                <span className="text-[11px] font-bold text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+                  {verifiedCount > 0 ? 'مؤكد 🟢' : 'في الانتظار'}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1 font-medium">تم تأكيد الدفع والتجهيز</p>
             </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-xl font-black text-cyan-300 font-mono">{totalSpent} <span className="text-xs font-sans text-slate-400">ج.م</span></span>
-              <span className="text-[11px] font-bold text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded-lg border border-cyan-500/20">
-                المجموع 💳
-              </span>
+
+            {/* Total Payments Card */}
+            <div className="p-4 rounded-3xl bg-slate-950 border border-slate-800/90 hover:border-cyan-500/40 transition-all duration-300 shadow-lg relative overflow-hidden group">
+              <div className="absolute -left-4 -top-4 w-16 h-16 bg-cyan-500/10 rounded-full blur-xl group-hover:bg-cyan-500/20 transition"></div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-300">💳 إجمالي قيمة الطلبات</span>
+                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-xl font-black text-cyan-300 font-mono">{totalSpent} <span className="text-xs font-sans text-slate-400">ج.م</span></span>
+                <span className="text-[11px] font-bold text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded-lg border border-cyan-500/20">
+                  المجموع 💳
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1 font-medium">إجمالي قيمة المشتريات المسجلة</p>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1 font-medium">إجمالي قيم المشتريات المسجلة</p>
           </div>
         </div>
       )}
