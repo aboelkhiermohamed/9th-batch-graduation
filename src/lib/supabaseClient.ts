@@ -1053,6 +1053,8 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
         const tx = dbTxs.find((t: any) => {
           if (t.matched_order_id === o.id || (o.matched_transaction_id && t.id === o.matched_transaction_id)) return true;
           if (oRef && oRef.length >= 4) {
+            // Do NOT match transaction if it is already assigned to a DIFFERENT order
+            if (t.matched_order_id && t.matched_order_id !== o.id) return false;
             const tRef = (t.transaction_ref || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
             if (tRef && (tRef === oRef || tRef.includes(oRef) || oRef.includes(tRef))) return true;
             if (t.raw_sms) {
@@ -1185,7 +1187,12 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
 
       const orderTotal = Number(o.total_amount || 0);
       const matchedTxSum = txSumMap[o.id] || txSumMap[o.order_code] || 0;
-      let effectivePaid = Math.max(paidAmount !== undefined ? paidAmount : 0, matchedTxSum);
+      
+      // Effective paid amount MUST come strictly from matched transactions if order is pending
+      let effectivePaid = matchedTxSum;
+      if (o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered') {
+        effectivePaid = Math.max(paidAmount !== undefined ? paidAmount : 0, matchedTxSum);
+      }
       let finalStatus = o.status;
 
       // Auto-reconcile: If paidAmount or matchedTxSum fully covers total_amount, clear pending difference

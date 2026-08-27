@@ -100,8 +100,29 @@ export async function POST(req: NextRequest) {
       items: orderItems
     };
 
-    // 0. Auto-verify immediately if the payment SMS arrived BEFORE order submission (while on checkout page)
-    await matchOrderWithUnmatchedTransactions(newOrder);
+    // 0. Duplicate Transaction Ref Protection:
+    // Check if transaction_ref was already used in a previously verified order
+    if (newOrder.transaction_ref && newOrder.transaction_ref.trim().length >= 4) {
+      const cleanRef = newOrder.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      const existingOrders = await fetchOrdersFromSupabase();
+      const isRefAlreadyUsed = existingOrders.some(o => {
+        if (o.id === newOrder.id) return false;
+        if (!o.transaction_ref) return false;
+        const oRef = o.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const isVerified = o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered';
+        return isVerified && oRef === cleanRef;
+      });
+
+      if (isRefAlreadyUsed) {
+        console.warn(`[Order Security Warning] Duplicate transaction_ref detected: "${newOrder.transaction_ref}" for order #${newOrder.order_code}`);
+        newOrder.notes = `[DUPLICATE_REF_WARNING: الرقم المرجعي (${newOrder.transaction_ref}) مستخدم سابقاً في طلب آخر مؤكد] ${newOrder.notes || ''}`;
+      } else {
+        // Auto-verify immediately if the payment SMS arrived BEFORE order submission (while on checkout page)
+        await matchOrderWithUnmatchedTransactions(newOrder);
+      }
+    } else {
+      await matchOrderWithUnmatchedTransactions(newOrder);
+    }
 
     // 1. Save locally
     const existingOrders = getMemoryOrders();
