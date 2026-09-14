@@ -169,7 +169,8 @@ export default function CheckoutPage() {
   // Cart total & Vodafone Cash fee calculations
   const cartTotal = cart.reduce((acc, item) => {
     const addonsPrice = item.selectedAddons ? item.selectedAddons.reduce((sum, a) => sum + (a.price || 0), 0) : 0;
-    return acc + (item.product.price + addonsPrice) * item.quantity;
+    const custPrice = (item.customText && item.product.has_customization) ? (Number(item.product.customization_price) || 0) : 0;
+    return acc + (item.product.price + addonsPrice + custPrice) * item.quantity;
   }, 0);
 
   const vodaFeePercent = Number(settings.vodafone_cash_fee_percent || 0);
@@ -291,7 +292,8 @@ export default function CheckoutPage() {
     try {
       const orderItems = cart.map(item => {
         const addonsPrice = item.selectedAddons ? item.selectedAddons.reduce((sum, a) => sum + (a.price || 0), 0) : 0;
-        const unitPrice = item.product.price + addonsPrice;
+        const custPrice = (item.customText && item.product.has_customization) ? (Number(item.product.customization_price) || 0) : 0;
+        const unitPrice = item.product.price + addonsPrice + custPrice;
         const addonsSummary = item.selectedAddons && item.selectedAddons.length > 0
           ? item.selectedAddons.map(a => `${a.name} (+${a.price} ج.م)`).join('، ')
           : undefined;
@@ -934,8 +936,9 @@ export default function CheckoutPage() {
                 <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
                   {cart.map((item, idx) => {
                     const addonsExtra = item.selectedAddons ? item.selectedAddons.reduce((s, a) => s + (a.price || 0), 0) : 0;
+                    const custExtra = (item.customText && item.product.has_customization) ? (Number(item.product.customization_price) || 0) : 0;
                     const baseProductPrice = item.product.price;
-                    const itemUnitPrice = baseProductPrice + addonsExtra;
+                    const itemUnitPrice = baseProductPrice + addonsExtra + custExtra;
                     const itemTotalPrice = itemUnitPrice * item.quantity;
 
                     return (

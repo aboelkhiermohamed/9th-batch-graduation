@@ -17,8 +17,10 @@ CREATE TABLE IF NOT EXISTS public.store_products (
     image_url TEXT NOT NULL,
     images JSONB DEFAULT '[]'::jsonb, -- Array of additional gallery images
     size_chart_url TEXT, -- Size chart image URL
+    size_chart_instructions TEXT, -- Size chart custom instructions/rules text
     has_customization BOOLEAN NOT NULL DEFAULT false, -- Enable custom text input
     customization_label VARCHAR(255) DEFAULT 'الاسم أو الكلية على القطعة',
+    customization_price DECIMAL(10, 2) DEFAULT 0, -- Extra price for embroidery/print
     sizes JSONB DEFAULT '[]'::jsonb, -- e.g. ["S", "M", "L", "XL", "XXL"]
     addons JSONB DEFAULT '[]'::jsonb, -- Array of optional add-ons e.g. [{"id":"1","name":"تطريز","price":50}]
     stock INTEGER NOT NULL DEFAULT 100,

@@ -415,7 +415,8 @@ export default function StoreFrontPage() {
 
   const cartTotal = cart.reduce((acc, item) => {
     const addonsPrice = item.selectedAddons ? item.selectedAddons.reduce((sum, a) => sum + (a.price || 0), 0) : 0;
-    return acc + (item.product.price + addonsPrice) * item.quantity;
+    const custPrice = (item.customText && item.product.has_customization) ? (Number(item.product.customization_price) || 0) : 0;
+    return acc + (item.product.price + addonsPrice + custPrice) * item.quantity;
   }, 0);
   const totalCartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
@@ -438,7 +439,8 @@ export default function StoreFrontPage() {
     try {
       const orderItems = cart.map(item => {
         const addonsPrice = item.selectedAddons ? item.selectedAddons.reduce((sum, a) => sum + (a.price || 0), 0) : 0;
-        const unitPrice = item.product.price + addonsPrice;
+        const custPrice = (item.customText && item.product.has_customization) ? (Number(item.product.customization_price) || 0) : 0;
+        const unitPrice = item.product.price + addonsPrice + custPrice;
         const addonsSummary = item.selectedAddons && item.selectedAddons.length > 0
           ? item.selectedAddons.map(a => `${a.name} (+${a.price} ج.م)`).join('، ')
           : undefined;
@@ -1051,19 +1053,58 @@ export default function StoreFrontPage() {
       {/* --- SIZE CHART VIEWER MODAL --- */}
       {isSizeChartModalOpen && activeProductModal?.size_chart_url && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md p-4 flex items-center justify-center">
-          <div className="relative max-w-xl w-full glass-modal rounded-3xl p-6 border border-slate-700 text-center space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="relative max-w-xl w-full bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-700 space-y-4 max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Ruler className="w-5 h-5 text-amber-400" />
                 <span>دليل وقوانين المقاسات بالسنتيمتر 📐</span>
               </h3>
-              <button onClick={() => setIsSizeChartModalOpen(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400">
+              <button onClick={() => setIsSizeChartModalOpen(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-2 rounded-2xl bg-slate-950 border border-slate-800 max-h-[70vh] overflow-auto">
-              <img src={activeProductModal.size_chart_url} alt="Size Chart" className="max-w-full rounded-xl mx-auto" />
+            <div className="space-y-4 overflow-y-auto pr-1">
+              <div className="p-2 rounded-2xl bg-slate-950 border border-slate-800">
+                <img src={activeProductModal.size_chart_url} alt="Size Chart" className="max-w-full h-auto max-h-[50vh] object-contain rounded-xl mx-auto" />
+              </div>
+
+              {/* Instructions Box */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2.5 text-right">
+                <h4 className="text-xs sm:text-sm font-extrabold text-amber-300 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>تنبيهات وتعليمات المقاسات:</span>
+                </h4>
+                {activeProductModal?.size_chart_instructions ? (
+                  <div className="text-xs text-slate-200 leading-relaxed whitespace-pre-line font-medium pr-1">
+                    {activeProductModal.size_chart_instructions}
+                  </div>
+                ) : (
+                  <ul className="space-y-2 text-xs text-slate-300 leading-relaxed pr-1">
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-400 shrink-0 font-bold">1️⃣</span>
+                      <span><strong>قياس قطعة مفضلة:</strong> يفضل قياس قطعة ملابس مريحة لديك ومقارنة القياسات بالجدول أعلاه.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-400 shrink-0 font-bold">2️⃣</span>
+                      <span><strong>نسبة الخطأ الطبيعية:</strong> القياسات بالسنتيمتر مع تفاوت طبيعي (±1 إلى 2 سم).</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-400 shrink-0 font-bold">3️⃣</span>
+                      <span><strong>في حال الحيرة بين مقاسين:</strong> اختار دائماً <strong>المقاس الأكبر (Size Up)</strong> لتضمن راحة أكبر.</span>
+                    </li>
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-2 shrink-0">
+              <button
+                onClick={() => setIsSizeChartModalOpen(false)}
+                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs sm:text-sm transition"
+              >
+                حسناً، فهمت ✓
+              </button>
             </div>
           </div>
         </div>
@@ -1099,7 +1140,8 @@ export default function StoreFrontPage() {
               ) : (
                 cart.map((item, idx) => {
                   const addonsExtra = item.selectedAddons ? item.selectedAddons.reduce((s, a) => s + (a.price || 0), 0) : 0;
-                  const itemUnitPrice = item.product.price + addonsExtra;
+                  const custExtra = (item.customText && item.product.has_customization) ? (Number(item.product.customization_price) || 0) : 0;
+                  const itemUnitPrice = item.product.price + addonsExtra + custExtra;
                   const itemTotalPrice = itemUnitPrice * item.quantity;
 
                   return (

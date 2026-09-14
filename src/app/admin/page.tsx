@@ -383,8 +383,10 @@ export default function AdminDashboardPage() {
   const [newProdSizeChart, setNewProdSizeChart] = useState('');
   const [newProdSizeChartPreview, setNewProdSizeChartPreview] = useState('');
   const [newProdSizeChartUploading, setNewProdSizeChartUploading] = useState(false);
+  const [newProdSizeChartNote, setNewProdSizeChartNote] = useState('');
   const [newProdHasCustomization, setNewProdHasCustomization] = useState(true);
   const [newProdCustomLabel, setNewProdCustomLabel] = useState('اسم الطالب أو الكلية للتطريز على القطعة');
+  const [newProdCustomPrice, setNewProdCustomPrice] = useState('0');
   const [newProdIsEvent, setNewProdIsEvent] = useState(false);
   const [newProdSizes, setNewProdSizes] = useState('S, M, L, XL, XXL');
   const [newProdDescAr, setNewProdDescAr] = useState('');
@@ -406,8 +408,10 @@ export default function AdminDashboardPage() {
   const [editProdSizeChart, setEditProdSizeChart] = useState('');
   const [editProdSizeChartPreview, setEditProdSizeChartPreview] = useState('');
   const [editProdSizeChartUploading, setEditProdSizeChartUploading] = useState(false);
+  const [editProdSizeChartNote, setEditProdSizeChartNote] = useState('');
   const [editProdHasCustomization, setEditProdHasCustomization] = useState(true);
   const [editProdCustomLabel, setEditProdCustomLabel] = useState('اسم الطالب أو الكلية للتطريز على القطعة');
+  const [editProdCustomPrice, setEditProdCustomPrice] = useState('0');
   const [editProdIsEvent, setEditProdIsEvent] = useState(false);
   const [editProdSizes, setEditProdSizes] = useState('S, M, L, XL, XXL');
   const [editProdDescAr, setEditProdDescAr] = useState('');
@@ -1207,6 +1211,59 @@ export default function AdminDashboardPage() {
     finally { setEditProdSizeChartUploading(false); }
   };
 
+  // Gallery Remove & Replace Helpers for Add / Edit Product Modals
+  const removeNewProdGalleryImage = (indexToRemove: number) => {
+    setNewProdGalleryPreviews(prev => prev.filter((_, idx) => idx !== indexToRemove));
+    setNewProdGalleryUrls(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const replaceNewProdGalleryImage = async (indexToReplace: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    setNewProdGalleryPreviews(prev => {
+      const copy = [...prev];
+      copy[indexToReplace] = objectUrl;
+      return copy;
+    });
+    try {
+      const url = await uploadProductImage(file);
+      setNewProdGalleryUrls(prev => {
+        const copy = [...prev];
+        copy[indexToReplace] = url;
+        return copy;
+      });
+    } catch {
+      alert('فشل استبدال الصورة');
+    }
+  };
+
+  const removeEditProdGalleryImage = (indexToRemove: number) => {
+    setEditProdGalleryPreviews(prev => prev.filter((_, idx) => idx !== indexToRemove));
+    setEditProdGalleryUrls(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const replaceEditProdGalleryImage = async (indexToReplace: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    setEditProdGalleryPreviews(prev => {
+      const copy = [...prev];
+      copy[indexToReplace] = objectUrl;
+      return copy;
+    });
+    try {
+      const url = await uploadProductImage(file);
+      setEditProdGalleryUrls(prev => {
+        const copy = [...prev];
+        copy[indexToReplace] = url;
+        return copy;
+      });
+    } catch {
+      alert('فشل استبدال الصورة');
+    }
+  };
+
   // Backup & Maintenance Handlers
   const handleExportBackup = () => {
     try {
@@ -1403,8 +1460,10 @@ export default function AdminDashboardPage() {
           image_url: newProdImage,
           images: allImages,
           size_chart_url: newProdSizeChart || undefined,
+          size_chart_instructions: newProdSizeChartNote.trim() || undefined,
           has_customization: newProdHasCustomization,
           customization_label: newProdCustomLabel.trim() || undefined,
+          customization_price: Number(newProdCustomPrice) || 0,
           is_event: newProdIsEvent,
           sizes: sizesArray,
           description_ar: newProdDescAr,
@@ -1422,6 +1481,8 @@ export default function AdminDashboardPage() {
         setNewProdGalleryPreviews([]);
         setNewProdSizeChart('');
         setNewProdSizeChartPreview('');
+        setNewProdSizeChartNote('');
+        setNewProdCustomPrice('0');
         setNewProdIsEvent(false);
         setNewProdAddons([]);
         fetchAllData();
@@ -1448,8 +1509,10 @@ export default function AdminDashboardPage() {
     setEditProdGalleryPreviews(gallery);
     setEditProdSizeChart(product.size_chart_url || '');
     setEditProdSizeChartPreview(product.size_chart_url || '');
+    setEditProdSizeChartNote(product.size_chart_instructions || '');
     setEditProdHasCustomization(Boolean(product.has_customization));
     setEditProdCustomLabel(product.customization_label || 'اسم الطالب أو الكلية للتطريز على القطعة');
+    setEditProdCustomPrice(String(product.customization_price || 0));
     setEditProdIsEvent(Boolean(product.is_event));
     setEditProdSizes((product.sizes || []).join(', '));
     setEditProdDescAr(product.description_ar || product.description || '');
@@ -1503,8 +1566,10 @@ export default function AdminDashboardPage() {
           image_url: editProdImage,
           images: allImages,
           size_chart_url: editProdSizeChart || undefined,
+          size_chart_instructions: editProdSizeChartNote.trim() || undefined,
           has_customization: editProdHasCustomization,
           customization_label: editProdCustomLabel.trim() || undefined,
+          customization_price: Number(editProdCustomPrice) || 0,
           is_event: editProdIsEvent,
           sizes: sizesArray,
           description_ar: editProdDescAr,
@@ -4732,7 +4797,15 @@ export default function AdminDashboardPage() {
                         )}
                         <p className="text-[10px] text-slate-500 truncate">{newProdImage}</p>
                       </div>
-                      <button type="button" onClick={() => { setNewProdImage(''); setNewProdImagePreview(''); }} className="text-rose-400 hover:text-rose-300 text-xs">حذف</button>
+                      <div className="flex items-center gap-1.5">
+                        <label className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold cursor-pointer transition">
+                          <input type="file" accept="image/*" onChange={handleMainImagePick} className="hidden" />
+                          🔄 تغيير
+                        </label>
+                        <button type="button" onClick={() => { setNewProdImage(''); setNewProdImagePreview(''); }} className="px-2.5 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 text-rose-400 text-xs font-bold transition">
+                          ❌ حذف
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -4760,20 +4833,52 @@ export default function AdminDashboardPage() {
 
               {/* Gallery Images Upload */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">صور إضافية للمعرض (يمكن اختيار أكثر من صورة)</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-300">صور إضافية للمعرض (يمكن اختيار وتعديل/حذف أي صورة)</label>
+                  {newProdGalleryPreviews.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setNewProdGalleryPreviews([]); setNewProdGalleryUrls([]); }}
+                      className="text-[11px] text-rose-400 hover:underline font-semibold"
+                    >
+                      مسح جميع الصور ({newProdGalleryPreviews.length})
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   {newProdGalleryPreviews.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2.5 p-2.5 rounded-xl bg-slate-900 border border-slate-800">
                       {newProdGalleryPreviews.map((src, i) => (
-                        <div key={i} className="relative">
-                          <img src={src} alt="" className="w-14 h-14 rounded-lg object-cover border border-slate-700" />
+                        <div key={i} className="relative group w-16 h-16 rounded-xl overflow-hidden border border-slate-700 shadow-sm">
+                          <img src={src} alt={`gallery ${i}`} className="w-full h-full object-cover" />
+                          
+                          {/* Status Badge */}
                           {i < newProdGalleryUrls.length ? (
-                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                            <span className="absolute top-1 left-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center pointer-events-none shadow">
                               <Check className="w-2.5 h-2.5 text-white" />
                             </span>
                           ) : (
-                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full animate-spin border border-amber-300" />
+                            <span className="absolute top-1 left-1 w-4 h-4 bg-amber-500 rounded-full animate-spin border border-amber-300 pointer-events-none" />
                           )}
+
+                          {/* Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() => removeNewProdGalleryImage(i)}
+                            title="حذف هذه الصورة"
+                            className="absolute top-1 right-1 w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full flex items-center justify-center shadow transition z-10"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+
+                          {/* Replace Overlay on Hover */}
+                          <label
+                            title="تغيير هذه الصورة"
+                            className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center cursor-pointer text-[10px] text-amber-300 font-bold gap-0.5"
+                          >
+                            <input type="file" accept="image/*" onChange={(e) => replaceNewProdGalleryImage(i, e)} className="hidden" />
+                            <span>🔄 تغيير</span>
+                          </label>
                         </div>
                       ))}
                     </div>
@@ -4781,14 +4886,14 @@ export default function AdminDashboardPage() {
                   <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-indigo-500/60 cursor-pointer transition">
                     <input type="file" accept="image/*" multiple onChange={handleGalleryImagesPick} className="hidden" />
                     <ImageIcon className="w-4 h-4 text-indigo-400" />
-                    <span className="text-xs text-slate-300">{newProdGalleryPreviews.length > 0 ? `إضافة مزيد من الصور (${newProdGalleryPreviews.length} محددة)` : 'اختر صور إضافية للمعرض (اختياري)'}</span>
+                    <span className="text-xs text-slate-300">{newProdGalleryPreviews.length > 0 ? `إضافة مزيد من الصور المعرض` : 'اختر صور إضافية للمعرض (اختياري)'}</span>
                   </label>
                 </div>
               </div>
 
-              {/* Size Chart Upload */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">صورة دليل المقاسات 📐 (Size Chart) — اختياري</label>
+              {/* Size Chart Upload & Custom Instructions */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-300">صورة دليل المقاسات 📐 (Size Chart) — اختياري</label>
                 {newProdSizeChartPreview ? (
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-700">
                     <img src={newProdSizeChartPreview} alt="size chart" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
@@ -4799,7 +4904,15 @@ export default function AdminDashboardPage() {
                         <p className="text-xs text-emerald-400 font-bold">✅ تم رفع دليل المقاسات</p>
                       )}
                     </div>
-                    <button type="button" onClick={() => { setNewProdSizeChart(''); setNewProdSizeChartPreview(''); }} className="text-rose-400 text-xs">حذف</button>
+                    <div className="flex items-center gap-1.5">
+                      <label className="px-2.5 py-1 rounded-lg bg-slate-800 text-amber-300 text-xs font-bold cursor-pointer hover:bg-slate-700 transition">
+                        <input type="file" accept="image/*" onChange={handleSizeChartPick} className="hidden" />
+                        🔄 تغيير
+                      </label>
+                      <button type="button" onClick={() => { setNewProdSizeChart(''); setNewProdSizeChartPreview(''); }} className="px-2 py-1 rounded-lg bg-rose-950/60 text-rose-400 hover:bg-rose-900/60 text-xs font-bold transition">
+                        ❌ حذف
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-slate-500 cursor-pointer transition">
@@ -4808,6 +4921,19 @@ export default function AdminDashboardPage() {
                     <span className="text-xs text-slate-400">اضغط لرفع جدول المقاسات (اختياري)</span>
                   </label>
                 )}
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    📝 تعليمات ونصوص دليل المقاسات (تظهر للعميل عند فتح جدول المقاسات):
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="أدخل تعليمات وقواعد المقاسات التي تريد ظهورها للعميل..."
+                    value={newProdSizeChartNote}
+                    onChange={(e) => setNewProdSizeChartNote(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-amber-500 leading-relaxed"
+                  />
+                </div>
               </div>
 
               {/* Customization Toggle */}
@@ -4822,13 +4948,29 @@ export default function AdminDashboardPage() {
                   <span>تفعيل خيار التطريز / طباعة اسم الطالب للعميل ✨</span>
                 </label>
                 {newProdHasCustomization && (
-                  <input
-                    type="text"
-                    placeholder="عنوان الحقل: اسم الطالب أو الكلية للتطريز..."
-                    value={newProdCustomLabel}
-                    onChange={(e) => setNewProdCustomLabel(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none"
-                  />
+                  <div className="space-y-2 pt-1">
+                    <input
+                      type="text"
+                      placeholder="عنوان الحقل: اسم الطالب أو الكلية للتطريز..."
+                      value={newProdCustomLabel}
+                      onChange={(e) => setNewProdCustomLabel(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none"
+                    />
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-xs text-slate-300 font-semibold shrink-0">سعر التطريز / الطباعة الإضافي:</span>
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={newProdCustomPrice}
+                          onChange={(e) => setNewProdCustomPrice(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-amber-400 font-mono font-bold text-xs focus:outline-none focus:border-amber-500"
+                        />
+                        <span className="absolute left-3 top-1.5 text-xs text-slate-400 font-bold">ج.م</span>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -5050,18 +5192,24 @@ export default function AdminDashboardPage() {
                 <label className="block text-xs font-semibold text-slate-300 mb-1">الصورة الرئيسية للمنتج *</label>
                 {editProdImagePreview ? (
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-700">
-                    <img src={editProdImagePreview} alt="main preview" className="w-16 h-16 rounded-lg object-cover border border-slate-700" />
-                    <div className="flex-1">
+                    <img src={editProdImagePreview} alt="main preview" className="w-16 h-16 rounded-lg object-cover border border-slate-700 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
                       {editProdImageUploading ? (
                         <p className="text-xs text-amber-400 font-bold animate-pulse">جاري الرفع...</p>
                       ) : (
                         <p className="text-xs text-emerald-400 font-bold">✅ تم اختيار الصورة</p>
                       )}
+                      <p className="text-[10px] text-slate-500 truncate">{editProdImage}</p>
                     </div>
-                    <label className="px-3 py-1.5 rounded-lg bg-slate-800 text-amber-300 text-xs font-bold cursor-pointer hover:bg-slate-700">
-                      <input type="file" accept="image/*" onChange={handleEditMainImagePick} className="hidden" />
-                      تغيير الصورة
-                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <label className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-amber-300 text-xs font-bold cursor-pointer hover:bg-slate-700 transition">
+                        <input type="file" accept="image/*" onChange={handleEditMainImagePick} className="hidden" />
+                        🔄 تغيير
+                      </label>
+                      <button type="button" onClick={() => { setEditProdImage(''); setEditProdImagePreview(''); }} className="px-2.5 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 text-rose-400 text-xs font-bold transition">
+                        ❌ حذف
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <label className="flex items-center justify-center gap-2 p-4 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-amber-500 cursor-pointer transition">
@@ -5074,13 +5222,52 @@ export default function AdminDashboardPage() {
 
               {/* Gallery Images Upload */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">معرض الصور الإضافية (Gallery)</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-300">معرض الصور الإضافية (Gallery)</label>
+                  {editProdGalleryPreviews.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setEditProdGalleryPreviews([]); setEditProdGalleryUrls([]); }}
+                      className="text-[11px] text-rose-400 hover:underline font-semibold"
+                    >
+                      مسح جميع الصور ({editProdGalleryPreviews.length})
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   {editProdGalleryPreviews.length > 0 && (
-                    <div className="flex flex-wrap gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800">
+                    <div className="flex flex-wrap gap-2.5 p-2.5 rounded-xl bg-slate-900 border border-slate-800">
                       {editProdGalleryPreviews.map((src, idx) => (
-                        <div key={idx} className="relative w-14 h-14 rounded-lg overflow-hidden border border-slate-700">
-                          <img src={src} alt="gallery" className="w-full h-full object-cover" />
+                        <div key={idx} className="relative group w-16 h-16 rounded-xl overflow-hidden border border-slate-700 shadow-sm">
+                          <img src={src} alt={`gallery ${idx}`} className="w-full h-full object-cover" />
+                          
+                          {/* Status Badge */}
+                          {idx < editProdGalleryUrls.length ? (
+                            <span className="absolute top-1 left-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center pointer-events-none shadow">
+                              <Check className="w-2.5 h-2.5 text-white" />
+                            </span>
+                          ) : (
+                            <span className="absolute top-1 left-1 w-4 h-4 bg-amber-500 rounded-full animate-spin border border-amber-300 pointer-events-none" />
+                          )}
+
+                          {/* Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() => removeEditProdGalleryImage(idx)}
+                            title="حذف هذه الصورة"
+                            className="absolute top-1 right-1 w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full flex items-center justify-center shadow transition z-10"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+
+                          {/* Replace Overlay on Hover */}
+                          <label
+                            title="تغيير هذه الصورة"
+                            className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center cursor-pointer text-[10px] text-amber-300 font-bold gap-0.5"
+                          >
+                            <input type="file" accept="image/*" onChange={(e) => replaceEditProdGalleryImage(idx, e)} className="hidden" />
+                            <span>🔄 تغيير</span>
+                          </label>
                         </div>
                       ))}
                     </div>
@@ -5088,14 +5275,14 @@ export default function AdminDashboardPage() {
                   <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-amber-500/60 cursor-pointer transition">
                     <input type="file" accept="image/*" multiple onChange={handleEditGalleryImagesPick} className="hidden" />
                     <ImageIcon className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs text-slate-300">{editProdGalleryPreviews.length > 0 ? `إضافة مزيد من الصور (${editProdGalleryPreviews.length} محددة)` : 'اختر صور إضافية للمعرض (اختياري)'}</span>
+                    <span className="text-xs text-slate-300">{editProdGalleryPreviews.length > 0 ? `إضافة مزيد من الصور المعرض` : 'اختر صور إضافية للمعرض (اختياري)'}</span>
                   </label>
                 </div>
               </div>
 
-              {/* Size Chart Upload */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">صورة دليل المقاسات 📐 (Size Chart)</label>
+              {/* Size Chart Upload & Custom Instructions */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-300">صورة دليل المقاسات 📐 (Size Chart)</label>
                 {editProdSizeChartPreview ? (
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-900 border border-slate-700">
                     <img src={editProdSizeChartPreview} alt="size chart" className="w-12 h-12 rounded-lg object-cover border border-slate-700" />
@@ -5106,7 +5293,15 @@ export default function AdminDashboardPage() {
                         <p className="text-xs text-emerald-400 font-bold">✅ تم رفع دليل المقاسات</p>
                       )}
                     </div>
-                    <button type="button" onClick={() => { setEditProdSizeChart(''); setEditProdSizeChartPreview(''); }} className="text-rose-400 text-xs">حذف</button>
+                    <div className="flex items-center gap-1.5">
+                      <label className="px-2.5 py-1 rounded-lg bg-slate-800 text-amber-300 text-xs font-bold cursor-pointer hover:bg-slate-700 transition">
+                        <input type="file" accept="image/*" onChange={handleEditSizeChartPick} className="hidden" />
+                        🔄 تغيير
+                      </label>
+                      <button type="button" onClick={() => { setEditProdSizeChart(''); setEditProdSizeChartPreview(''); }} className="px-2 py-1 rounded-lg bg-rose-950/60 text-rose-400 hover:bg-rose-900/60 text-xs font-bold transition">
+                        ❌ حذف
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <label className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-slate-500 cursor-pointer transition">
@@ -5115,6 +5310,19 @@ export default function AdminDashboardPage() {
                     <span className="text-xs text-slate-400">اضغط لرفع جدول المقاسات (اختياري)</span>
                   </label>
                 )}
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    📝 تعليمات ونصوص دليل المقاسات (تظهر للعميل عند فتح جدول المقاسات):
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="أدخل تعليمات وقواعد المقاسات التي تريد ظهورها للعميل..."
+                    value={editProdSizeChartNote}
+                    onChange={(e) => setEditProdSizeChartNote(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-amber-500 leading-relaxed"
+                  />
+                </div>
               </div>
 
               {/* Customization Toggle */}
@@ -5129,13 +5337,29 @@ export default function AdminDashboardPage() {
                   <span>تفعيل خيار التطريز / طباعة اسم الطالب للعميل ✨</span>
                 </label>
                 {editProdHasCustomization && (
-                  <input
-                    type="text"
-                    placeholder="عنوان الحقل: اسم الطالب أو الكلية للتطريز..."
-                    value={editProdCustomLabel}
-                    onChange={(e) => setEditProdCustomLabel(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none"
-                  />
+                  <div className="space-y-2 pt-1">
+                    <input
+                      type="text"
+                      placeholder="عنوان الحقل: اسم الطالب أو الكلية للتطريز..."
+                      value={editProdCustomLabel}
+                      onChange={(e) => setEditProdCustomLabel(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none"
+                    />
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-xs text-slate-300 font-semibold shrink-0">سعر التطريز / الطباعة الإضافي:</span>
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={editProdCustomPrice}
+                          onChange={(e) => setEditProdCustomPrice(e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-amber-400 font-mono font-bold text-xs focus:outline-none focus:border-amber-500"
+                        />
+                        <span className="absolute left-3 top-1.5 text-xs text-slate-400 font-bold">ج.م</span>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
 

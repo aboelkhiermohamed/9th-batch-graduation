@@ -237,6 +237,12 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
             ? Boolean(p.is_event) 
             : (prodMeta?.evt !== undefined ? Boolean(prodMeta.evt) : false);
 
+          const resolvedCustomPrice = p.customization_price !== undefined && p.customization_price !== null
+            ? Number(p.customization_price) 
+            : (prodMeta?.cprice !== undefined ? Number(prodMeta.cprice) : 0);
+
+          const resolvedSizeChartInstructions = p.size_chart_instructions || prodMeta?.chart_note || undefined;
+
           dbProds.push({
             id: p.id,
             title: p.title || p.title_ar,
@@ -248,8 +254,10 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
             image_url: p.image_url || '',
             images: resolvedImages,
             size_chart_url: resolvedSizeChart,
+            size_chart_instructions: resolvedSizeChartInstructions,
             has_customization: Boolean(p.has_customization),
             customization_label: p.customization_label || undefined,
+            customization_price: resolvedCustomPrice,
             is_event: resolvedIsEvent,
             sizes: Array.isArray(p.sizes) ? p.sizes : (typeof p.sizes === 'string' ? JSON.parse(p.sizes) : []),
             addons: resolvedAddons,
@@ -302,8 +310,10 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
     const prodMeta = {
       imgs: rawImages,
       chart: product.size_chart_url || undefined,
+      chart_note: product.size_chart_instructions || undefined,
       addons: rawAddons,
-      evt: Boolean(product.is_event)
+      evt: Boolean(product.is_event),
+      cprice: Number(product.customization_price) || 0
     };
     const b64Meta = encodeProdMeta(prodMeta);
     const encodedDesc = b64Meta ? `${cleanDesc} [PROD_META_B64:${b64Meta}]` : cleanDesc;
@@ -318,8 +328,10 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
       image_url: product.image_url,
       images: rawImages,
       size_chart_url: product.size_chart_url || null,
+      size_chart_instructions: product.size_chart_instructions || null,
       has_customization: Boolean(product.has_customization),
       customization_label: product.customization_label || null,
+      customization_price: Number(product.customization_price) || 0,
       is_event: Boolean(product.is_event),
       sizes: rawSizes,
       addons: rawAddons,

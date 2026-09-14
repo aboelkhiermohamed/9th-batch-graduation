@@ -40,8 +40,10 @@ export interface Product {
   image_url: string;
   images?: string[];
   size_chart_url?: string;
+  size_chart_instructions?: string; // Custom instructions/rules for size chart written by admin
   has_customization?: boolean;
   customization_label?: string;
+  customization_price?: number; // Optional price for embroidery / name print (e.g. 5 or 50 EGP)
   is_event?: boolean; // Flag to indicate if product is an Event Ticket / Booking
   event_date?: string; // Optional Event Date (e.g. "2026-09-25")
   event_location?: string; // Optional Event Venue / Location

@@ -91,6 +91,7 @@ export default function StandaloneProductPage() {
 
   // Selected Product Options
   const [selectedSize, setSelectedSize] = useState<string>('');
+  const [enableCustomization, setEnableCustomization] = useState(false);
   const [customText, setCustomText] = useState<string>('');
   const [selectedAddons, setSelectedAddons] = useState<ProductAddon[]>([]);
   const [quantity, setQuantity] = useState(1);
@@ -257,7 +258,7 @@ export default function StandaloneProductPage() {
     const newItem: CartItem = {
       product,
       selectedSize: selectedSize || undefined,
-      customText: customText.trim() || undefined,
+      customText: (product.has_customization && enableCustomization) ? (customText.trim() || undefined) : undefined,
       quantity,
       selectedAddons: selectedAddons.length > 0 ? [...selectedAddons] : undefined,
       attendees: isEvent ? [...attendees] : undefined
@@ -329,9 +330,10 @@ export default function StandaloneProductPage() {
   const galleryImages = product.images && product.images.length > 0 ? product.images : [product.image_url];
   const activeImage = galleryImages[activeImageIndex] || product.image_url;
 
-  // Calculate Addons Extra Price
+  // Calculate Addons & Customization Extra Price
   const addonsTotalPrice = selectedAddons.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
-  const singleUnitPrice = product.price + addonsTotalPrice;
+  const customizationExtraPrice = (product.has_customization && enableCustomization) ? (Number(product.customization_price) || 0) : 0;
+  const singleUnitPrice = product.price + addonsTotalPrice + customizationExtraPrice;
   const totalPriceCalculated = singleUnitPrice * quantity;
 
   return (
@@ -534,19 +536,51 @@ export default function StandaloneProductPage() {
               </div>
             )}
 
-            {/* Custom Embroidery Input */}
+            {/* Custom Embroidery Input / Optional Toggle */}
             {product.has_customization && (
-              <div className="space-y-2 bg-slate-900/80 border border-slate-800 p-4 rounded-2xl">
-                <label className="block text-xs font-bold text-amber-400">
-                  ✏️ {product.customization_label || 'الاسم أو الكلية للتطريز/الطباعة:'}
+              <div className={`space-y-3 p-4 rounded-2xl border transition-all duration-300 ${
+                enableCustomization 
+                  ? 'bg-slate-900 border-amber-500/60 shadow-lg shadow-amber-500/10' 
+                  : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+              }`}>
+                <label className="flex items-center justify-between cursor-pointer select-none">
+                  <div className="flex items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={enableCustomization}
+                      onChange={(e) => {
+                        setEnableCustomization(e.target.checked);
+                        if (!e.target.checked) setCustomText('');
+                      }}
+                      className="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-700 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <span className="text-xs sm:text-sm font-bold text-amber-300 flex items-center gap-1">
+                      ✏️ {product.customization_label || 'إضافة تطريز / طباعة الاسم على القطعة'}
+                    </span>
+                  </div>
+                  <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full font-mono border ${
+                    (Number(product.customization_price) || 0) > 0
+                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  }`}>
+                    {(Number(product.customization_price) || 0) > 0
+                      ? `+${product.customization_price} ج.م`
+                      : 'مجاناً'}
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="مثال: أحمد مصطفى - كلية الهندسـة"
-                  value={customText}
-                  onChange={(e) => setCustomText(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
-                />
+
+                {enableCustomization && (
+                  <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                    <p className="text-[11px] text-slate-400">أدخل الاسم أو الكلية المطلوب تطريزها على المنتج:</p>
+                    <input
+                      type="text"
+                      placeholder="مثال: أحمد مصطفى - كلية الهندسـة"
+                      value={customText}
+                      onChange={(e) => setCustomText(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -933,22 +967,67 @@ export default function StandaloneProductPage() {
 
       {/* --- SIZE CHART MODAL --- */}
       {isSizeChartOpen && product.size_chart_url && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="relative max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden p-6">
-            <button
-              onClick={() => setIsSizeChartOpen(false)}
-              className="absolute top-4 left-4 p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-slate-100"
-            >
-              <X className="w-5 h-5" />
-            </button>
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="relative max-w-2xl w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden p-5 sm:p-6 shadow-2xl space-y-4 my-8 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                <Ruler className="w-5 h-5 text-amber-400" />
+                <span>دليل وقوانين المقاسات - {product.title_ar} 📐</span>
+              </h3>
+              <button
+                onClick={() => setIsSizeChartOpen(false)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <h3 className="text-base font-bold text-slate-100 mb-4 flex items-center gap-2">
-              <Ruler className="w-5 h-5 text-amber-400" />
-              <span>جدول مقاسات - {product.title_ar}</span>
-            </h3>
+            <div className="space-y-4 overflow-y-auto pr-1">
+              {/* Size Chart Image */}
+              <div className="rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-2">
+                <img src={product.size_chart_url} alt="جدول المقاسات" className="w-full h-auto max-h-[50vh] object-contain mx-auto rounded-xl" />
+              </div>
 
-            <div className="rounded-2xl overflow-hidden border border-slate-800 bg-slate-950">
-              <img src={product.size_chart_url} alt="جدول المقاسات" className="w-full h-auto max-h-[70vh] object-contain" />
+              {/* Sizing Instructions & Guidelines Box */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-2.5 text-right">
+                <h4 className="text-xs sm:text-sm font-extrabold text-amber-300 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>تنبيهات وتعليمات المقاسات:</span>
+                </h4>
+                {product.size_chart_instructions ? (
+                  <div className="text-xs text-slate-200 leading-relaxed whitespace-pre-line font-medium pr-1">
+                    {product.size_chart_instructions}
+                  </div>
+                ) : (
+                  <ul className="space-y-2 text-xs text-slate-300 leading-relaxed pr-1">
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-400 shrink-0 font-bold">1️⃣</span>
+                      <span><strong>قياس قطعة ملابس مفضلة لديك:</strong> يفضل قياس قطعة ملابس مريحة ومفضلة لديك (العرض من الإبط للإبط، والطول من الكتف) ومقارنتها بالأرقام الموضحة بالجدول.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-400 shrink-0 font-bold">2️⃣</span>
+                      <span><strong>نسبة السماحية والخطأ:</strong> جميع القياسات مقاسة بالسنتيمتر، ويوجد هامش تفاوت طبيعي بحدود (±1 إلى 2 سم) نتيجة عملية القص والخياطة اليدوية.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-400 shrink-0 font-bold">3️⃣</span>
+                      <span><strong>في حال الحيرة بين مقاسين:</strong> ننصحك دائماً باختيار <strong>المقاس الأكبر (Size Up)</strong> لتضمن راحة أكثر وحرية في الحركة أثناء الشتاء أو الحفل.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-400 shrink-0 font-bold">4️⃣</span>
+                      <span><strong>سياسة التطريز والتخصيص:</strong> القطع المخصص عليها اسم الطالب يتم تفصيلها وتطريزها خصيصاً لك، لذا يرجى التأكد التام من صحة المقاس قبل إتمام الطلب والدفع.</span>
+                    </li>
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-2 shrink-0">
+              <button
+                onClick={() => setIsSizeChartOpen(false)}
+                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs sm:text-sm transition shadow-lg shadow-amber-500/20"
+              >
+                فهمت، العودة لاختيار المقاس ✓
+              </button>
             </div>
           </div>
         </div>
