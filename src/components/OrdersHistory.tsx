@@ -42,6 +42,37 @@ interface OrdersHistoryProps {
   supportPhone?: string;
 }
 
+const isEventItem = (item: any): boolean => {
+  if (item.product?.is_event) return true;
+  const cat = item.product?.category || item.category || '';
+  const title = (item.product_title || item.title_ar || item.title || '').toLowerCase();
+
+  return Boolean(
+    cat.includes('تذاكر') ||
+    cat.includes('تذكرة') ||
+    cat.includes('تذكره') ||
+    cat.includes('إيفينت') ||
+    cat.includes('ايقينت') ||
+    cat.includes('Event') ||
+    cat.includes('Ticket') ||
+    cat.includes('حفل') ||
+    cat.includes('فعالية') ||
+    cat.includes('Day') ||
+    title.includes('scarb') ||
+    title.includes('day') ||
+    title.includes('تذكر') ||
+    title.includes('تذكرة') ||
+    title.includes('تذكره') ||
+    title.includes('يوم') ||
+    title.includes('حفل') ||
+    title.includes('حفلة') ||
+    title.includes('فعالية') ||
+    title.includes('إيفينت') ||
+    title.includes('ايقينت') ||
+    title.includes('ticket')
+  );
+};
+
 export default function OrdersHistory({
   orders,
   isLoading,
@@ -916,41 +947,43 @@ export default function OrdersHistory({
                                         </span>
                                       )}
 
-                                      {/* Event Attendees Breakdown & Edit Action */}
-                                      <div className="w-full mt-2.5 pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
-                                        {item.attendees && item.attendees.length > 0 ? (
-                                          <div className="flex-1 min-w-[200px] p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 space-y-1">
-                                            <div className="flex items-center justify-between">
-                                              <span className="font-bold text-amber-400 flex items-center gap-1">
-                                                <Ticket className="w-3.5 h-3.5" /> أسماء الحاضرين والتذاكر ({item.attendees.length}):
-                                              </span>
-                                              <button
-                                                type="button"
-                                                onClick={() => handleOpenAttendeesModal(order, item)}
-                                                className="text-[11px] text-amber-300 hover:text-amber-200 font-bold underline flex items-center gap-1"
-                                              >
-                                                <span>تعديل الأسماء ✏️</span>
-                                              </button>
-                                            </div>
-                                            <div className="flex flex-wrap gap-1.5 pt-1">
-                                              {item.attendees.map((att, aIdx) => (
-                                                <span key={aIdx} className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-200">
-                                                  👤 {att.name} {att.phone ? `(${att.phone})` : ''}
+                                      {/* Event Attendees Breakdown & Edit Action (Only for Event Tickets / Bookings) */}
+                                      {((item.attendees && item.attendees.length > 0) || isEventItem(item)) && (
+                                        <div className="w-full mt-2.5 pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+                                          {item.attendees && item.attendees.length > 0 ? (
+                                            <div className="flex-1 min-w-[200px] p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 space-y-1">
+                                              <div className="flex items-center justify-between">
+                                                <span className="font-bold text-amber-400 flex items-center gap-1">
+                                                  <Ticket className="w-3.5 h-3.5" /> أسماء الحاضرين والتذاكر ({item.attendees.length}):
                                                 </span>
-                                              ))}
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleOpenAttendeesModal(order, item)}
+                                                  className="text-[11px] text-amber-300 hover:text-amber-200 font-bold underline flex items-center gap-1"
+                                                >
+                                                  <span>تعديل الأسماء ✏️</span>
+                                                </button>
+                                              </div>
+                                              <div className="flex flex-wrap gap-1.5 pt-1">
+                                                {item.attendees.map((att, aIdx) => (
+                                                  <span key={aIdx} className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-200">
+                                                    👤 {att.name} {att.phone ? `(${att.phone})` : ''}
+                                                  </span>
+                                                ))}
+                                              </div>
                                             </div>
-                                          </div>
-                                        ) : (
-                                          <button
-                                            type="button"
-                                            onClick={() => handleOpenAttendeesModal(order, item)}
-                                            className="px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-bold transition flex items-center gap-1.5"
-                                          >
-                                            <Ticket className="w-4 h-4 text-indigo-400" />
-                                            <span>🎟️ كتابة/تعديل أسماء الحاضرين للتذاكر ({item.quantity})</span>
-                                          </button>
-                                        )}
-                                      </div>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleOpenAttendeesModal(order, item)}
+                                              className="px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-bold transition flex items-center gap-1.5"
+                                            >
+                                              <Ticket className="w-4 h-4 text-indigo-400" />
+                                              <span>🎟️ كتابة/تعديل أسماء الحاضرين للتذاكر ({item.quantity})</span>
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
