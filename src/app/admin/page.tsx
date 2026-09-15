@@ -4784,6 +4784,17 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">وصف مختصر للمنتج</label>
+                <textarea
+                  rows={2}
+                  placeholder="أدخل وصفاً مشوقاً للمنتج ومميزاته (تطريز خاص، خامة فاخرة...)"
+                  value={newProdDescAr}
+                  onChange={(e) => setNewProdDescAr(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
               {/* Main Image Upload */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
