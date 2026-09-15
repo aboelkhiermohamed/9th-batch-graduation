@@ -416,6 +416,7 @@ export default function AdminDashboardPage() {
   const [editProdSizes, setEditProdSizes] = useState('S, M, L, XL, XXL');
   const [editProdDescAr, setEditProdDescAr] = useState('');
   const [editProdAddons, setEditProdAddons] = useState<{id: string; name: string; price: string; image_url?: string; description?: string}[]>([]);
+  const [addonUploadingId, setAddonUploadingId] = useState<string | null>(null);
 
   // Settings form state
   const [vodaEnabled, setVodaEnabled] = useState(true);
@@ -1163,6 +1164,7 @@ export default function AdminDashboardPage() {
   const handleAddonImagePick = async (addonId: string, isEdit: boolean, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setAddonUploadingId(addonId);
     try {
       const url = await uploadProductImage(file);
       if (isEdit) {
@@ -1172,6 +1174,8 @@ export default function AdminDashboardPage() {
       }
     } catch {
       alert('فشل رفع صورة الإضافة');
+    } finally {
+      setAddonUploadingId(null);
     }
   };
 
@@ -5056,27 +5060,64 @@ export default function AdminDashboardPage() {
 
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              placeholder="رابط الصورة أو ارفع من الجهاز 📷"
-                              value={addon.image_url || ''}
-                              onChange={(e) => updateAddon(addon.id, 'image_url', e.target.value)}
-                              className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500"
-                            />
-                            <label className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40 cursor-pointer flex items-center gap-1.5 flex-shrink-0 transition">
-                              <Upload className="w-3.5 h-3.5" />
-                              <span>رفع صورة</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(e) => handleAddonImagePick(addon.id, false, e)}
-                              />
-                            </label>
-                            {addon.image_url && (
-                              <img src={addon.image_url} alt="معاينة الإضافة" className="w-8 h-8 rounded-lg object-cover border border-amber-500/50 flex-shrink-0" />
+                            {addon.image_url ? (
+                              <div className="flex items-center gap-2 flex-1 p-1.5 rounded-xl bg-slate-900 border border-slate-800">
+                                <img
+                                  src={addon.image_url}
+                                  alt="معاينة الإضافة"
+                                  className="w-9 h-9 rounded-lg object-cover border border-amber-500/50 flex-shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="رابط الصورة"
+                                  value={addon.image_url}
+                                  onChange={(e) => updateAddon(addon.id, 'image_url', e.target.value)}
+                                  className="flex-1 min-w-0 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500 font-mono"
+                                />
+                                <label className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-bold border border-amber-500/40 cursor-pointer flex items-center gap-1 flex-shrink-0 transition">
+                                  <Upload className="w-3 h-3" />
+                                  <span>🔄 تغيير</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => handleAddonImagePick(addon.id, false, e)}
+                                  />
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => updateAddon(addon.id, 'image_url', '')}
+                                  title="حذف الصورة"
+                                  className="px-2 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 text-rose-400 text-xs font-bold transition flex-shrink-0"
+                                >
+                                  ❌
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <input
+                                  type="text"
+                                  placeholder="رابط الصورة أو ارفع من الجهاز 📷"
+                                  value={addon.image_url || ''}
+                                  onChange={(e) => updateAddon(addon.id, 'image_url', e.target.value)}
+                                  className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500"
+                                />
+                                <label className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40 cursor-pointer flex items-center gap-1.5 flex-shrink-0 transition">
+                                  <Upload className="w-3.5 h-3.5" />
+                                  <span>{addonUploadingId === addon.id ? 'جاري الرفع... ⏳' : 'رفع صورة'}</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => handleAddonImagePick(addon.id, false, e)}
+                                  />
+                                </label>
+                              </>
                             )}
                           </div>
+                          {addonUploadingId === addon.id && (
+                            <p className="text-[10px] text-amber-400 font-bold animate-pulse">⏳ جاري رفع صورة الإضافة...</p>
+                          )}
                           <input
                             type="text"
                             placeholder="وصف مختصر للإضافة (اختياري)"
@@ -5093,10 +5134,10 @@ export default function AdminDashboardPage() {
 
               <button
                 type="submit"
-                disabled={newProdImageUploading || newProdGalleryUploading || newProdSizeChartUploading || !newProdImage}
+                disabled={newProdImageUploading || newProdGalleryUploading || newProdSizeChartUploading || !!addonUploadingId || !newProdImage}
                 className="w-full py-3.5 px-4 rounded-xl gradient-purple-btn text-white font-bold text-sm shadow-xl shadow-indigo-600/30 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {(newProdImageUploading || newProdGalleryUploading || newProdSizeChartUploading)
+                {(newProdImageUploading || newProdGalleryUploading || newProdSizeChartUploading || !!addonUploadingId)
                   ? 'جاري رفع الصور... ⏳'
                   : 'حفظ وإضافة المنتج فوراً'
                 }
@@ -5440,27 +5481,64 @@ export default function AdminDashboardPage() {
                         </div>
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              placeholder="رابط الصورة أو ارفع من الجهاز 📷"
-                              value={addon.image_url || ''}
-                              onChange={(e) => updateEditAddon(addon.id, 'image_url', e.target.value)}
-                              className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500"
-                            />
-                            <label className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40 cursor-pointer flex items-center gap-1.5 flex-shrink-0 transition">
-                              <Upload className="w-3.5 h-3.5" />
-                              <span>رفع صورة</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(e) => handleAddonImagePick(addon.id, true, e)}
-                              />
-                            </label>
-                            {addon.image_url && (
-                              <img src={addon.image_url} alt="معاينة الإضافة" className="w-8 h-8 rounded-lg object-cover border border-amber-500/50 flex-shrink-0" />
+                            {addon.image_url ? (
+                              <div className="flex items-center gap-2 flex-1 p-1.5 rounded-xl bg-slate-900 border border-slate-800">
+                                <img
+                                  src={addon.image_url}
+                                  alt="معاينة الإضافة"
+                                  className="w-9 h-9 rounded-lg object-cover border border-amber-500/50 flex-shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="رابط الصورة"
+                                  value={addon.image_url}
+                                  onChange={(e) => updateEditAddon(addon.id, 'image_url', e.target.value)}
+                                  className="flex-1 min-w-0 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500 font-mono"
+                                />
+                                <label className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-bold border border-amber-500/40 cursor-pointer flex items-center gap-1 flex-shrink-0 transition">
+                                  <Upload className="w-3 h-3" />
+                                  <span>🔄 تغيير</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => handleAddonImagePick(addon.id, true, e)}
+                                  />
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => updateEditAddon(addon.id, 'image_url', '')}
+                                  title="حذف الصورة"
+                                  className="px-2 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 text-rose-400 text-xs font-bold transition flex-shrink-0"
+                                >
+                                  ❌
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <input
+                                  type="text"
+                                  placeholder="رابط الصورة أو ارفع من الجهاز 📷"
+                                  value={addon.image_url || ''}
+                                  onChange={(e) => updateEditAddon(addon.id, 'image_url', e.target.value)}
+                                  className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 text-[11px] focus:outline-none focus:border-amber-500"
+                                />
+                                <label className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40 cursor-pointer flex items-center gap-1.5 flex-shrink-0 transition">
+                                  <Upload className="w-3.5 h-3.5" />
+                                  <span>{addonUploadingId === addon.id ? 'جاري الرفع... ⏳' : 'رفع صورة'}</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => handleAddonImagePick(addon.id, true, e)}
+                                  />
+                                </label>
+                              </>
                             )}
                           </div>
+                          {addonUploadingId === addon.id && (
+                            <p className="text-[10px] text-amber-400 font-bold animate-pulse">⏳ جاري رفع صورة الإضافة...</p>
+                          )}
                           <input
                             type="text"
                             placeholder="وصف مختصر للإضافة (اختياري)"
@@ -5477,10 +5555,10 @@ export default function AdminDashboardPage() {
 
               <button
                 type="submit"
-                disabled={editProdImageUploading || editProdGalleryUploading || editProdSizeChartUploading || !editProdImage}
+                disabled={editProdImageUploading || editProdGalleryUploading || editProdSizeChartUploading || !!addonUploadingId || !editProdImage}
                 className="w-full py-3.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-sm shadow-xl shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
-                {(editProdImageUploading || editProdGalleryUploading || editProdSizeChartUploading)
+                {(editProdImageUploading || editProdGalleryUploading || editProdSizeChartUploading || !!addonUploadingId)
                   ? 'جاري رفع الصور... ⏳'
                   : 'حفظ والتعديل فوراً 💾'
                 }
