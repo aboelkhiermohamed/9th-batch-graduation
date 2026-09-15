@@ -127,12 +127,12 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
     const orderMatchedTxsMap = new Map<string, IncomingTransaction>();
     allTxs.filter(t => t.matched_order_id === matchedOrder!.id || t.id === tx.id).forEach(t => orderMatchedTxsMap.set(t.id, t));
     const sumTxsAmount = Array.from(orderMatchedTxsMap.values()).reduce((acc, t) => acc + Number(t.amount || 0), 0);
-
-    const newPaidAmount = Math.max(sumTxsAmount, Number(tx.amount || 0));
+    const prevPaid = Number(matchedOrder.paid_amount || 0);
+    const newPaidAmount = Math.max(prevPaid + Number(tx.amount || 0), sumTxsAmount, Number(tx.amount || 0));
     const totalOrderAmount = Number(matchedOrder.total_amount || 0);
 
-    // Determine if payment is complete (must cover exact total_amount)
-    const isFullyPaid = newPaidAmount >= (totalOrderAmount - 0.01);
+    // Determine if payment is complete (must cover total_amount within fee tolerance)
+    const isFullyPaid = newPaidAmount >= (totalOrderAmount - 1);
     const newStatus: OrderStatus = isFullyPaid ? 'auto_verified' : 'pending_difference';
     const remainingDiff = isFullyPaid ? 0 : Math.max(0, totalOrderAmount - newPaidAmount);
     const isDiffPending = !isFullyPaid;
@@ -286,8 +286,8 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
       allTxs.filter(t => t.matched_order_id === newOrder.id || t.id === matchedTx!.id).forEach(t => orderMatchedTxsMap.set(t.id, t));
       const sumTxsAmount = Array.from(orderMatchedTxsMap.values()).reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
-      const paidAmount = Math.max(sumTxsAmount, Number(matchedTx.amount || 0));
-      const isFullyPaid = paidAmount >= (orderTotal - 0.01);
+      const paidAmount = Math.max(prevPaid + Number(matchedTx.amount || 0), sumTxsAmount, Number(matchedTx.amount || 0));
+      const isFullyPaid = paidAmount >= (orderTotal - 1);
       const newStatus: OrderStatus = isFullyPaid ? 'auto_verified' : 'pending_difference';
       const remainingDiff = isFullyPaid ? 0 : Math.max(0, orderTotal - paidAmount);
 
