@@ -65,9 +65,11 @@ export interface OrderItem {
   selected_size?: string;
   quantity: number;
   unit_price: number;
+  base_price?: number;
   custom_text?: string;
   customization_option?: string;
   selected_addons?: ProductAddon[]; // Selected add-ons for this item
+  product_addons?: ProductAddon[]; // Available product add-ons list
   attendees?: EventAttendee[]; // List of attendee details corresponding to ticket quantity
   product?: Product;
 }

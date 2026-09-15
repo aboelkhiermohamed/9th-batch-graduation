@@ -266,7 +266,7 @@ export default function AdminDashboardPage() {
 
     // Enrich items with base_price, selected_addons, and product_addons
     const enrichedItems = (order.items || []).map(item => {
-      const copy = { ...item };
+      const copy: any = { ...item };
       const matchedProd = products.find(p => p.id === copy.product_id || p.title === copy.product_title || p.title_ar === copy.product_title);
       const currentSelectedAddons: ProductAddon[] = copy.selected_addons || [];
       const addonsSum = currentSelectedAddons.reduce((s, a) => s + (Number(a.price) || 0), 0);
