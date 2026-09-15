@@ -6843,7 +6843,7 @@ export default function AdminDashboardPage() {
                       <span>{p.title_ar || p.title} ({p.price} ج.م)</span>
                       {hasAddons && (
                         <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 text-[10px] font-bold border border-amber-500/20">
-                          ✨ {p.addons.length} إضافات
+                          ✨ {p.addons?.length || 0} إضافات
                         </span>
                       )}
                     </button>
