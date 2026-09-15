@@ -48,6 +48,13 @@ export default function PayDifferencePage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  const vodaNums = useMemo(() => {
+    const raw = settings?.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0
+      ? settings.vodafone_cash_numbers
+      : ['01015339426'];
+    return shuffleArray(raw);
+  }, [settings?.vodafone_cash_numbers]);
+
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
@@ -179,13 +186,6 @@ export default function PayDifferencePage() {
     : 0;
   const vodaFee = Math.ceil(rawVodaFee);
   const finalPayableDiff = paymentMethod === 'vodafone_cash' ? (remainingBalance + vodaFee) : remainingBalance;
-
-  const vodaNums = useMemo(() => {
-    const raw = settings?.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0
-      ? settings.vodafone_cash_numbers
-      : ['01015339426'];
-    return shuffleArray(raw);
-  }, [settings?.vodafone_cash_numbers]);
 
   if (isSubmitted) {
     return (
