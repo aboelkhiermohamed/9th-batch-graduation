@@ -93,6 +93,7 @@ export default function StandaloneProductPage() {
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [enableCustomization, setEnableCustomization] = useState(false);
   const [customText, setCustomText] = useState<string>('');
+  const [customTexts, setCustomTexts] = useState<string[]>(['']);
   const [selectedAddons, setSelectedAddons] = useState<ProductAddon[]>([]);
   const [quantity, setQuantity] = useState(1);
 
@@ -175,6 +176,50 @@ export default function StandaloneProductPage() {
     }
   }, [quantity, isEvent]);
 
+  // Sync customTexts array with quantity
+  useEffect(() => {
+    setCustomTexts(prev => {
+      const updated = [...prev];
+      if (updated.length < quantity) {
+        while (updated.length < quantity) {
+          updated.push('');
+        }
+      } else if (updated.length > quantity) {
+        return updated.slice(0, quantity);
+      }
+      return updated;
+    });
+  }, [quantity]);
+
+  const copyFirstTextToAll = () => {
+    const first = (customTexts[0] || customText || '').trim();
+    if (!first) return;
+    setCustomTexts(Array(quantity).fill(first));
+  };
+
+  const getFormattedCustomText = (): string | undefined => {
+    if (!product?.has_customization || !enableCustomization) return undefined;
+
+    if (quantity === 1) {
+      const single = (customTexts[0] || customText || '').trim();
+      return single || undefined;
+    }
+
+    const filled = customTexts
+      .map((txt, idx) => {
+        const t = (txt || '').trim();
+        return t ? `القطعة ${idx + 1}: ${t}` : null;
+      })
+      .filter(Boolean);
+
+    if (filled.length === 0) {
+      const fallback = customText.trim();
+      return fallback || undefined;
+    }
+
+    return filled.join(' | ');
+  };
+
   useEffect(() => {
     async function loadProductData() {
       setIsLoading(true);
@@ -255,10 +300,12 @@ export default function StandaloneProductPage() {
       }
     }
 
+    const formattedCustomText = getFormattedCustomText();
+
     const newItem: CartItem = {
       product,
       selectedSize: selectedSize || undefined,
-      customText: (product.has_customization && enableCustomization) ? (customText.trim() || undefined) : undefined,
+      customText: formattedCustomText,
       quantity,
       selectedAddons: selectedAddons.length > 0 ? [...selectedAddons] : undefined,
       attendees: isEvent ? [...attendees] : undefined
@@ -550,7 +597,10 @@ export default function StandaloneProductPage() {
                       checked={enableCustomization}
                       onChange={(e) => {
                         setEnableCustomization(e.target.checked);
-                        if (!e.target.checked) setCustomText('');
+                        if (!e.target.checked) {
+                          setCustomText('');
+                          setCustomTexts(Array(quantity).fill(''));
+                        }
                       }}
                       className="w-4 h-4 rounded text-amber-500 bg-slate-950 border-slate-700 focus:ring-amber-500 cursor-pointer"
                     />
@@ -570,15 +620,66 @@ export default function StandaloneProductPage() {
                 </label>
 
                 {enableCustomization && (
-                  <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                    <p className="text-[11px] text-slate-400">أدخل الاسم أو الكلية المطلوب تطريزها على المنتج:</p>
-                    <input
-                      type="text"
-                      placeholder="مثال: أحمد مصطفى - كلية الهندسـة"
-                      value={customText}
-                      onChange={(e) => setCustomText(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
-                    />
+                  <div className="pt-3 border-t border-slate-800/80 space-y-3">
+                    {quantity === 1 ? (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] text-slate-400">أدخل الاسم أو الكلية المطلوب تطريزها على المنتج:</p>
+                        <input
+                          type="text"
+                          placeholder="مثال: أحمد مصطفى - كلية الهندسـة"
+                          value={customTexts[0] ?? customText}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomText(val);
+                            setCustomTexts(prev => {
+                              const next = [...prev];
+                              next[0] = val;
+                              return next;
+                            });
+                          }}
+                          className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs sm:text-sm focus:outline-none focus:border-amber-500 transition"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] text-slate-300 font-bold flex items-center gap-1.5">
+                            <span>أدخل الاسم والتطريز المطلوب لكل قطعة ({quantity} قطع):</span>
+                          </p>
+                          <button
+                            type="button"
+                            onClick={copyFirstTextToAll}
+                            className="text-[11px] text-amber-400 font-bold hover:underline flex items-center gap-1 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 active:scale-95 transition"
+                          >
+                            <span>تكرار الاسم الأول للكل 📋</span>
+                          </button>
+                        </div>
+
+                        <div className="space-y-2.5">
+                          {Array.from({ length: quantity }).map((_, idx) => (
+                            <div key={idx} className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                              <div className="flex items-center justify-between text-[11px] font-bold text-amber-400">
+                                <span>القطعة رقم {idx + 1} {selectedSize ? `(مقاس ${selectedSize})` : ''}:</span>
+                              </div>
+                              <input
+                                type="text"
+                                placeholder={`أدخل التطريز/الاسم للقطعة ${idx + 1} (مثال: أحمد مصطفى - هندسة)`}
+                                value={customTexts[idx] || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setCustomTexts(prev => {
+                                    const next = [...prev];
+                                    next[idx] = val;
+                                    return next;
+                                  });
+                                }}
+                                className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-amber-500 transition"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
