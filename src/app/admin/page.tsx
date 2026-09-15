@@ -58,7 +58,7 @@ import {
   Camera,
   X
 } from 'lucide-react';
-import { Product, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
+import { Product, ProductAddon, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
 import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase, parseAttendeesAndCleanOpt, clearOrdersInSupabase, deleteOrderFromSupabase, cleanupBase64InSupabase, decodeProdMeta } from '@/lib/supabaseClient';
 import { normalizePhoneNumber, isValidEgyptianPhone } from '@/lib/smsParser';
 
