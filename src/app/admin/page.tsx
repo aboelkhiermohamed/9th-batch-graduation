@@ -69,6 +69,69 @@ function generateUUID() {
   return 'f' + Date.now().toString(16).padStart(11, '0') + '-4000-8000-' + Math.random().toString(36).substring(2, 10);
 }
 
+interface ParsedPieceDetail {
+  pieceNum: number;
+  size?: string;
+  customText?: string;
+}
+
+function parseItemPieces(sizeStr?: string, textStr?: string, quantity: number = 1): ParsedPieceDetail[] {
+  const isMultiSize = Boolean(sizeStr && (sizeStr.includes('القطعة') || sizeStr.includes('قطعة')));
+  const isMultiText = Boolean(textStr && (textStr.includes('القطعة') || textStr.includes('قطعة')));
+
+  if (!isMultiSize && !isMultiText) {
+    return [{
+      pieceNum: 1,
+      size: sizeStr || undefined,
+      customText: textStr || undefined
+    }];
+  }
+
+  const sizeMap: Record<number, string> = {};
+  if (isMultiSize && sizeStr) {
+    const parts = sizeStr.split('|');
+    parts.forEach(p => {
+      const match = p.match(/(?:القطعة|قطعة)\s*(\d+)[\s:]+(.*)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        sizeMap[num] = match[2].trim();
+      }
+    });
+  }
+
+  const textMap: Record<number, string> = {};
+  if (isMultiText && textStr) {
+    const parts = textStr.split('|');
+    parts.forEach(p => {
+      const match = p.match(/(?:القطعة|قطعة)\s*(\d+)[\s:]+(.*)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        textMap[num] = match[2].trim();
+      }
+    });
+  }
+
+  const maxPiece = Math.max(
+    quantity || 1,
+    ...Object.keys(sizeMap).map(Number),
+    ...Object.keys(textMap).map(Number),
+    1
+  );
+
+  const pieces: ParsedPieceDetail[] = [];
+  for (let i = 1; i <= maxPiece; i++) {
+    const sz = sizeMap[i] || (!isMultiSize ? sizeStr : undefined);
+    const txt = textMap[i] || (!isMultiText ? textStr : undefined);
+    pieces.push({
+      pieceNum: i,
+      size: sz || undefined,
+      customText: txt || undefined
+    });
+  }
+
+  return pieces;
+}
+
 function formatUsername(userStr?: string): string {
   if (!userStr) return '';
   const clean = userStr.trim();
@@ -1995,21 +2058,41 @@ export default function AdminDashboardPage() {
 
       const items = getOrderEffectiveItems(order);
       items.forEach(item => {
-        const text = (item.custom_text || '').trim();
         const addons = item.customization_option || (item.selected_addons || []).map((a: any) => a.name).join(' | ') || '';
+        const pieces = parseItemPieces(item.selected_size, item.custom_text, item.quantity);
+        const isMulti = pieces.length > 1 && (item.selected_size?.includes('القطعة') || item.custom_text?.includes('القطعة'));
 
-        if (text || addons) {
-          rows.push([
-            String(rowNum++),
-            order.order_code || '',
-            order.customer_name || '',
-            order.customer_phone || '',
-            item.product_title || '',
-            item.selected_size || 'Free Size',
-            String(item.quantity || 1),
-            text || '—',
-            addons || '—'
-          ]);
+        if (isMulti) {
+          pieces.forEach(p => {
+            if (p.customText || p.size || addons) {
+              rows.push([
+                String(rowNum++),
+                order.order_code || '',
+                order.customer_name || '',
+                order.customer_phone || '',
+                `${item.product_title || ''} (قطعة ${p.pieceNum})`,
+                p.size || item.selected_size || 'Free Size',
+                '1',
+                p.customText || '—',
+                addons || '—'
+              ]);
+            }
+          });
+        } else {
+          const text = (item.custom_text || '').trim();
+          if (text || addons) {
+            rows.push([
+              String(rowNum++),
+              order.order_code || '',
+              order.customer_name || '',
+              order.customer_phone || '',
+              item.product_title || '',
+              item.selected_size || 'Free Size',
+              String(item.quantity || 1),
+              text || '—',
+              addons || '—'
+            ]);
+          }
         }
       });
     });
@@ -2254,7 +2337,24 @@ export default function AdminDashboardPage() {
             if (!isConfirmed) return;
             const items = getReportEffectiveItems(o);
             items.forEach(item => {
-              if (item.custom_text && item.custom_text.trim()) {
+              const pieces = parseItemPieces(item.selected_size, item.custom_text, item.quantity);
+              const isMulti = pieces.length > 1 && (item.selected_size?.includes('القطعة') || item.custom_text?.includes('القطعة'));
+
+              if (isMulti) {
+                pieces.forEach(p => {
+                  if (p.customText || p.size) {
+                    embRows.push({
+                      code: o.order_code,
+                      customer: o.customer_name,
+                      phone: o.customer_phone,
+                      product: `${item.product_title} (قطعة ${p.pieceNum})`,
+                      size: p.size || item.selected_size || 'Free Size',
+                      qty: 1,
+                      text: p.customText || '—'
+                    });
+                  }
+                });
+              } else if (item.custom_text && item.custom_text.trim()) {
                 embRows.push({
                   code: o.order_code,
                   customer: o.customer_name,
@@ -2338,9 +2438,30 @@ export default function AdminDashboardPage() {
                 </td>` : ''}
                 <td>
                   ${effItems.map(it => {
+                    const pieces = parseItemPieces(it.selected_size, it.custom_text, it.quantity);
+                    const isMulti = pieces.length > 1 && (it.selected_size?.includes('القطعة') || it.custom_text?.includes('القطعة'));
                     const { cleanOpt, attendees: parsedAtt } = parseAttendeesAndCleanOpt(it.customization_option);
                     const attendees = (it.attendees && it.attendees.length > 0) ? it.attendees : parsedAtt;
                     const optText = pdfShowTickets ? (it.customization_option || '') : (cleanOpt || '');
+
+                    if (isMulti) {
+                      return `
+                        <div style="margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed #cbd5e1;">
+                          <strong style="color: #0f172a;">• ${it.product_title}</strong> <span style="font-size: 10px; color: #64748b; font-weight: bold;">(إجمالي ${it.quantity} قطع)</span>
+                          <div style="margin-top: 3px; padding-right: 8px;">
+                            ${pieces.map(p => `
+                              <div style="font-size: 11px; line-height: 1.5; color: #334155; margin-bottom: 2px;">
+                                <span style="color: #d97706; font-weight: 800;">🔹 قطعة ${p.pieceNum}:</span> 
+                                ${p.size ? `<span style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 1px 5px; border-radius: 4px; font-weight: bold; font-family: monospace;">مقاس ${p.size}</span>` : ''}
+                                ${pdfShowCustomization && p.customText ? `<span style="color: #b45309; font-weight: 800; margin-right: 4px;">— تطريز: "${p.customText}"</span>` : ''}
+                              </div>
+                            `).join('')}
+                          </div>
+                          ${pdfShowCustomization && optText ? `<small style="color: #047857; display: block; margin-top: 2px;">(إضافة: ${optText})</small>` : ''}
+                        </div>
+                      `;
+                    }
+
                     return `
                       <div>• ${it.product_title} ${it.selected_size ? `[${it.selected_size}]` : ''} × ${it.quantity}
                       ${pdfShowCustomization && it.custom_text ? `<br><small style="color: #b45309;">(تطريز: ${it.custom_text})</small>` : ''}
@@ -3102,47 +3223,69 @@ export default function AdminDashboardPage() {
                               )}
                             </div>
                           ) : (
-                            order.items.map((item, i) => (
-                              <div key={i} className="py-1 border-b border-slate-800/80 last:border-0 text-slate-300">
-                                <div className="flex flex-wrap items-center gap-1.5 text-xs text-white">
-                                  <span className="font-semibold">{item.product_title}</span>
-                                  <span className="text-slate-400 font-mono">× {item.quantity}</span>
-                                  {item.selected_size && (
-                                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 font-mono text-[10px] border border-slate-700 font-bold">
-                                      {item.selected_size}
+                            order.items.map((item, i) => {
+                              const pieces = parseItemPieces(item.selected_size, item.custom_text, item.quantity);
+                              const isMulti = pieces.length > 1 && (item.selected_size?.includes('القطعة') || item.custom_text?.includes('القطعة'));
+                              const { cleanOpt, attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
+                              const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
+
+                              return (
+                                <div key={i} className="py-1.5 border-b border-slate-800/80 last:border-0 text-slate-300">
+                                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-white font-semibold">
+                                    <span>{item.product_title}</span>
+                                    <span className="text-amber-400 font-mono text-[11px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                      × {item.quantity}
                                     </span>
+                                    {!isMulti && item.selected_size && (
+                                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 font-mono text-[10px] border border-slate-700 font-bold">
+                                        {item.selected_size}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {isMulti ? (
+                                    <div className="space-y-1 pr-1.5 border-r-2 border-amber-500/50 my-1.5">
+                                      {pieces.map((p, pIdx) => (
+                                        <div key={pIdx} className="text-[11px] flex flex-wrap items-center gap-1.5 bg-slate-950/80 p-1.5 rounded-lg border border-slate-800/90">
+                                          <span className="text-amber-400 font-bold whitespace-nowrap">🔹 قطعة {p.pieceNum}:</span>
+                                          {p.size && (
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 font-mono text-[10px] border border-slate-700 font-bold">
+                                              مقاس {p.size}
+                                            </span>
+                                          )}
+                                          {p.customText && (
+                                            <span className="text-amber-200/90 font-medium">
+                                              ✨ تطريز: &quot;{p.customText}&quot;
+                                            </span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    item.custom_text && (
+                                      <p className="text-[11px] text-amber-400/90 font-medium mt-0.5">
+                                        ✨ التطريز: &quot;{item.custom_text}&quot;
+                                      </p>
+                                    )
+                                  )}
+                                  {cleanOpt && (
+                                    <p className="text-[11px] text-emerald-400/90 font-medium mt-0.5">
+                                      💎 {cleanOpt}
+                                    </p>
+                                  )}
+                                  {attendeesList && attendeesList.length > 0 && (
+                                    <div className="mt-1 p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 space-y-0.5">
+                                      <span className="font-bold text-indigo-400 block">🎟️ الحاضرين والتذاكر ({attendeesList.length}):</span>
+                                      {attendeesList.map((att: any, aIdx: number) => (
+                                        <div key={aIdx} className="text-[10px] text-slate-200">
+                                          • {att.name} {att.phone ? `(${att.phone})` : ''}
+                                        </div>
+                                      ))}
+                                    </div>
                                   )}
                                 </div>
-                                {item.custom_text && (
-                                  <p className="text-[11px] text-amber-400/90 font-medium mt-0.5">
-                                    ✨ التطريز: &quot;{item.custom_text}&quot;
-                                  </p>
-                                )}
-                                {(() => {
-                                  const { cleanOpt, attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
-                                  const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
-                                  return (
-                                    <>
-                                      {cleanOpt && (
-                                        <p className="text-[11px] text-emerald-400/90 font-medium mt-0.5">
-                                          💎 {cleanOpt}
-                                        </p>
-                                      )}
-                                      {attendeesList && attendeesList.length > 0 && (
-                                        <div className="mt-1 p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 space-y-0.5">
-                                          <span className="font-bold text-indigo-400 block">🎟️ الحاضرين والتذاكر ({attendeesList.length}):</span>
-                                          {attendeesList.map((att: any, aIdx: number) => (
-                                            <div key={aIdx} className="text-[10px] text-slate-200">
-                                              • {att.name} {att.phone ? `(${att.phone})` : ''}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </>
-                                  );
-                                })()}
-                              </div>
-                            ))
+                              );
+                            })
                           )}
                         </td>
                         <td className="p-4 text-center align-middle whitespace-nowrap space-y-1">
@@ -6361,31 +6504,68 @@ export default function AdminDashboardPage() {
                     </p>
                   </div>
                 ) : (
-                  selectedOrderModal.items.map((item, idx) => (
-                    <div key={idx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-                      <div className="flex items-center justify-between font-bold text-sm text-white">
-                        <span>{item.product_title} × {item.quantity}</span>
-                        <div className="flex items-center gap-2">
-                          {item.selected_size && (
-                            <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 font-mono text-xs border border-amber-500/30">
-                              المقاس: {item.selected_size}
-                            </span>
-                          )}
-                          <span className="text-amber-400 font-mono text-xs">{item.unit_price * item.quantity} ج.م</span>
-                        </div>
-                      </div>
+                  selectedOrderModal.items.map((item, idx) => {
+                    const pieces = parseItemPieces(item.selected_size, item.custom_text, item.quantity);
+                    const isMulti = pieces.length > 1 && (item.selected_size?.includes('القطعة') || item.custom_text?.includes('القطعة'));
 
-                      {item.custom_text && (
-                        <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-indigo-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center justify-between">
+                    return (
+                      <div key={idx} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
+                        <div className="flex items-center justify-between font-bold text-sm text-white">
                           <span className="flex items-center gap-1.5">
-                            <Sparkles className="w-4 h-4 text-amber-400" />
-                            <span>✨ الاسم / الكلية للتطريز:</span>
+                            <span>{item.product_title}</span>
+                            <span className="text-amber-400 font-mono text-xs bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                              × {item.quantity}
+                            </span>
                           </span>
-                          <span className="bg-slate-950 px-3 py-1 rounded-lg text-white font-black text-sm border border-amber-500/30 font-sans">
-                            &quot;{item.custom_text}&quot;
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {!isMulti && item.selected_size && (
+                              <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 font-mono text-xs border border-amber-500/30">
+                                المقاس: {item.selected_size}
+                              </span>
+                            )}
+                            <span className="text-amber-400 font-mono text-xs font-black">{item.unit_price * item.quantity} ج.م</span>
+                          </div>
                         </div>
-                      )}
+
+                        {isMulti ? (
+                          <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                            <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                              <Sparkles className="w-4 h-4 text-amber-400" />
+                              <span>تفاصيل ومقاسات كل قطعة ({pieces.length} قطع):</span>
+                            </span>
+                            <div className="space-y-1.5 pt-1">
+                              {pieces.map((p, pIdx) => (
+                                <div key={pIdx} className="flex flex-wrap items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80 text-xs">
+                                  <span className="font-extrabold text-amber-400">🔹 قطعة رقم {p.pieceNum}:</span>
+                                  <div className="flex items-center gap-2">
+                                    {p.size && (
+                                      <span className="px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-mono text-xs border border-slate-700 font-bold">
+                                        مقاس {p.size}
+                                      </span>
+                                    )}
+                                    {p.customText && (
+                                      <span className="bg-slate-950 px-2.5 py-0.5 rounded text-amber-200 font-bold text-xs border border-amber-500/30">
+                                        تطريز: &quot;{p.customText}&quot;
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          item.custom_text && (
+                            <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-indigo-500/15 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <Sparkles className="w-4 h-4 text-amber-400" />
+                                <span>✨ الاسم / الكلية للتطريز:</span>
+                              </span>
+                              <span className="bg-slate-950 px-3 py-1 rounded-lg text-white font-black text-sm border border-amber-500/30 font-sans">
+                                &quot;{item.custom_text}&quot;
+                              </span>
+                            </div>
+                          )
+                        )}
                       {(() => {
                         const { cleanOpt, attendees: parsedAtt } = parseAttendeesAndCleanOpt(item.customization_option);
                         const attendeesList = (item.attendees && item.attendees.length > 0) ? item.attendees : parsedAtt;
@@ -6478,7 +6658,8 @@ export default function AdminDashboardPage() {
                         );
                       })()}
                     </div>
-                  ))
+                  );
+                })
                 )}
               </div>
 
