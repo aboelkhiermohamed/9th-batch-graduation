@@ -263,7 +263,23 @@ export default function AdminDashboardPage() {
 
   const handleOpenEditOrder = (order: Order) => {
     setEditingOrder(order);
-    setEditOrderItems(JSON.parse(JSON.stringify(order.items || [])));
+
+    // Enrich items with base_price, selected_addons, and product_addons
+    const enrichedItems = (order.items || []).map(item => {
+      const copy = { ...item };
+      const matchedProd = products.find(p => p.id === copy.product_id || p.title === copy.product_title || p.title_ar === copy.product_title);
+      const currentSelectedAddons: ProductAddon[] = copy.selected_addons || [];
+      const addonsSum = currentSelectedAddons.reduce((s, a) => s + (Number(a.price) || 0), 0);
+      const basePrice = copy.base_price !== undefined ? Number(copy.base_price) : Math.max(0, (Number(copy.unit_price) || 0) - addonsSum);
+      return {
+        ...copy,
+        base_price: basePrice,
+        selected_addons: currentSelectedAddons,
+        product_addons: matchedProd?.addons || copy.product?.addons || []
+      };
+    });
+
+    setEditOrderItems(enrichedItems);
 
     // Calculate net subtotal of existing items in the order
     const existingItemsNetSubtotal = (order.items || []).reduce(
@@ -310,6 +326,34 @@ export default function AdminDashboardPage() {
     setEditOrderItems(updated);
   };
 
+  const handleToggleEditItemAddon = (idx: number, addon: ProductAddon) => {
+    const updated = [...editOrderItems];
+    const item = updated[idx];
+    const currentAddons: ProductAddon[] = item.selected_addons || [];
+    const exists = currentAddons.some(a => a.id === addon.id || a.name === addon.name);
+
+    let nextAddons: ProductAddon[];
+    if (exists) {
+      nextAddons = currentAddons.filter(a => a.id !== addon.id && a.name !== addon.name);
+    } else {
+      nextAddons = [...currentAddons, addon];
+    }
+
+    item.selected_addons = nextAddons;
+
+    if (nextAddons.length > 0) {
+      item.customization_option = nextAddons.map(a => `${a.name} (+${a.price} ج.م)`).join(' | ');
+    } else {
+      item.customization_option = undefined;
+    }
+
+    const basePrice = item.base_price !== undefined ? Number(item.base_price) : (Number(item.unit_price) || 0);
+    const addonsSum = nextAddons.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+    item.unit_price = basePrice + addonsSum;
+
+    setEditOrderItems(updated);
+  };
+
   const handleAddProductToEditOrder = (prod: Product) => {
     const newItem = {
       id: generateUUID(),
@@ -319,7 +363,10 @@ export default function AdminDashboardPage() {
       image_url: prod.image_url,
       selected_size: prod.sizes && prod.sizes.length > 0 ? prod.sizes[0] : 'Free Size',
       quantity: 1,
-      unit_price: prod.price
+      base_price: prod.price,
+      unit_price: prod.price,
+      selected_addons: [],
+      product_addons: prod.addons || []
     };
     setEditOrderItems([...editOrderItems, newItem]);
   };
@@ -6701,6 +6748,48 @@ export default function AdminDashboardPage() {
                             className="w-full bg-slate-900 text-xs text-amber-300 p-2 rounded-xl border border-slate-800"
                           />
                         </div>
+
+                        {/* Add-ons Selector for this product */}
+                        {(() => {
+                          const availableAddons: ProductAddon[] = item.product_addons?.length
+                            ? item.product_addons
+                            : (products.find(p => p.id === item.product_id || p.title === item.product_title || p.title_ar === item.product_title)?.addons || []);
+
+                          if (!availableAddons || availableAddons.length === 0) return null;
+
+                          return (
+                            <div className="mt-2.5 pt-2 border-t border-slate-900 space-y-1.5">
+                              <label className="block text-[11px] text-amber-400 font-bold flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-amber-400" />
+                                <span>الإضافات والملحقات المتاحة لهذا المنتج (Add-ons):</span>
+                              </label>
+                              <div className="flex flex-wrap gap-1.5">
+                                {availableAddons.map(addon => {
+                                  const isSelected = (item.selected_addons || []).some((a: any) => a.id === addon.id || a.name === addon.name);
+                                  return (
+                                    <button
+                                      key={addon.id}
+                                      type="button"
+                                      onClick={() => handleToggleEditItemAddon(idx, addon)}
+                                      className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border flex items-center gap-1.5 transition ${
+                                        isSelected
+                                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
+                                      }`}
+                                    >
+                                      {addon.image_url && (
+                                        <img src={addon.image_url} alt="" className="w-4 h-4 rounded-md object-cover border border-amber-500/30 shrink-0" />
+                                      )}
+                                      <span>{addon.name}</span>
+                                      <span className="text-[10px] font-mono opacity-80">(+{addon.price} ج.م)</span>
+                                      {isSelected && <Check className="w-3 h-3 text-amber-400 shrink-0" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex flex-col items-end justify-between space-y-3">
@@ -6741,17 +6830,25 @@ export default function AdminDashboardPage() {
             <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
               <span className="text-xs text-slate-400 font-bold block mb-2">➕ إضافة منتج جديد للطلب:</span>
               <div className="flex flex-wrap gap-2">
-                {products.map(p => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handleAddProductToEditOrder(p)}
-                    className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 text-xs font-semibold flex items-center gap-1 transition"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{p.title_ar || p.title} ({p.price} ج.م)</span>
-                  </button>
-                ))}
+                {products.map(p => {
+                  const hasAddons = p.addons && p.addons.length > 0;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handleAddProductToEditOrder(p)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 text-xs font-semibold flex items-center gap-1.5 transition"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>{p.title_ar || p.title} ({p.price} ج.م)</span>
+                      {hasAddons && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 text-[10px] font-bold border border-amber-500/20">
+                          ✨ {p.addons.length} إضافات
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
