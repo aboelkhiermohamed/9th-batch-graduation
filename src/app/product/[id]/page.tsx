@@ -91,6 +91,7 @@ export default function StandaloneProductPage() {
 
   // Selected Product Options
   const [selectedSize, setSelectedSize] = useState<string>('');
+  const [selectedSizesArray, setSelectedSizesArray] = useState<string[]>([]);
   const [enableCustomization, setEnableCustomization] = useState(false);
   const [customText, setCustomText] = useState<string>('');
   const [customTexts, setCustomTexts] = useState<string[]>(['']);
@@ -220,6 +221,51 @@ export default function StandaloneProductPage() {
     return filled.join(' | ');
   };
 
+  // Sync selectedSizesArray with quantity and main selected size
+  useEffect(() => {
+    if (!product?.sizes || product.sizes.length === 0) return;
+    const def = selectedSize || product.sizes[0];
+    setSelectedSizesArray(prev => {
+      const updated = [...prev];
+      if (updated.length < quantity) {
+        while (updated.length < quantity) {
+          updated.push(def);
+        }
+      } else if (updated.length > quantity) {
+        return updated.slice(0, quantity);
+      }
+      return updated;
+    });
+  }, [quantity, product?.sizes]);
+
+  const setPieceSize = (idx: number, sz: string) => {
+    setSelectedSizesArray(prev => {
+      const next = [...prev];
+      next[idx] = sz;
+      return next;
+    });
+  };
+
+  const getFormattedSelectedSize = (): string | undefined => {
+    if (!product?.sizes || product.sizes.length === 0) return undefined;
+
+    if (quantity === 1) {
+      return selectedSizesArray[0] || selectedSize || product.sizes[0];
+    }
+
+    const def = selectedSize || product.sizes[0];
+    const first = selectedSizesArray[0] || def;
+    const allSame = selectedSizesArray.length === quantity && selectedSizesArray.every(s => (s || def) === first);
+
+    if (allSame) {
+      return first;
+    }
+
+    return selectedSizesArray
+      .map((sz, idx) => `القطعة ${idx + 1}: ${sz || def}`)
+      .join(' | ');
+  };
+
   useEffect(() => {
     async function loadProductData() {
       setIsLoading(true);
@@ -287,7 +333,9 @@ export default function StandaloneProductPage() {
       }
     }
 
-    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+    const formattedSize = getFormattedSelectedSize();
+
+    if (product.sizes && product.sizes.length > 0 && !formattedSize) {
       alert('يرجى اختيار المقاس أولاً');
       return;
     }
@@ -304,7 +352,7 @@ export default function StandaloneProductPage() {
 
     const newItem: CartItem = {
       product,
-      selectedSize: selectedSize || undefined,
+      selectedSize: formattedSize,
       customText: formattedCustomText,
       quantity,
       selectedAddons: selectedAddons.length > 0 ? [...selectedAddons] : undefined,
@@ -314,12 +362,25 @@ export default function StandaloneProductPage() {
     let updatedCart: CartItem[];
 
     if (redirectAfter) {
-      // Buy Now: Replace cart with this immediate purchase to avoid accumulating old items
+      // Buy Now: Replace cart with this immediate purchase
       updatedCart = [newItem];
     } else {
-      // Add to Cart: Replace previous selection of the same product with new selection
-      const filtered = cart.filter(item => item.product.id !== product.id);
-      updatedCart = [...filtered, newItem];
+      // Add to Cart: Smart merge matching product ID + selected size + custom text
+      const existingIndex = cart.findIndex(item => 
+        item.product.id === product.id && 
+        item.selectedSize === newItem.selectedSize && 
+        item.customText === newItem.customText
+      );
+
+      if (existingIndex > -1) {
+        updatedCart = [...cart];
+        updatedCart[existingIndex] = {
+          ...updatedCart[existingIndex],
+          quantity: updatedCart[existingIndex].quantity + newItem.quantity
+        };
+      } else {
+        updatedCart = [...cart, newItem];
+      }
     }
 
     saveCartToStorage(updatedCart);
@@ -569,7 +630,10 @@ export default function StandaloneProductPage() {
                   {product.sizes.map((sz) => (
                     <button
                       key={sz}
-                      onClick={() => setSelectedSize(sz)}
+                      onClick={() => {
+                        setSelectedSize(sz);
+                        setSelectedSizesArray(Array(quantity).fill(sz));
+                      }}
                       className={`min-w-[48px] h-12 px-4 rounded-2xl text-xs sm:text-sm font-bold border transition ${
                         selectedSize === sz
                           ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-md shadow-amber-500/20'
@@ -580,6 +644,44 @@ export default function StandaloneProductPage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Per-Piece Size Selector when quantity > 1 */}
+                {quantity > 1 && (
+                  <div className="pt-2 space-y-2 border-t border-slate-800/80">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-amber-300">
+                        تحديد المقاسات المختلفة لـ ({quantity} قطع):
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        (اختياري في حال اختلاف المقاسات)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2">
+                      {Array.from({ length: quantity }).map((_, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+                          <span className="font-bold text-slate-300">القطعة {idx + 1}:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {product.sizes.map((sz) => (
+                              <button
+                                key={sz}
+                                type="button"
+                                onClick={() => setPieceSize(idx, sz)}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition border ${
+                                  (selectedSizesArray[idx] || selectedSize) === sz
+                                    ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-sm font-black'
+                                    : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                                }`}
+                              >
+                                {sz}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -659,7 +761,7 @@ export default function StandaloneProductPage() {
                           {Array.from({ length: quantity }).map((_, idx) => (
                             <div key={idx} className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
                               <div className="flex items-center justify-between text-[11px] font-bold text-amber-400">
-                                <span>القطعة رقم {idx + 1} {selectedSize ? `(مقاس ${selectedSize})` : ''}:</span>
+                                <span>القطعة رقم {idx + 1} {(selectedSizesArray[idx] || selectedSize) ? `(مقاس ${selectedSizesArray[idx] || selectedSize})` : ''}:</span>
                               </div>
                               <input
                                 type="text"
