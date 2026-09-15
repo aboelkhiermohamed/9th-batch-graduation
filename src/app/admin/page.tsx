@@ -1983,6 +1983,53 @@ export default function AdminDashboardPage() {
     return Object.entries(addonTally).map(([name, count]) => ({ name, count }));
   };
 
+  const exportEmbroideryExcel = () => {
+    const rows: string[][] = [
+      ['مسلسل', 'كود الطلب', 'اسم العميل', 'رقم الموبايل', 'اسم المنتج', 'المقاس', 'العدد', 'نص التطريز / الطباعة المطلوبة', 'الإضافات الاختيارية (Add-ons)']
+    ];
+
+    let rowNum = 1;
+    orders.forEach(order => {
+      const isConfirmed = order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered';
+      if (!isConfirmed) return;
+
+      const items = getOrderEffectiveItems(order);
+      items.forEach(item => {
+        const text = (item.custom_text || '').trim();
+        const addons = item.customization_option || (item.selected_addons || []).map((a: any) => a.name).join(' | ') || '';
+
+        if (text || addons) {
+          rows.push([
+            String(rowNum++),
+            order.order_code || '',
+            order.customer_name || '',
+            order.customer_phone || '',
+            item.product_title || '',
+            item.selected_size || 'Free Size',
+            String(item.quantity || 1),
+            text || '—',
+            addons || '—'
+          ]);
+        }
+      });
+    });
+
+    if (rows.length <= 1) {
+      alert('لا توجد طلبات مؤكدة تحتوي على نصوص تطريز حالياً');
+      return;
+    }
+
+    const csvContent = '\uFEFF' + rows.map(r => r.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `شيت_التطريز_والطباعة_المصنع_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const printStandalonePdfReport = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -2198,6 +2245,61 @@ export default function AdminDashboardPage() {
             </tbody>
           </table>
         ` : ''}
+
+        <!-- Section 1.8: Embroidery & Customization List for Factory -->
+        ${(() => {
+          const embRows: Array<{ code: string; customer: string; phone: string; product: string; size: string; qty: number; text: string }> = [];
+          reportOrders.forEach(o => {
+            const isConfirmed = o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered';
+            if (!isConfirmed) return;
+            const items = getReportEffectiveItems(o);
+            items.forEach(item => {
+              if (item.custom_text && item.custom_text.trim()) {
+                embRows.push({
+                  code: o.order_code,
+                  customer: o.customer_name,
+                  phone: o.customer_phone,
+                  product: item.product_title,
+                  size: item.selected_size || 'Free Size',
+                  qty: item.quantity || 1,
+                  text: item.custom_text.trim()
+                });
+              }
+            });
+          });
+
+          if (embRows.length === 0) return '';
+
+          return `
+            <div class="section-header">1.8. كشف التطريز والطباعة على القطع (مباشر لمسؤول التطريز بالمصانع) — إجمالي ${embRows.length} صنف</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 5%;">#</th>
+                  <th style="width: 14%;">كود الطلب</th>
+                  <th style="width: 20%;">اسم العميل</th>
+                  <th style="width: 22%;">المنتج</th>
+                  <th class="text-center" style="width: 10%;">المقاس</th>
+                  <th class="text-center" style="width: 8%;">العدد</th>
+                  <th style="width: 21%;">✨ النص المطلوب للتطريز / الطباعة</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${embRows.map((r, i) => `
+                  <tr>
+                    <td class="text-center font-mono">${i + 1}</td>
+                    <td class="font-mono text-amber">#${r.code}</td>
+                    <td><strong>${r.customer}</strong></td>
+                    <td>${r.product}</td>
+                    <td class="text-center font-mono">${r.size}</td>
+                    <td class="text-center font-mono font-bold">${r.qty}</td>
+                    <td style="background: #fffbe6; color: #b45309; font-weight: 800;">✨ ${r.text}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+        })()}
 
         <!-- Section 2: Detailed Orders Breakdown -->
         <div class="section-header">2. كشوفات تسليم طلبات العملاء وتفاصيل التطريز</div>
@@ -3902,7 +4004,15 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={exportEmbroideryExcel}
+                  className="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>📥 تصدير شيت إكسيل التطريز (CSV)</span>
+                </button>
                 <button
                   type="button"
                   onClick={printStandalonePdfReport}
@@ -5770,7 +5880,14 @@ export default function AdminDashboardPage() {
                   <FileText className="w-6 h-6 text-amber-600" />
                   <h3 className="text-lg font-extrabold text-slate-900">تقرير المبيعات وحصر المقاسات الشامل</h3>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={exportEmbroideryExcel}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg transition"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>تصدير شيت التطريز (CSV/Excel) 📥</span>
+                  </button>
                   <button
                     onClick={() => printStandalonePdfReport()}
                     className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg transition"
