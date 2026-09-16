@@ -69,6 +69,23 @@ function generateUUID() {
   return 'f' + Date.now().toString(16).padStart(11, '0') + '-4000-8000-' + Math.random().toString(36).substring(2, 10);
 }
 
+function normalizeSizeName(rawSize?: string): string {
+  if (!rawSize) return 'بدون مقاس';
+  const clean = rawSize.trim().toUpperCase();
+
+  if (clean === '2X' || clean === 'XXL' || clean === '2XL') return '2XL';
+  if (clean === '3X' || clean === 'XXXL' || clean === '3XL') return '3XL';
+  if (clean === '4X' || clean === 'XXXXL' || clean === '4XL') return '4XL';
+  if (clean === '5X' || clean === 'XXXXXL' || clean === '5XL') return '5XL';
+  if (clean === 'S') return 'S';
+  if (clean === 'M') return 'M';
+  if (clean === 'L') return 'L';
+  if (clean === 'XL') return 'XL';
+  if (clean === 'FREE SIZE' || clean === 'FREE' || clean === 'بدون مقاس') return 'بدون مقاس';
+
+  return rawSize.trim();
+}
+
 interface ParsedPieceDetail {
   pieceNum: number;
   size?: string;
@@ -1989,22 +2006,47 @@ export default function AdminDashboardPage() {
         if (!stats[title]) {
           stats[title] = {
             productTitle: title,
-            sizeCounts: { S: 0, M: 0, L: 0, XL: 0, XXL: 0, 'بدون مقاس': 0 },
+            sizeCounts: { S: 0, M: 0, L: 0, XL: 0, '2XL': 0, '3XL': 0, 'بدون مقاس': 0 },
             totalUnits: 0,
             totalRevenue: 0
           };
         }
-        const sz = item.selected_size || 'بدون مقاس';
-        if (!stats[title].sizeCounts[sz]) {
-          stats[title].sizeCounts[sz] = 0;
-        }
-        stats[title].sizeCounts[sz] += item.quantity;
-        stats[title].totalUnits += item.quantity;
-        stats[title].totalRevenue += item.quantity * item.unit_price;
+
+        const pieces = parseItemPieces(item.selected_size, item.custom_text, item.quantity);
+        pieces.forEach(p => {
+          const normSize = normalizeSizeName(p.size);
+          if (!stats[title].sizeCounts[normSize]) {
+            stats[title].sizeCounts[normSize] = 0;
+          }
+          stats[title].sizeCounts[normSize] += 1;
+          stats[title].totalUnits += 1;
+        });
+
+        stats[title].totalRevenue += (item.quantity || 1) * (item.unit_price || 0);
       });
     });
 
     return Object.values(stats);
+  };
+
+  const getReportSizeColumns = (statsList: any[]) => {
+    const defaultCols = ['S', 'M', 'L', 'XL', '2XL', '3XL'];
+    const extraCols: string[] = [];
+
+    statsList.forEach(stat => {
+      Object.keys(stat.sizeCounts).forEach(sz => {
+        if (!defaultCols.includes(sz) && sz !== 'بدون مقاس' && stat.sizeCounts[sz] > 0) {
+          if (!extraCols.includes(sz)) extraCols.push(sz);
+        }
+      });
+    });
+
+    const hasNoSize = statsList.some(stat => (stat.sizeCounts['بدون مقاس'] || 0) > 0);
+    if (hasNoSize) {
+      extraCols.push('بدون مقاس');
+    }
+
+    return [...defaultCols, ...extraCols];
   };
 
   // Calculate aggregated counts for all Add-ons/Accessories from confirmed orders
@@ -2279,34 +2321,29 @@ export default function AdminDashboardPage() {
 
         <!-- Section 1: Product Size Matrix -->
         <div class="section-header">1. بيان حصر القطع والمقاسات (الموجه للمصانع والمطبعة)</div>
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 35%;">اسم المنتج</th>
-              <th class="text-center">S</th>
-              <th class="text-center">M</th>
-              <th class="text-center">L</th>
-              <th class="text-center">XL</th>
-              <th class="text-center">XXL</th>
-              <th class="text-center">بدون مقاس</th>
-              <th class="text-center">إجمالي القطع</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${productSizeStats.map(stat => `
-              <tr>
-                <td><strong>${stat.productTitle}</strong></td>
-                <td class="text-center font-mono">${stat.sizeCounts['S'] || 0}</td>
-                <td class="text-center font-mono">${stat.sizeCounts['M'] || 0}</td>
-                <td class="text-center font-mono">${stat.sizeCounts['L'] || 0}</td>
-                <td class="text-center font-mono">${stat.sizeCounts['XL'] || 0}</td>
-                <td class="text-center font-mono">${stat.sizeCounts['XXL'] || 0}</td>
-                <td class="text-center font-mono">${stat.sizeCounts['بدون مقاس'] || 0}</td>
-                <td class="text-center font-mono text-amber"><strong>${stat.totalUnits} قطعة</strong></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        ${(() => {
+          const reportCols = getReportSizeColumns(productSizeStats);
+          return `
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 30%;">اسم المنتج</th>
+                  ${reportCols.map(sz => `<th class="text-center">${sz}</th>`).join('')}
+                  <th class="text-center">إجمالي القطع</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${productSizeStats.map(stat => `
+                  <tr>
+                    <td><strong>${stat.productTitle}</strong></td>
+                    ${reportCols.map(sz => `<td class="text-center font-mono">${stat.sizeCounts[sz] || 0}</td>`).join('')}
+                    <td class="text-center font-mono text-amber"><strong>${stat.totalUnits} قطعة</strong></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          `;
+        })()}
 
         <!-- Section 1.5: Add-ons & Accessories Breakdown -->
         ${addonStats.length > 0 ? `
@@ -6121,36 +6158,37 @@ export default function AdminDashboardPage() {
                 </h3>
                 
                 <div className="overflow-x-auto rounded-xl border border-slate-300">
-                  <table className="w-full text-right text-xs">
-                    <thead className="bg-slate-100 text-slate-800 font-extrabold border-b border-slate-300">
-                      <tr>
-                        <th className="p-3">اسم المنتج</th>
-                        <th className="p-3 text-center">S</th>
-                        <th className="p-3 text-center">M</th>
-                        <th className="p-3 text-center">L</th>
-                        <th className="p-3 text-center">XL</th>
-                        <th className="p-3 text-center">XXL</th>
-                        <th className="p-3 text-center">أخرى</th>
-                        <th className="p-3 text-center">إجمالي القطع</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 font-bold">
-                      {productSizeStats.map((stat, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="p-3 font-extrabold text-slate-900">{stat.productTitle}</td>
-                          <td className="p-3 text-center text-amber-700 font-mono">{stat.sizeCounts['S'] || 0}</td>
-                          <td className="p-3 text-center text-amber-700 font-mono">{stat.sizeCounts['M'] || 0}</td>
-                          <td className="p-3 text-center text-amber-700 font-mono">{stat.sizeCounts['L'] || 0}</td>
-                          <td className="p-3 text-center text-amber-700 font-mono">{stat.sizeCounts['XL'] || 0}</td>
-                          <td className="p-3 text-center text-amber-700 font-mono">{stat.sizeCounts['XXL'] || 0}</td>
-                          <td className="p-3 text-center text-slate-600 font-mono">{stat.sizeCounts['بدون مقاس'] || 0}</td>
-                          <td className="p-3 text-center font-mono font-black text-amber-900 bg-amber-100/50">
-                            {stat.totalUnits} قطعة
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {(() => {
+                    const reportCols = getReportSizeColumns(productSizeStats);
+                    return (
+                      <table className="w-full text-right text-xs">
+                        <thead className="bg-slate-100 text-slate-800 font-extrabold border-b border-slate-300">
+                          <tr>
+                            <th className="p-3">اسم المنتج</th>
+                            {reportCols.map(sz => (
+                              <th key={sz} className="p-3 text-center">{sz}</th>
+                            ))}
+                            <th className="p-3 text-center">إجمالي القطع</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 font-bold">
+                          {productSizeStats.map((stat, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50">
+                              <td className="p-3 font-extrabold text-slate-900">{stat.productTitle}</td>
+                              {reportCols.map(sz => (
+                                <td key={sz} className="p-3 text-center text-amber-700 font-mono">
+                                  {stat.sizeCounts[sz] || 0}
+                                </td>
+                              ))}
+                              <td className="p-3 text-center font-mono font-black text-amber-900 bg-amber-100/50">
+                                {stat.totalUnits} قطعة
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    );
+                  })()}
                 </div>
               </div>
 
