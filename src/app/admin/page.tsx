@@ -7049,12 +7049,18 @@ export default function AdminDashboardPage() {
                               onChange={e => handleUpdateEditItemSize(idx, e.target.value)}
                               className="w-full bg-slate-900 text-xs text-amber-300 font-bold p-2 rounded-xl border border-slate-800"
                             >
+                              {item.selected_size && !['S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', '3X', '4XL', 'Free Size'].includes(item.selected_size) && (
+                                <option value={item.selected_size}>{item.selected_size}</option>
+                              )}
                               <option value="S">S</option>
                               <option value="M">M</option>
                               <option value="L">L</option>
                               <option value="XL">XL</option>
+                              <option value="2XL">2XL</option>
                               <option value="XXL">XXL</option>
                               <option value="3XL">3XL</option>
+                              <option value="3X">3X</option>
+                              <option value="4XL">4XL</option>
                               <option value="Free Size">Free Size</option>
                             </select>
                           </div>
