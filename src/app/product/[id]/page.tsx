@@ -725,10 +725,10 @@ export default function StandaloneProductPage() {
                   <div className="pt-3 border-t border-slate-800/80 space-y-3">
                     {quantity === 1 ? (
                       <div className="space-y-1.5">
-                        <p className="text-[11px] text-slate-400">أدخل الاسم أو الكلية المطلوب تطريزها على المنتج:</p>
+                        <p className="text-[11px] text-slate-400">أدخل الاسم المطلوب (اكتب اسمك أحادي زي د.أحمد):</p>
                         <input
                           type="text"
-                          placeholder="مثال: أحمد مصطفى - كلية الهندسـة"
+                          placeholder="اكتب اسمك أحادي زي د.أحمد"
                           value={customTexts[0] ?? customText}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -765,7 +765,7 @@ export default function StandaloneProductPage() {
                               </div>
                               <input
                                 type="text"
-                                placeholder={`أدخل التطريز/الاسم للقطعة ${idx + 1} (مثال: أحمد مصطفى - هندسة)`}
+                                placeholder={`أدخل التطريز للقطعة ${idx + 1} (اكتب اسمك أحادي زي د.أحمد)`}
                                 value={customTexts[idx] || ''}
                                 onChange={(e) => {
                                   const val = e.target.value;

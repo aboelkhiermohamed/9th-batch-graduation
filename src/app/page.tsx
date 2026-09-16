@@ -979,7 +979,7 @@ export default function StoreFrontPage() {
                     </label>
                     <input
                       type="text"
-                      placeholder="أدخل الاسم أو الكلية (مثال: أحمد علي - حاسبات 2026)"
+                      placeholder="اكتب اسمك أحادي زي د.أحمد"
                       value={modalCustomText}
                       onChange={(e) => setModalCustomText(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-amber-500"
