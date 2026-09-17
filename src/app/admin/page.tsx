@@ -7063,231 +7063,246 @@ export default function AdminDashboardPage() {
 
       {/* EDIT ORDER ITEMS & SIZES MODAL */}
       {isEditOrderModalOpen && editingOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 space-y-6 shadow-2xl my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold">
-                  <Edit3 className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-2xl max-h-[92vh] bg-slate-900 border border-indigo-500/40 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 flex flex-col shadow-2xl my-auto text-right dir-rtl">
+            <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold shrink-0">
+                  <Edit3 className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">تعديل عناصر الطلب والمقاسات</h3>
-                  <p className="text-xs text-slate-400 font-mono">الطلب #{editingOrder.order_code} - {editingOrder.customer_name}</p>
+                  <h3 className="text-sm sm:text-base font-bold text-white">تعديل عناصر الطلب والمقاسات</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-400 font-mono">الطلب #{editingOrder.order_code} - {editingOrder.customer_name}</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsEditOrderModalOpen(false)}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                className="p-1.5 sm:p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition shrink-0"
               >
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Current Items Editor List */}
-            <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
-              {editOrderItems.length === 0 ? (
-                <p className="text-xs text-amber-400 text-center py-6">لا توجد منتجات بالطلب حالياً. أضف منتج جديد أدناه.</p>
-              ) : (
-                editOrderItems.map((item, idx) => (
-                  <div key={idx} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <h4 className="text-xs font-bold text-white mb-1">{item.product_title}</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                          <div>
-                            <label className="block text-[10px] text-slate-400 font-bold mb-0.5">المقاس:</label>
-                            <select
-                              value={item.selected_size || ''}
-                              onChange={e => handleUpdateEditItemSize(idx, e.target.value)}
-                              className="w-full bg-slate-900 text-xs text-amber-300 font-bold p-2 rounded-xl border border-slate-800"
-                            >
-                              {item.selected_size && !['S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', '3X', '4XL', 'Free Size'].includes(item.selected_size) && (
-                                <option value={item.selected_size}>{item.selected_size}</option>
-                              )}
-                              <option value="S">S</option>
-                              <option value="M">M</option>
-                              <option value="L">L</option>
-                              <option value="XL">XL</option>
-                              <option value="2XL">2XL</option>
-                              <option value="XXL">XXL</option>
-                              <option value="3XL">3XL</option>
-                              <option value="3X">3X</option>
-                              <option value="4XL">4XL</option>
-                              <option value="Free Size">Free Size</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] text-slate-400 font-bold mb-0.5">سعر القطعة (ج.م):</label>
-                            <input
-                              type="number"
-                              value={item.unit_price}
-                              onChange={e => {
-                                const updated = [...editOrderItems];
-                                updated[idx].unit_price = Number(e.target.value);
-                                setEditOrderItems(updated);
-                              }}
-                              className="w-full bg-slate-900 text-xs text-white font-mono font-bold p-2 rounded-xl border border-slate-800"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mt-2">
-                          <label className="block text-[10px] text-slate-400 font-bold mb-0.5">✨ الاسم المطلوب للتطريز على هذه القطعة:</label>
-                          <input
-                            type="text"
-                            value={item.custom_text || ''}
-                            onChange={e => handleUpdateEditItemCustomText(idx, e.target.value)}
-                            placeholder="مثال: د. محمد أحمد"
-                            className="w-full bg-slate-900 text-xs text-amber-300 p-2 rounded-xl border border-slate-800"
-                          />
-                        </div>
-
-                        {/* Add-ons Selector for this product */}
-                        {(() => {
-                          const availableAddons: ProductAddon[] = item.product_addons?.length
-                            ? item.product_addons
-                            : (products.find(p => p.id === item.product_id || p.title === item.product_title || p.title_ar === item.product_title)?.addons || []);
-
-                          if (!availableAddons || availableAddons.length === 0) return null;
-
-                          return (
-                            <div className="mt-2.5 pt-2 border-t border-slate-900 space-y-1.5">
-                              <label className="block text-[11px] text-amber-400 font-bold flex items-center gap-1">
-                                <Sparkles className="w-3 h-3 text-amber-400" />
-                                <span>الإضافات والملحقات المتاحة لهذا المنتج (Add-ons):</span>
-                              </label>
-                              <div className="flex flex-wrap gap-1.5">
-                                {availableAddons.map(addon => {
-                                  const isSelected = (item.selected_addons || []).some((a: any) => a.id === addon.id || a.name === addon.name);
-                                  return (
-                                    <button
-                                      key={addon.id}
-                                      type="button"
-                                      onClick={() => handleToggleEditItemAddon(idx, addon)}
-                                      className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border flex items-center gap-1.5 transition ${
-                                        isSelected
-                                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
-                                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
-                                      }`}
-                                    >
-                                      {addon.image_url && (
-                                        <img src={addon.image_url} alt="" className="w-4 h-4 rounded-md object-cover border border-amber-500/30 shrink-0" />
-                                      )}
-                                      <span>{addon.name}</span>
-                                      <span className="text-[10px] font-mono opacity-80">(+{addon.price} ج.م)</span>
-                                      {isSelected && <Check className="w-3 h-3 text-amber-400 shrink-0" />}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-
-                      <div className="flex flex-col items-end justify-between space-y-3">
+            {/* Scrollable Content Body */}
+            <div className="flex-1 overflow-y-auto space-y-4 py-3 pl-1 pr-0.5">
+              {/* Current Items Editor List */}
+              <div className="space-y-3">
+                {editOrderItems.length === 0 ? (
+                  <p className="text-xs text-amber-400 text-center py-6">لا توجد منتجات بالطلب حالياً. أضف منتج جديد أدناه.</p>
+                ) : (
+                  editOrderItems.map((item, idx) => (
+                    <div key={idx} className="p-3.5 sm:p-4 rounded-2xl bg-slate-950 border border-slate-800/90 space-y-3">
+                      {/* Item Header & Remove Button */}
+                      <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-900">
+                        <h4 className="text-xs sm:text-sm font-bold text-white flex-1 truncate">{item.product_title}</h4>
                         <button
                           type="button"
                           onClick={() => handleRemoveEditItem(idx)}
-                          className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20"
+                          className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-bold flex items-center gap-1 shrink-0"
                           title="حذف هذا المنتج من الطلب"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>حذف</span>
                         </button>
+                      </div>
 
-                        <div className="flex items-center gap-1 bg-slate-900 rounded-xl p-1 border border-slate-800">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateEditItemQuantity(idx, item.quantity - 1)}
-                            className="p-1 hover:bg-slate-800 text-slate-300 rounded-lg"
+                      {/* Controls Grid: Size, Unit Price, Quantity */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div>
+                          <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">المقاس:</label>
+                          <select
+                            value={item.selected_size || ''}
+                            onChange={e => handleUpdateEditItemSize(idx, e.target.value)}
+                            className="w-full bg-slate-900 text-xs text-amber-300 font-bold p-2.5 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none"
                           >
-                            -
-                          </button>
-                          <span className="text-xs font-mono font-bold text-white px-2">{item.quantity}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateEditItemQuantity(idx, item.quantity + 1)}
-                            className="p-1 hover:bg-slate-800 text-slate-300 rounded-lg"
-                          >
-                            +
-                          </button>
+                            {item.selected_size && !['S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', '3X', '4XL', 'Free Size'].includes(item.selected_size) && (
+                              <option value={item.selected_size}>{item.selected_size}</option>
+                            )}
+                            <option value="S">S</option>
+                            <option value="M">M</option>
+                            <option value="L">L</option>
+                            <option value="XL">XL</option>
+                            <option value="2XL">2XL</option>
+                            <option value="XXL">XXL</option>
+                            <option value="3XL">3XL</option>
+                            <option value="3X">3X</option>
+                            <option value="4XL">4XL</option>
+                            <option value="Free Size">Free Size</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">سعر القطعة (ج.م):</label>
+                          <input
+                            type="number"
+                            value={item.unit_price}
+                            onChange={e => {
+                              const updated = [...editOrderItems];
+                              updated[idx].unit_price = Number(e.target.value);
+                              setEditOrderItems(updated);
+                            }}
+                            className="w-full bg-slate-900 text-xs text-white font-mono font-bold p-2.5 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">العدد (الكمية):</label>
+                          <div className="flex items-center justify-between bg-slate-900 rounded-xl p-1 border border-slate-800 h-[38px]">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateEditItemQuantity(idx, item.quantity - 1)}
+                              className="w-8 h-full hover:bg-slate-800 text-slate-300 rounded-lg font-bold flex items-center justify-center text-sm"
+                            >
+                              -
+                            </button>
+                            <span className="text-xs font-mono font-extrabold text-white px-2">{item.quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateEditItemQuantity(idx, item.quantity + 1)}
+                              className="w-8 h-full hover:bg-slate-800 text-slate-300 rounded-lg font-bold flex items-center justify-center text-sm"
+                            >
+                              +
+                            </button>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Custom Embroidery Text */}
+                      <div>
+                        <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">✨ الاسم المطلوب للتطريز على هذه القطعة:</label>
+                        <input
+                          type="text"
+                          value={item.custom_text || ''}
+                          onChange={e => handleUpdateEditItemCustomText(idx, e.target.value)}
+                          placeholder="مثال: د. محمد أحمد"
+                          className="w-full bg-slate-900 text-xs text-amber-300 p-2.5 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Add-ons Selector for this product */}
+                      {(() => {
+                        const availableAddons: ProductAddon[] = item.product_addons?.length
+                          ? item.product_addons
+                          : (products.find(p => p.id === item.product_id || p.title === item.product_title || p.title_ar === item.product_title)?.addons || []);
+
+                        if (!availableAddons || availableAddons.length === 0) return null;
+
+                        return (
+                          <div className="mt-2.5 pt-2.5 border-t border-slate-900 space-y-2">
+                            <label className="block text-[11px] text-amber-400 font-bold flex items-center gap-1">
+                              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span>الإضافات والملحقات المتاحة لهذا المنتج (Add-ons):</span>
+                            </label>
+                            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-1.5">
+                              {availableAddons.map(addon => {
+                                const isSelected = (item.selected_addons || []).some((a: any) => a.id === addon.id || a.name === addon.name);
+                                return (
+                                  <button
+                                    key={addon.id}
+                                    type="button"
+                                    onClick={() => handleToggleEditItemAddon(idx, addon)}
+                                    className={`px-2.5 py-2 rounded-xl text-[11px] font-bold border flex items-center justify-between gap-1.5 transition text-right ${
+                                      isSelected
+                                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-1.5 min-w-0 truncate">
+                                      {addon.image_url && (
+                                        <img src={addon.image_url} alt="" className="w-4 h-4 rounded-md object-cover border border-amber-500/30 shrink-0" />
+                                      )}
+                                      <span className="truncate">{addon.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <span className="text-[10px] font-mono opacity-80">(+{addon.price} ج.م)</span>
+                                      {isSelected && <Check className="w-3 h-3 text-amber-400 shrink-0" />}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Add Product Selector */}
+              <div className="p-3 sm:p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                <span className="text-xs text-slate-400 font-bold block">➕ إضافة منتج جديد للطلب:</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {products.map(p => {
+                    const hasAddons = p.addons && p.addons.length > 0;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleAddProductToEditOrder(p)}
+                        className="w-full p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 text-xs font-semibold flex items-center justify-between gap-2 transition"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0 truncate">
+                          <Plus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span className="truncate">{p.title_ar || p.title}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-mono text-amber-400 font-bold">{p.price} ج.م</span>
+                          {hasAddons && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 text-[10px] font-bold border border-amber-500/20">
+                              ✨ {p.addons?.length || 0} إضافات
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Summary & Price Difference Calculation Box */}
+              {(() => {
+                const newTotal = editOrderItems.reduce((sum, item) => sum + (Number(item.unit_price) * Number(item.quantity)), 0);
+                const prevPaid = Number(editPaidAmount) || 0;
+                const priceDiff = newTotal - prevPaid;
+
+                return (
+                  <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-3 text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <label className="text-slate-300 font-bold">
+                        المبلغ المدفوع والمؤكد سابقاً قبل التعديل (ج.م):
+                      </label>
+                      <input
+                        type="number"
+                        value={editPaidAmount}
+                        onChange={e => setEditPaidAmount(e.target.value)}
+                        placeholder="أدخل المبلغ المدفوع سابقاً"
+                        className="w-full sm:w-36 bg-slate-900 text-emerald-400 font-mono font-bold text-sm p-2 rounded-xl border border-slate-800 text-center focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-400 pt-2 border-t border-slate-900">
+                      <span>إجمالي الطلب الجديد بعد التعديلات:</span>
+                      <span className="font-mono font-extrabold text-white text-sm">{newTotal} ج.م</span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pt-2 border-t border-slate-800 font-bold">
+                      <span className="text-amber-400">فرق السعر المستحق لسداد الفاتورة الجزئية:</span>
+                      <span className={`font-mono text-sm sm:text-base ${priceDiff > 0 ? 'text-amber-400 font-black' : 'text-slate-400'}`}>
+                        {priceDiff > 0 ? `+${priceDiff} ج.م (فاتورة تكملة 💳)` : '0 ج.م (لا يوجد فارق)'}
+                      </span>
                     </div>
                   </div>
-                ))
-              )}
+                );
+              })()}
             </div>
 
-            {/* Add Product Selector */}
-            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">
-              <span className="text-xs text-slate-400 font-bold block mb-2">➕ إضافة منتج جديد للطلب:</span>
-              <div className="flex flex-wrap gap-2">
-                {products.map(p => {
-                  const hasAddons = p.addons && p.addons.length > 0;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => handleAddProductToEditOrder(p)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 text-xs font-semibold flex items-center gap-1.5 transition"
-                    >
-                      <Plus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span>{p.title_ar || p.title} ({p.price} ج.م)</span>
-                      {hasAddons && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 text-[10px] font-bold border border-amber-500/20">
-                          ✨ {p.addons?.length || 0} إضافات
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Summary & Price Difference Calculation Box */}
-            {(() => {
-              const newTotal = editOrderItems.reduce((sum, item) => sum + (Number(item.unit_price) * Number(item.quantity)), 0);
-              const prevPaid = Number(editPaidAmount) || 0;
-              const priceDiff = newTotal - prevPaid;
-
-              return (
-                <div className="p-4 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-3 text-xs">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <label className="text-slate-300 font-bold">
-                      المبلغ المدفوع والمؤكد سابقاً قبل التعديل (ج.م):
-                    </label>
-                    <input
-                      type="number"
-                      value={editPaidAmount}
-                      onChange={e => setEditPaidAmount(e.target.value)}
-                      placeholder="أدخل المبلغ المدفوع سابقاً"
-                      className="w-full sm:w-36 bg-slate-900 text-emerald-400 font-mono font-bold text-sm p-2 rounded-xl border border-slate-800 text-center"
-                    />
-                  </div>
-
-                  <div className="flex justify-between text-slate-400 pt-1 border-t border-slate-900">
-                    <span>إجمالي الطلب الجديد بعد التعديلات:</span>
-                    <span className="font-mono font-bold text-white text-sm">{newTotal} ج.م</span>
-                  </div>
-
-                  <div className="flex justify-between items-center pt-2 border-t border-slate-800 font-bold">
-                    <span className="text-amber-400">فرق السعر المستحق لسداد الفاتورة الجزئية:</span>
-                    <span className={`font-mono text-base ${priceDiff > 0 ? 'text-amber-400 font-black' : 'text-slate-400'}`}>
-                      {priceDiff > 0 ? `+${priceDiff} ج.م (فاتورة تكملة 💳)` : '0 ج.م (لا يوجد فارق)'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            {/* Actions Footer */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsEditOrderModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+                className="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs sm:text-sm transition text-center"
               >
                 إلغاء
               </button>
@@ -7295,9 +7310,9 @@ export default function AdminDashboardPage() {
                 type="button"
                 onClick={handleSaveOrderEdits}
                 disabled={isSavingOrderEdits}
-                className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg flex items-center gap-2"
+                className="flex-1 sm:flex-none px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm shadow-lg flex items-center justify-center gap-2 transition disabled:opacity-50"
               >
-                <Save className="w-4 h-4" />
+                <Save className="w-4 h-4 shrink-0" />
                 <span>{isSavingOrderEdits ? 'جاري التعديل...' : 'حفظ التعديلات وتوليد الفاتورة 💾'}</span>
               </button>
             </div>
