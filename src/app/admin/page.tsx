@@ -319,6 +319,7 @@ export default function AdminDashboardPage() {
   const [pdfShowRef, setPdfShowRef] = useState(true);
   const [pdfShowCustomization, setPdfShowCustomization] = useState(true);
   const [pdfShowStatus, setPdfShowStatus] = useState(true);
+  const [pdfShowEmbroiderySection, setPdfShowEmbroiderySection] = useState(true);
   const [pdfShowTickets, setPdfShowTickets] = useState(false);
 
   // Backup & Restore State
@@ -2088,6 +2089,46 @@ export default function AdminDashboardPage() {
     return Object.entries(addonTally).map(([name, count]) => ({ name, count }));
   };
 
+  const getEmbroideryRows = () => {
+    const embRows: Array<{ code: string; customer: string; phone: string; product: string; size: string; qty: number; text: string }> = [];
+    reportOrders.forEach(o => {
+      const isConfirmed = o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered';
+      if (!isConfirmed) return;
+      const items = getReportEffectiveItems(o);
+      items.forEach(item => {
+        const pieces = parseItemPieces(item.selected_size, item.custom_text, item.quantity);
+        const isMulti = pieces.length > 1 && (item.selected_size?.includes('القطعة') || item.custom_text?.includes('القطعة'));
+
+        if (isMulti) {
+          pieces.forEach(p => {
+            if (p.customText || p.size) {
+              embRows.push({
+                code: o.order_code,
+                customer: o.customer_name,
+                phone: o.customer_phone,
+                product: `${item.product_title} (قطعة ${p.pieceNum})`,
+                size: p.size || item.selected_size || 'Free Size',
+                qty: 1,
+                text: p.customText || '—'
+              });
+            }
+          });
+        } else if (item.custom_text && item.custom_text.trim()) {
+          embRows.push({
+            code: o.order_code,
+            customer: o.customer_name,
+            phone: o.customer_phone,
+            product: item.product_title,
+            size: item.selected_size || 'Free Size',
+            qty: item.quantity || 1,
+            text: item.custom_text.trim()
+          });
+        }
+      });
+    });
+    return embRows;
+  };
+
   const exportEmbroideryExcel = () => {
     const rows: string[][] = [
       ['مسلسل', 'كود الطلب', 'اسم العميل', 'رقم الموبايل', 'اسم المنتج', 'المقاس', 'العدد', 'نص التطريز / الطباعة المطلوبة', 'الإضافات الاختيارية (Add-ons)']
@@ -2367,43 +2408,8 @@ export default function AdminDashboardPage() {
         ` : ''}
 
         <!-- Section 1.8: Embroidery & Customization List for Factory -->
-        ${(() => {
-          const embRows: Array<{ code: string; customer: string; phone: string; product: string; size: string; qty: number; text: string }> = [];
-          reportOrders.forEach(o => {
-            const isConfirmed = o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered';
-            if (!isConfirmed) return;
-            const items = getReportEffectiveItems(o);
-            items.forEach(item => {
-              const pieces = parseItemPieces(item.selected_size, item.custom_text, item.quantity);
-              const isMulti = pieces.length > 1 && (item.selected_size?.includes('القطعة') || item.custom_text?.includes('القطعة'));
-
-              if (isMulti) {
-                pieces.forEach(p => {
-                  if (p.customText || p.size) {
-                    embRows.push({
-                      code: o.order_code,
-                      customer: o.customer_name,
-                      phone: o.customer_phone,
-                      product: `${item.product_title} (قطعة ${p.pieceNum})`,
-                      size: p.size || item.selected_size || 'Free Size',
-                      qty: 1,
-                      text: p.customText || '—'
-                    });
-                  }
-                });
-              } else if (item.custom_text && item.custom_text.trim()) {
-                embRows.push({
-                  code: o.order_code,
-                  customer: o.customer_name,
-                  phone: o.customer_phone,
-                  product: item.product_title,
-                  size: item.selected_size || 'Free Size',
-                  qty: item.quantity || 1,
-                  text: item.custom_text.trim()
-                });
-              }
-            });
-          });
+        ${pdfShowEmbroiderySection ? (() => {
+          const embRows = getEmbroideryRows();
 
           if (embRows.length === 0) return '';
 
@@ -2436,7 +2442,7 @@ export default function AdminDashboardPage() {
               </tbody>
             </table>
           `;
-        })()}
+        })() : ''}
 
         <!-- Section 2: Detailed Orders Breakdown -->
         <div class="section-header">2. كشوفات تسليم طلبات العملاء وتفاصيل التطريز</div>
@@ -6106,6 +6112,10 @@ export default function AdminDashboardPage() {
                     <span>تفاصيل التطريز والإضافات</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={pdfShowEmbroiderySection} onChange={e => setPdfShowEmbroiderySection(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
+                    <span>كشف التطريز والطباعة على القطع</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={pdfShowTickets} onChange={e => setPdfShowTickets(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
                     <span>أسماء وتفاصيل التذاكر 🎟️</span>
                   </label>
@@ -6224,6 +6234,48 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
               )}
+
+              {/* SECTION 1.8: Embroidery & Customization List Table */}
+              {pdfShowEmbroiderySection && (() => {
+                const embRows = getEmbroideryRows();
+                if (embRows.length === 0) return null;
+                return (
+                  <div className="space-y-3 pt-2">
+                    <h3 className="text-base font-extrabold text-slate-900 border-r-4 border-amber-600 pr-3">
+                      1.8. كشف التطريز والطباعة على القطع (مباشر لمسؤول التطريز بالمصانع) — إجمالي {embRows.length} صنف
+                    </h3>
+                    
+                    <div className="overflow-x-auto rounded-xl border border-slate-300">
+                      <table className="w-full text-right text-xs">
+                        <thead className="bg-amber-50 text-amber-950 font-extrabold border-b border-amber-200">
+                          <tr>
+                            <th className="p-3 text-center">#</th>
+                            <th className="p-3">كود الطلب</th>
+                            <th className="p-3">اسم العميل</th>
+                            <th className="p-3">المنتج</th>
+                            <th className="p-3 text-center">المقاس</th>
+                            <th className="p-3 text-center">العدد</th>
+                            <th className="p-3">✨ النص المطلوب للتطريز / الطباعة</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 font-bold">
+                          {embRows.map((r, i) => (
+                            <tr key={i} className="hover:bg-slate-50">
+                              <td className="p-3 text-center font-mono">{i + 1}</td>
+                              <td className="p-3 font-mono text-amber-800 font-bold">#{r.code}</td>
+                              <td className="p-3 font-extrabold text-slate-900">{r.customer}</td>
+                              <td className="p-3">{r.product}</td>
+                              <td className="p-3 text-center font-mono">{r.size}</td>
+                              <td className="p-3 text-center font-mono font-black">{r.qty}</td>
+                              <td className="p-3 bg-amber-50 text-amber-900 font-black">✨ {r.text}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* SECTION 2: Detailed Customer Orders Table */}
               <div className="space-y-3 pt-4">
