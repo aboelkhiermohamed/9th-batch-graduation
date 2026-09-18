@@ -77,6 +77,8 @@ function normalizeSizeName(rawSize?: string): string {
   if (clean === '3X' || clean === 'XXXL' || clean === '3XL') return '3XL';
   if (clean === '4X' || clean === 'XXXXL' || clean === '4XL') return '4XL';
   if (clean === '5X' || clean === 'XXXXXL' || clean === '5XL') return '5XL';
+  if (clean === '6X' || clean === 'XXXXXXL' || clean === '6XL') return '6XL';
+  if (clean === '7X' || clean === 'XXXXXXXL' || clean === '7XL') return '7XL';
   if (clean === 'S') return 'S';
   if (clean === 'M') return 'M';
   if (clean === 'L') return 'L';
@@ -2007,7 +2009,7 @@ export default function AdminDashboardPage() {
         if (!stats[title]) {
           stats[title] = {
             productTitle: title,
-            sizeCounts: { S: 0, M: 0, L: 0, XL: 0, '2XL': 0, '3XL': 0, 'بدون مقاس': 0 },
+            sizeCounts: { S: 0, M: 0, L: 0, XL: 0, '2XL': 0, '3XL': 0, '4XL': 0, '5XL': 0, '6XL': 0, 'بدون مقاس': 0 },
             totalUnits: 0,
             totalRevenue: 0
           };
@@ -2031,23 +2033,36 @@ export default function AdminDashboardPage() {
   };
 
   const getReportSizeColumns = (statsList: any[]) => {
+    const MASTER_ORDER = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL'];
     const defaultCols = ['S', 'M', 'L', 'XL', '2XL', '3XL'];
-    const extraCols: string[] = [];
+
+    const activeSizes = new Set<string>(defaultCols);
 
     statsList.forEach(stat => {
-      Object.keys(stat.sizeCounts).forEach(sz => {
-        if (!defaultCols.includes(sz) && sz !== 'بدون مقاس' && stat.sizeCounts[sz] > 0) {
-          if (!extraCols.includes(sz)) extraCols.push(sz);
-        }
-      });
+      if (stat.sizeCounts) {
+        Object.keys(stat.sizeCounts).forEach(sz => {
+          if (stat.sizeCounts[sz] > 0 && sz !== 'بدون مقاس') {
+            activeSizes.add(sz);
+          }
+        });
+      }
     });
 
-    const hasNoSize = statsList.some(stat => (stat.sizeCounts['بدون مقاس'] || 0) > 0);
+    const sortedCols = Array.from(activeSizes).sort((a, b) => {
+      const idxA = MASTER_ORDER.indexOf(a);
+      const idxB = MASTER_ORDER.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    const hasNoSize = statsList.some(stat => (stat.sizeCounts && stat.sizeCounts['بدون مقاس'] || 0) > 0);
     if (hasNoSize) {
-      extraCols.push('بدون مقاس');
+      sortedCols.push('بدون مقاس');
     }
 
-    return [...defaultCols, ...extraCols];
+    return sortedCols;
   };
 
   // Calculate aggregated counts for all Add-ons/Accessories from confirmed orders
