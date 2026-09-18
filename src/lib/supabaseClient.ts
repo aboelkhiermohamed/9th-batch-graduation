@@ -1321,11 +1321,42 @@ export async function updateOrderStatusInSupabase(
       if (status === 'auto_verified' || status === 'manual_verified') {
         target.verified_at = target.verified_at || new Date().toISOString();
       }
-      if (verifiedBy) {
-        let cleanN = (target.notes || '').replace(/\[VERIFIED_BY:.*?\]/g, '').trim();
-        target.notes = `${cleanN} [VERIFIED_BY:${verifiedBy}]`.trim();
-        payload.notes = target.notes;
-      }
+
+      // Re-encode items and metadata so they are NEVER wiped out from DB notes when updating status
+      let cleanN = (target.notes || '')
+        .replace(/\[VERIFIED_BY:.*?\]/g, '')
+        .replace(/\[ITEMS_META_B64:[A-Za-z0-9+/=]+\]/g, '')
+        .replace(/\[ITEMS_META:[\s\S]*?\]\]?/g, '')
+        .replace(/\[PARTIAL_META:.*?\]/g, '')
+        .trim();
+
+      const metaTag = `[PARTIAL_META:${JSON.stringify({
+        p: target.paid_amount || 0,
+        d: target.difference_amount || 0,
+        dp: Boolean(target.is_difference_pending),
+        h: target.edit_history || []
+      })}]`;
+
+      const cleanItemsMeta = (target.items || []).map(item => {
+        const copy = { ...item };
+        if (copy.attendees && Array.isArray(copy.attendees)) {
+          copy.attendees = copy.attendees.map((a: any) => {
+            let pUrl = a.photo_url;
+            if (pUrl && pUrl.length > 2000 && pUrl.startsWith('data:')) {
+              pUrl = pUrl.substring(0, 100) + '...';
+            }
+            return { ...a, photo_url: pUrl };
+          });
+        }
+        return copy;
+      });
+      const b64Items = encodeProdMeta(cleanItemsMeta);
+      const itemsMetaMarker = b64Items ? ` [ITEMS_META_B64:${b64Items}]` : '';
+      const vBy = verifiedBy || target.verified_by;
+      const verifiedMarker = vBy ? ` [VERIFIED_BY:${vBy}]` : '';
+
+      payload.notes = `${cleanN} ${metaTag}${itemsMetaMarker}${verifiedMarker}`.trim();
+      target.notes = cleanN;
       target.updated_at = new Date().toISOString();
       setMemoryOrders(memOrders);
     }
