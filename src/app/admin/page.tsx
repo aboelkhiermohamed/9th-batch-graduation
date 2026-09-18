@@ -4472,7 +4472,7 @@ export default function AdminDashboardPage() {
                       </div>
 
                       {(() => {
-                        const sizesList = ['S', 'M', 'L', 'XL', 'XXL', '3XL', 'Free Size'];
+                        const sizesList = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', 'Free Size'];
                         const totalUnitsAll = productSizeStats.reduce((s, p) => s + p.totalUnits, 0) || 1;
                         
                         let topSize = 'XL';
@@ -7131,9 +7131,10 @@ export default function AdminDashboardPage() {
                             onChange={e => handleUpdateEditItemSize(idx, e.target.value)}
                             className="w-full bg-slate-900 text-xs text-amber-300 font-bold p-2.5 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none"
                           >
-                            {item.selected_size && !['S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', '3X', '4XL', 'Free Size'].includes(item.selected_size) && (
+                            {item.selected_size && !['XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', '3X', '4XL', '5XL', '6XL', '7XL', 'Free Size'].includes(item.selected_size) && (
                               <option value={item.selected_size}>{item.selected_size}</option>
                             )}
+                            <option value="XS">XS</option>
                             <option value="S">S</option>
                             <option value="M">M</option>
                             <option value="L">L</option>
@@ -7143,6 +7144,9 @@ export default function AdminDashboardPage() {
                             <option value="3XL">3XL</option>
                             <option value="3X">3X</option>
                             <option value="4XL">4XL</option>
+                            <option value="5XL">5XL</option>
+                            <option value="6XL">6XL</option>
+                            <option value="7XL">7XL</option>
                             <option value="Free Size">Free Size</option>
                           </select>
                         </div>
