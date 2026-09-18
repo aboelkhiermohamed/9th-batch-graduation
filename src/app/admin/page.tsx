@@ -73,6 +73,7 @@ function normalizeSizeName(rawSize?: string): string {
   if (!rawSize) return 'بدون مقاس';
   const clean = rawSize.trim().toUpperCase();
 
+  if (clean === 'XS' || clean === 'EXTRA SMALL' || clean === 'X-SMALL') return 'XS';
   if (clean === '2X' || clean === 'XXL' || clean === '2XL') return '2XL';
   if (clean === '3X' || clean === 'XXXL' || clean === '3XL') return '3XL';
   if (clean === '4X' || clean === 'XXXXL' || clean === '4XL') return '4XL';
@@ -2033,7 +2034,7 @@ export default function AdminDashboardPage() {
   };
 
   const getReportSizeColumns = (statsList: any[]) => {
-    const MASTER_ORDER = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL'];
+    const MASTER_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL'];
     const defaultCols = ['S', 'M', 'L', 'XL', '2XL', '3XL'];
 
     const activeSizes = new Set<string>(defaultCols);
