@@ -413,6 +413,53 @@ export default function AdminDashboardPage() {
     setEditOrderItems(updated);
   };
 
+  const handleUpdateEditPieceSize = (idx: number, pieceNum: number, newSize: string) => {
+    const updated = [...editOrderItems];
+    const item = updated[idx];
+    const pieces = parseItemPieces(item.selected_size, item.custom_text, item.quantity || 1);
+    
+    const pieceObj = pieces.find(p => p.pieceNum === pieceNum);
+    if (pieceObj) {
+      pieceObj.size = newSize;
+    } else {
+      pieces.push({ pieceNum, size: newSize });
+    }
+
+    if (item.quantity <= 1 && pieces.length <= 1) {
+      item.selected_size = newSize;
+    } else {
+      item.selected_size = pieces.map(p => `القطعة ${p.pieceNum}: ${p.size || 'Free Size'}`).join(' | ');
+    }
+    
+    setEditOrderItems(updated);
+  };
+
+  const handleUpdateEditPieceCustomText = (idx: number, pieceNum: number, newText: string) => {
+    const updated = [...editOrderItems];
+    const item = updated[idx];
+    const pieces = parseItemPieces(item.selected_size, item.custom_text, item.quantity || 1);
+    
+    const pieceObj = pieces.find(p => p.pieceNum === pieceNum);
+    if (pieceObj) {
+      pieceObj.customText = newText;
+    } else {
+      pieces.push({ pieceNum, customText: newText });
+    }
+
+    if (item.quantity <= 1 && pieces.length <= 1) {
+      item.custom_text = newText || undefined;
+    } else {
+      const hasAnyText = pieces.some(p => p.customText && p.customText.trim());
+      if (hasAnyText) {
+        item.custom_text = pieces.map(p => `القطعة ${p.pieceNum}: ${p.customText?.trim() || '—'}`).join(' | ');
+      } else {
+        item.custom_text = undefined;
+      }
+    }
+
+    setEditOrderItems(updated);
+  };
+
   const handleUpdateEditItemCustomText = (idx: number, text: string) => {
     const updated = [...editOrderItems];
     updated[idx].custom_text = text;
@@ -421,7 +468,31 @@ export default function AdminDashboardPage() {
 
   const handleUpdateEditItemQuantity = (idx: number, qty: number) => {
     const updated = [...editOrderItems];
-    updated[idx].quantity = Math.max(1, qty);
+    const item = updated[idx];
+    const newQty = Math.max(1, qty);
+    const oldQty = item.quantity || 1;
+    
+    if (newQty !== oldQty) {
+      const pieces = parseItemPieces(item.selected_size, item.custom_text, oldQty);
+      if (newQty > oldQty) {
+        for (let i = oldQty + 1; i <= newQty; i++) {
+          pieces.push({ pieceNum: i, size: pieces[0]?.size || 'Free Size', customText: undefined });
+        }
+      } else {
+        pieces.splice(newQty);
+      }
+      
+      item.quantity = newQty;
+      if (newQty > 1 || pieces.length > 1) {
+        item.selected_size = pieces.map(p => `القطعة ${p.pieceNum}: ${p.size || 'Free Size'}`).join(' | ');
+        const hasText = pieces.some(p => p.customText && p.customText.trim());
+        item.custom_text = hasText ? pieces.map(p => `القطعة ${p.pieceNum}: ${p.customText?.trim() || '—'}`).join(' | ') : undefined;
+      } else {
+        item.selected_size = pieces[0]?.size || item.selected_size || 'Free Size';
+        item.custom_text = pieces[0]?.customText || item.custom_text;
+      }
+    }
+    
     setEditOrderItems(updated);
   };
 
@@ -7191,82 +7262,128 @@ export default function AdminDashboardPage() {
                         </button>
                       </div>
 
-                      {/* Controls Grid: Size, Unit Price, Quantity */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                        <div>
-                          <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">المقاس:</label>
-                          <select
-                            value={item.selected_size || ''}
-                            onChange={e => handleUpdateEditItemSize(idx, e.target.value)}
-                            className="w-full bg-slate-900 text-xs text-amber-300 font-bold p-2.5 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none"
-                          >
-                            {item.selected_size && !['XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', '3X', '4XL', '5XL', '6XL', '7XL', 'Free Size'].includes(item.selected_size) && (
-                              <option value={item.selected_size}>{item.selected_size}</option>
+                      {/* Item Controls & Piece-by-Piece Size Editor */}
+                      {(() => {
+                        const pieces = parseItemPieces(item.selected_size, item.custom_text, item.quantity || 1);
+                        const isMultiPiece = (item.quantity && item.quantity > 1) || pieces.length > 1 || Boolean(item.selected_size?.includes('القطعة'));
+
+                        return (
+                          <div className="space-y-3">
+                            {/* Controls Row: Unit Price & Quantity */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              <div>
+                                <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">سعر القطعة الواحدة (ج.م):</label>
+                                <input
+                                  type="number"
+                                  value={item.unit_price}
+                                  onChange={e => {
+                                    const updated = [...editOrderItems];
+                                    updated[idx].unit_price = Number(e.target.value);
+                                    setEditOrderItems(updated);
+                                  }}
+                                  className="w-full bg-slate-900 text-xs text-white font-mono font-bold p-2.5 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">العدد (الكمية الإجمالية):</label>
+                                <div className="flex items-center justify-between bg-slate-900 rounded-xl p-1 border border-slate-800 h-[38px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateEditItemQuantity(idx, item.quantity - 1)}
+                                    className="w-8 h-full hover:bg-slate-800 text-slate-300 rounded-lg font-bold flex items-center justify-center text-sm"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="text-xs font-mono font-extrabold text-amber-300 px-2">{item.quantity} {item.quantity === 1 ? 'قطعة' : 'قطع'}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateEditItemQuantity(idx, item.quantity + 1)}
+                                    className="w-8 h-full hover:bg-slate-800 text-slate-300 rounded-lg font-bold flex items-center justify-center text-sm"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Piece Sizes & Custom Embroidery Section */}
+                            {!isMultiPiece ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                <div>
+                                  <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">المقاس:</label>
+                                  <select
+                                    value={item.selected_size || 'Free Size'}
+                                    onChange={e => handleUpdateEditItemSize(idx, e.target.value)}
+                                    className="w-full bg-slate-900 text-xs text-amber-300 font-bold p-2.5 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none"
+                                  >
+                                    {['XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', '3X', '4XL', '5XL', '6XL', '7XL', 'Free Size'].map(sz => (
+                                      <option key={sz} value={sz}>{sz}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">✨ الاسم المطلوب للتطريز:</label>
+                                  <input
+                                    type="text"
+                                    value={item.custom_text || ''}
+                                    onChange={e => handleUpdateEditItemCustomText(idx, e.target.value)}
+                                    placeholder="مثال: د. محمد أحمد"
+                                    className="w-full bg-slate-900 text-xs text-amber-300 p-2.5 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="p-3 rounded-2xl bg-slate-900/90 border border-indigo-500/30 space-y-2.5">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                  <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1">
+                                    ✨ تفاصيل ومقاسات الـ ({pieces.length}) قطع المطلوبة لهذا المنتج:
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">يمكنك تحديد مقاس وتطريز كل قطعة بشكل منفصل 👇</span>
+                                </div>
+
+                                <div className="space-y-2">
+                                  {pieces.map(p => (
+                                    <div key={p.pieceNum} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300">
+                                        <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                        <span>القطعة رقم ({p.pieceNum}):</span>
+                                      </div>
+
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div>
+                                          <label className="block text-[10px] text-slate-400 mb-1">المقاس:</label>
+                                          <select
+                                            value={p.size || 'Free Size'}
+                                            onChange={e => handleUpdateEditPieceSize(idx, p.pieceNum, e.target.value)}
+                                            className="w-full bg-slate-900 text-xs text-amber-300 font-bold p-2 rounded-lg border border-slate-800 focus:border-indigo-500 focus:outline-none"
+                                          >
+                                            {['XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', '3X', '4XL', '5XL', '6XL', '7XL', 'Free Size'].map(sz => (
+                                              <option key={sz} value={sz}>{sz}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+
+                                        <div>
+                                          <label className="block text-[10px] text-slate-400 mb-1">اسم / تطريز القطعة {p.pieceNum}:</label>
+                                          <input
+                                            type="text"
+                                            placeholder={`مثال: د. مريم (القطعة ${p.pieceNum})`}
+                                            value={p.customText || ''}
+                                            onChange={e => handleUpdateEditPieceCustomText(idx, p.pieceNum, e.target.value)}
+                                            className="w-full bg-slate-900 text-xs text-amber-300 p-2 rounded-lg border border-slate-800 focus:border-indigo-500 focus:outline-none"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             )}
-                            <option value="XS">XS</option>
-                            <option value="S">S</option>
-                            <option value="M">M</option>
-                            <option value="L">L</option>
-                            <option value="XL">XL</option>
-                            <option value="2XL">2XL</option>
-                            <option value="XXL">XXL</option>
-                            <option value="3XL">3XL</option>
-                            <option value="3X">3X</option>
-                            <option value="4XL">4XL</option>
-                            <option value="5XL">5XL</option>
-                            <option value="6XL">6XL</option>
-                            <option value="7XL">7XL</option>
-                            <option value="Free Size">Free Size</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">سعر القطعة (ج.م):</label>
-                          <input
-                            type="number"
-                            value={item.unit_price}
-                            onChange={e => {
-                              const updated = [...editOrderItems];
-                              updated[idx].unit_price = Number(e.target.value);
-                              setEditOrderItems(updated);
-                            }}
-                            className="w-full bg-slate-900 text-xs text-white font-mono font-bold p-2.5 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">العدد (الكمية):</label>
-                          <div className="flex items-center justify-between bg-slate-900 rounded-xl p-1 border border-slate-800 h-[38px]">
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateEditItemQuantity(idx, item.quantity - 1)}
-                              className="w-8 h-full hover:bg-slate-800 text-slate-300 rounded-lg font-bold flex items-center justify-center text-sm"
-                            >
-                              -
-                            </button>
-                            <span className="text-xs font-mono font-extrabold text-white px-2">{item.quantity}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateEditItemQuantity(idx, item.quantity + 1)}
-                              className="w-8 h-full hover:bg-slate-800 text-slate-300 rounded-lg font-bold flex items-center justify-center text-sm"
-                            >
-                              +
-                            </button>
                           </div>
-                        </div>
-                      </div>
-
-                      {/* Custom Embroidery Text */}
-                      <div>
-                        <label className="block text-[10px] sm:text-[11px] text-slate-400 font-bold mb-1">✨ الاسم المطلوب للتطريز على هذه القطعة:</label>
-                        <input
-                          type="text"
-                          value={item.custom_text || ''}
-                          onChange={e => handleUpdateEditItemCustomText(idx, e.target.value)}
-                          placeholder="مثال: د. محمد أحمد"
-                          className="w-full bg-slate-900 text-xs text-amber-300 p-2.5 rounded-xl border border-slate-800 focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
+                        );
+                      })()}
 
                       {/* Add-ons Selector for this product */}
                       {(() => {
