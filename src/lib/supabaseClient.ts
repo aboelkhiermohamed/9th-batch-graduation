@@ -1171,6 +1171,12 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
           custOpt = parsed.cleanOpt;
         }
 
+        const noteItem = extractedItemsFromNotes?.find((ni: any) =>
+          (ni.id && item.id && ni.id === item.id) ||
+          (ni.product_id && item.product_id && ni.product_id === item.product_id) ||
+          (ni.product_title && title && ni.product_title === title)
+        );
+
         return {
           id: item.id,
           order_id: item.order_id,
@@ -1182,7 +1188,9 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
           customization_option: custOpt,
           attendees: attendees && Array.isArray(attendees) ? attendees : undefined,
           quantity: Number(item.quantity || 1),
-          unit_price: Number(item.unit_price || 0)
+          unit_price: Number(item.unit_price || 0),
+          selected_addons: item.selected_addons || noteItem?.selected_addons || undefined,
+          base_price: item.base_price !== undefined ? Number(item.base_price) : (noteItem?.base_price !== undefined ? Number(noteItem.base_price) : undefined)
         };
       });
 

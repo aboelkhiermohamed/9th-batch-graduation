@@ -352,35 +352,55 @@ export default function AdminDashboardPage() {
     const enrichedItems = (order.items || []).map(item => {
       const copy: any = { ...item };
       const matchedProd = products.find(p => p.id === copy.product_id || p.title === copy.product_title || p.title_ar === copy.product_title);
-      const currentSelectedAddons: ProductAddon[] = copy.selected_addons || [];
+      const availableAddons: ProductAddon[] = matchedProd?.addons || copy.product_addons || copy.product?.addons || [];
+      
+      let currentSelectedAddons: ProductAddon[] = copy.selected_addons || [];
+      
+      // If selected_addons is missing, infer from customization_option text
+      if ((!currentSelectedAddons || currentSelectedAddons.length === 0) && copy.customization_option && availableAddons.length > 0) {
+        currentSelectedAddons = availableAddons.filter(addon => 
+          copy.customization_option.toLowerCase().includes(addon.name.toLowerCase())
+        );
+      }
+
       const addonsSum = currentSelectedAddons.reduce((s, a) => s + (Number(a.price) || 0), 0);
-      const basePrice = copy.base_price !== undefined ? Number(copy.base_price) : Math.max(0, (Number(copy.unit_price) || 0) - addonsSum);
+      
+      let basePrice = copy.base_price !== undefined ? Number(copy.base_price) : undefined;
+      if (basePrice === undefined) {
+        if (copy.unit_price !== undefined && Number(copy.unit_price) > 0) {
+          basePrice = Math.max(0, Number(copy.unit_price) - addonsSum);
+        } else if (matchedProd) {
+          basePrice = Number(matchedProd.price || 0);
+        } else {
+          basePrice = 0;
+        }
+      }
+
+      const unitPrice = (copy.unit_price !== undefined && Number(copy.unit_price) > 0)
+        ? Number(copy.unit_price)
+        : (basePrice + addonsSum);
+
       return {
         ...copy,
         base_price: basePrice,
+        unit_price: unitPrice,
         selected_addons: currentSelectedAddons,
-        product_addons: matchedProd?.addons || copy.product?.addons || []
+        product_addons: availableAddons
       };
     });
 
     setEditOrderItems(enrichedItems);
 
-    // Calculate net subtotal of existing items in the order
-    const existingItemsNetSubtotal = (order.items || []).reduce(
-      (sum, item) => sum + (Number(item.unit_price || 0) * Number(item.quantity || 1)),
-      0
-    );
-
+    // Initial paid amount: preserve full paid_amount or total_amount (including fees)
     let initialPaid = 0;
-    // If order is paid/verified, use net items subtotal to exclude previous payment fees (e.g. Vodafone Cash fee)
-    if (order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered') {
-      initialPaid = existingItemsNetSubtotal > 0 ? existingItemsNetSubtotal : (order.total_amount || 0);
-    } else if (order.paid_amount !== undefined && order.paid_amount > 0) {
-      initialPaid = existingItemsNetSubtotal > 0 ? Math.min(order.paid_amount, existingItemsNetSubtotal) : order.paid_amount;
+    if (order.paid_amount !== undefined && order.paid_amount > 0) {
+      initialPaid = order.paid_amount;
+    } else if (order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered') {
+      initialPaid = order.total_amount || 0;
     } else if (order.difference_amount && order.difference_amount > 0) {
       initialPaid = Math.max(0, (order.total_amount || 0) - order.difference_amount);
     } else {
-      initialPaid = existingItemsNetSubtotal > 0 ? existingItemsNetSubtotal : (order.total_amount || 0);
+      initialPaid = order.paid_amount || order.total_amount || 0;
     }
 
     setEditPaidAmount(String(initialPaid));
@@ -459,9 +479,14 @@ export default function AdminDashboardPage() {
     if (!editingOrder) return;
     setIsSavingOrderEdits(true);
 
-    const newTotal = editOrderItems.reduce((sum, item) => sum + (Number(item.unit_price) * Number(item.quantity)), 0);
+    const newItemsSubtotal = editOrderItems.reduce((sum, item) => sum + (Number(item.unit_price || 0) * Number(item.quantity || 1)), 0);
     const prevPaid = Number(editPaidAmount) || 0;
 
+    // Preserve non-item fees (e.g. Vodafone Cash fee) from original order total
+    const origItemsSubtotal = (editingOrder.items || []).reduce((sum, item) => sum + (Number(item.unit_price || 0) * Number(item.quantity || 1)), 0);
+    const extraFee = Math.max(0, (editingOrder.total_amount || 0) - origItemsSubtotal);
+
+    const newTotal = newItemsSubtotal + extraFee;
     const priceDiff = Math.max(0, newTotal - prevPaid);
     const isDiffPending = priceDiff > 0;
 
@@ -7282,9 +7307,12 @@ export default function AdminDashboardPage() {
 
               {/* Summary & Price Difference Calculation Box */}
               {(() => {
-                const newTotal = editOrderItems.reduce((sum, item) => sum + (Number(item.unit_price) * Number(item.quantity)), 0);
+                const newItemsSubtotal = editOrderItems.reduce((sum, item) => sum + (Number(item.unit_price || 0) * Number(item.quantity || 1)), 0);
+                const origItemsSubtotal = (editingOrder.items || []).reduce((sum, item) => sum + (Number(item.unit_price || 0) * Number(item.quantity || 1)), 0);
+                const extraFee = Math.max(0, (editingOrder.total_amount || 0) - origItemsSubtotal);
+                const newTotal = newItemsSubtotal + extraFee;
                 const prevPaid = Number(editPaidAmount) || 0;
-                const priceDiff = newTotal - prevPaid;
+                const priceDiff = Math.max(0, newTotal - prevPaid);
 
                 return (
                   <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-3 text-xs">
@@ -7303,7 +7331,9 @@ export default function AdminDashboardPage() {
 
                     <div className="flex justify-between items-center text-slate-400 pt-2 border-t border-slate-900">
                       <span>إجمالي الطلب الجديد بعد التعديلات:</span>
-                      <span className="font-mono font-extrabold text-white text-sm">{newTotal} ج.م</span>
+                      <span className="font-mono font-extrabold text-white text-sm">
+                        {newTotal} ج.م {extraFee > 0 && <span className="text-[11px] text-amber-400 font-normal">(شامل رسوم الدفع/الرسوم {extraFee} ج.م)</span>}
+                      </span>
                     </div>
 
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pt-2 border-t border-slate-800 font-bold">
