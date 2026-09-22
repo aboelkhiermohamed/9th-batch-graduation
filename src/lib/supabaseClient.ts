@@ -603,6 +603,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
     const vodaFeePct = meta?.vf !== undefined ? Number(meta.vf) : (data.vodafone_cash_fee_percent !== undefined ? Number(data.vodafone_cash_fee_percent) : (currentMem.vodafone_cash_fee_percent ?? 1));
     const supportPhone = data.support_phone || meta?.sp || meta?.support_phone || currentMem.support_phone || '01555583154';
     const lineLabels = meta?.lbl || currentMem.line_labels || {};
+    const disabledNumbers = meta?.dis || meta?.disabled_numbers || (Array.isArray(data.disabled_numbers) ? data.disabled_numbers : currentMem.disabled_numbers || []);
 
     const settings: StoreSettings = {
       id: data.id,
@@ -611,6 +612,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
       instapay_enabled: instaEnabled,
       vodafone_cash_fee_percent: vodaFeePct,
       vodafone_cash_numbers: vodaNums,
+      disabled_numbers: disabledNumbers,
       line_labels: lineLabels,
       instapay_ipa: defaultIpa,
       instapay_ipas: instaAccounts,
@@ -637,6 +639,9 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
     if (settings.instapay_ipas && settings.instapay_ipas.length > 0) {
       localStorage.setItem('graduation_store_insta_ipas', JSON.stringify(settings.instapay_ipas));
     }
+    if (settings.disabled_numbers) {
+      localStorage.setItem('graduation_store_disabled_nums', JSON.stringify(settings.disabled_numbers));
+    }
   }
   const cleanNote = cleanDisplayNotes(settings.pickup_note || 'تابع جروب التليجرام');
   const memoryPayload = { ...settings, pickup_note: cleanNote };
@@ -652,7 +657,8 @@ export async function saveSettingsToSupabase(settings: StoreSettings): Promise<b
       vf: Number(settings.vodafone_cash_fee_percent || 0),
       m: settings.maintenance_mode ? 1 : 0,
       sp: settings.support_phone,
-      vn: settings.vodafone_cash_numbers.join(',')
+      vn: settings.vodafone_cash_numbers.join(','),
+      dis: settings.disabled_numbers || []
     };
 
     const metaTag = `[META:${JSON.stringify(compactMeta)}]`;

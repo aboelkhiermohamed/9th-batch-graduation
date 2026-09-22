@@ -52,8 +52,10 @@ export default function PayDifferencePage() {
     const raw = settings?.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0
       ? settings.vodafone_cash_numbers
       : ['01015339426'];
-    return shuffleArray(raw);
-  }, [settings?.vodafone_cash_numbers]);
+    const disabledSet = new Set(settings?.disabled_numbers || []);
+    const active = raw.filter(n => !disabledSet.has(n));
+    return shuffleArray(active.length > 0 ? active : raw);
+  }, [settings?.vodafone_cash_numbers, settings?.disabled_numbers]);
 
   useEffect(() => {
     const loadData = async () => {

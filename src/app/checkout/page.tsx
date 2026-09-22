@@ -78,20 +78,26 @@ export default function CheckoutPage() {
   // Submitted Order Result State
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
-  // Randomize / Shuffle wallet lines and InstaPay accounts on each page load for balanced load distribution
+  // Randomize / Shuffle active wallet lines and InstaPay accounts on each page load for balanced load distribution
   const shuffledVodaNums = useMemo(() => {
-    const nums = settings.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0
+    const raw = settings.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0
       ? settings.vodafone_cash_numbers
       : ['01015339426'];
-    return shuffleArray(nums);
-  }, [settings.vodafone_cash_numbers]);
+    const disabledSet = new Set(settings.disabled_numbers || []);
+    const active = raw.filter(n => !disabledSet.has(n));
+    const finalNums = active.length > 0 ? active : raw;
+    return shuffleArray(finalNums);
+  }, [settings.vodafone_cash_numbers, settings.disabled_numbers]);
 
   const shuffledInstaAccounts = useMemo(() => {
-    const accs = settings.instapay_ipas && settings.instapay_ipas.length > 0
+    const rawAccs = settings.instapay_ipas && settings.instapay_ipas.length > 0
       ? settings.instapay_ipas
       : [settings.instapay_ipa || '9thbatch@instapay'];
-    return shuffleArray(accs);
-  }, [settings.instapay_ipas, settings.instapay_ipa]);
+    const disabledSet = new Set(settings.disabled_numbers || []);
+    const active = rawAccs.filter(a => !disabledSet.has(a));
+    const finalAccs = active.length > 0 ? active : rawAccs;
+    return shuffleArray(finalAccs);
+  }, [settings.instapay_ipas, settings.instapay_ipa, settings.disabled_numbers]);
 
   // Load cart & settings from localStorage and API
   useEffect(() => {

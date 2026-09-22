@@ -115,6 +115,7 @@ export interface StoreSettings {
   instapay_enabled?: boolean;
   vodafone_cash_fee_percent?: number;
   vodafone_cash_numbers: string[];
+  disabled_numbers?: string[]; // Numbers/handles hidden from checkout & payment pages
   line_labels?: Record<string, string>; // Maps phone numbers or index to custom line titles e.g. {"01015339426": "خط 1 - المحفظة الرئيسية"}
   instapay_ipa: string;
   instapay_ipas?: string[];

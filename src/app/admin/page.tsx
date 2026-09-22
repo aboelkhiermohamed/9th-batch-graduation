@@ -580,6 +580,7 @@ export default function AdminDashboardPage() {
   const [vodaInput, setVodaInput] = useState('');
   const [vodaLines, setVodaLines] = useState<string[]>(['01015339426']);
   const [lineLabelsMap, setLineLabelsMap] = useState<Record<string, string>>({});
+  const [disabledNumbers, setDisabledNumbers] = useState<string[]>([]);
   const [vodaFeePercentInput, setVodaFeePercentInput] = useState('1');
   const [instaInput, setInstaInput] = useState('');
   const [pickupInput, setPickupInput] = useState('');
@@ -1037,6 +1038,7 @@ export default function AdminDashboardPage() {
         if (s) {
           setSettings(s);
           if (s.line_labels) setLineLabelsMap(s.line_labels);
+          if (Array.isArray(s.disabled_numbers)) setDisabledNumbers(s.disabled_numbers);
           setVodaEnabled(Boolean(s.vodafone_cash_enabled));
           setInstaEnabled(Boolean(s.instapay_enabled));
           const rawNums = Array.isArray(s.vodafone_cash_numbers) 
@@ -1792,6 +1794,7 @@ export default function AdminDashboardPage() {
         instapay_enabled: instaEnabled,
         vodafone_cash_fee_percent: Number(vodaFeePercentInput) || 0,
         vodafone_cash_numbers: vodaArray.length > 0 ? vodaArray : ['01015339426'],
+        disabled_numbers: disabledNumbers,
         line_labels: lineLabelsMap,
         instapay_ipa: instaArray[0] || '9thbatch@instapay',
         instapay_ipas: instaArray.length > 0 ? instaArray : ['9thbatch@instapay'],
@@ -4075,6 +4078,27 @@ export default function AdminDashboardPage() {
                               className="w-full sm:w-44 px-3 py-2 rounded-xl bg-slate-900 text-amber-300 text-xs font-semibold border border-slate-700 focus:outline-none"
                             />
 
+                            {/* Dongle Toggle Switch */}
+                            {num && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDisabledNumbers(prev => 
+                                    prev.includes(num) ? prev.filter(n => n !== num) : [...prev, num]
+                                  );
+                                }}
+                                className={`px-3 py-2 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition shrink-0 cursor-pointer ${
+                                  disabledNumbers.includes(num)
+                                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20'
+                                    : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25 shadow-sm shadow-emerald-500/10'
+                                }`}
+                                title={disabledNumbers.includes(num) ? 'إظهار الخط للعملاء في صفحة الدفع' : 'إخفاء الخط مؤقتاً من صفحة الدفع (إيقاف التحويل عليه دون حذفه)'}
+                              >
+                                <span className={`w-2.5 h-2.5 rounded-full ${disabledNumbers.includes(num) ? 'bg-rose-500' : 'bg-emerald-400 animate-pulse'}`} />
+                                <span>{disabledNumbers.includes(num) ? 'مخفي 🔴' : 'مفعّل 🟢'}</span>
+                              </button>
+                            )}
+
                             {vodaLines.length > 1 && (
                               <button
                                 type="button"
@@ -4116,15 +4140,35 @@ export default function AdminDashboardPage() {
                   </p>
                 </div>
 
-                {/* Display Parsed Badges */}
+                {/* Display Parsed Badges with Dongle Status */}
                 {vodaLines.filter(n => n.trim()).length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    <span className="text-[11px] text-slate-400 font-semibold ml-1">الأرقام المعروضة للعميل:</span>
-                    {vodaLines.filter(n => n.trim()).map((num, i) => (
-                      <span key={i} className="px-2.5 py-0.5 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-mono font-bold">
-                        📞 {num}
-                      </span>
-                    ))}
+                  <div className="flex flex-wrap gap-1.5 pt-1 items-center">
+                    <span className="text-[11px] text-slate-400 font-semibold ml-1">الأرقام المعروضة للعميل بالدفع:</span>
+                    {vodaLines.filter(n => n.trim()).map((num, i) => {
+                      const isDisabled = disabledNumbers.includes(num);
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            setDisabledNumbers(prev => 
+                              prev.includes(num) ? prev.filter(n => n !== num) : [...prev, num]
+                            );
+                          }}
+                          className={`px-2.5 py-1 rounded-lg border text-xs font-mono font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                            isDisabled
+                              ? 'bg-slate-950 text-slate-500 border-slate-800 line-through opacity-70'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40 hover:border-rose-400'
+                          }`}
+                          title="انقر لتعديل حالة الخط (إظهار/إخفاء)"
+                        >
+                          <span>📞 {num}</span>
+                          <span className="text-[10px] font-sans no-underline font-semibold px-1 py-0.2 rounded bg-slate-900/80">
+                            {isDisabled ? '🔴 (معطّل مؤقتاً)' : '🟢 (مفعّل)'}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
