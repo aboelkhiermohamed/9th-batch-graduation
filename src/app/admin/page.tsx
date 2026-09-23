@@ -2437,6 +2437,7 @@ export default function AdminDashboardPage() {
 
           @media print {
             body { padding: 0; }
+            #search-bar-container { display: none !important; }
             @page { size: A4 landscape; margin: 0.8cm; }
             tr { page-break-inside: avoid; break-inside: avoid; }
             .footer-signatures { page-break-inside: avoid; break-inside: avoid; }
@@ -2446,6 +2447,14 @@ export default function AdminDashboardPage() {
         </style>
       </head>
       <body>
+        <!-- Interactive Live Search Bar for Web Viewing -->
+        <div id="search-bar-container" style="background: #0f172a; padding: 12px 20px; border-radius: 12px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+          <div style="font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+            <span>🔍 بحث سريع في الصفوف (أو استخدم Ctrl + F للبحث في الصفحة):</span>
+          </div>
+          <input type="text" id="reportSearchInput" placeholder="ادخل كود الطلب، اسم العميل، رقم الهاتف، أو نص التطريز..." style="width: 55%; padding: 8px 14px; border-radius: 8px; border: 1px solid #475569; font-size: 13px; outline: none; background: #1e293b; color: #ffffff; direction: rtl;" />
+        </div>
+
         <!-- Header -->
         <div class="header-container">
           <div>
@@ -2656,10 +2665,43 @@ export default function AdminDashboardPage() {
         </div>
 
         <script>
+          document.addEventListener('DOMContentLoaded', function() {
+            var searchInput = document.getElementById('reportSearchInput');
+            if (searchInput) {
+              searchInput.addEventListener('input', function(e) {
+                var query = (e.target.value || '').toLowerCase().trim();
+                var rows = document.querySelectorAll('tbody tr');
+                rows.forEach(function(row) {
+                  var text = (row.textContent || '').toLowerCase();
+                  if (!query || text.indexOf(query) !== -1) {
+                    row.style.display = '';
+                  } else {
+                    row.style.display = 'none';
+                  }
+                });
+              });
+            }
+          });
+
           window.onload = function() {
+            var searchInput = document.getElementById('reportSearchInput');
+            if (searchInput) {
+              searchInput.addEventListener('input', function(e) {
+                var query = (e.target.value || '').toLowerCase().trim();
+                var rows = document.querySelectorAll('tbody tr');
+                rows.forEach(function(row) {
+                  var text = (row.textContent || '').toLowerCase();
+                  if (!query || text.indexOf(query) !== -1) {
+                    row.style.display = '';
+                  } else {
+                    row.style.display = 'none';
+                  }
+                });
+              });
+            }
             setTimeout(function() {
               window.print();
-            }, 300);
+            }, 500);
           }
         </script>
       </body>
