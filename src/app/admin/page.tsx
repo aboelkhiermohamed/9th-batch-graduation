@@ -2068,15 +2068,19 @@ export default function AdminDashboardPage() {
     return items;
   };
 
-  // Filtered orders list for reports based on pdfShowTickets toggle
+  // Filtered orders list for reports based on pdfShowTickets toggle and active search/filters
+  const baseReportOrders = (deferredOrderSearch || statusFilter !== 'all' || lineFilter !== 'all' || paymentFilter !== 'all')
+    ? filteredOrders
+    : orders;
+
   const reportOrders = pdfShowTickets
-    ? orders
-    : orders.filter(o => getOrderEffectiveItems(o).some(it => !isTicketItem(it)));
+    ? baseReportOrders
+    : baseReportOrders.filter(o => getOrderEffectiveItems(o).some(it => !isTicketItem(it)));
 
   // Report specific Gross Revenue calculation
   const reportGrossRevenue = pdfShowTickets
-    ? orders.reduce((sum, o) => o.status !== 'cancelled' ? sum + Number(o.total_amount) : sum, 0)
-    : orders.reduce((sum, o) => {
+    ? baseReportOrders.reduce((sum, o) => o.status !== 'cancelled' ? sum + Number(o.total_amount) : sum, 0)
+    : baseReportOrders.reduce((sum, o) => {
         if (o.status === 'cancelled') return sum;
         const nonTicketItems = getOrderEffectiveItems(o).filter(it => !isTicketItem(it));
         const orderSubtotal = nonTicketItems.reduce((acc, it) => acc + (Number(it.unit_price) || 0) * (Number(it.quantity) || 1), 0);
@@ -2183,7 +2187,7 @@ export default function AdminDashboardPage() {
         }
 
         if (optStr) {
-          const parts = optStr.split(/[,،\n]/).map((p: string) => p.trim()).filter(Boolean);
+          const parts = optStr.split(/[,،\n|]/).map((p: string) => p.trim()).filter(Boolean);
           parts.forEach((addon: string) => {
             let cleanAddon = addon
               .replace(/\s*\(\s*\+?\s*\d+[\s\S]*?\)/gi, '')
