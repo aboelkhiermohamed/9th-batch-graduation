@@ -89,6 +89,43 @@ function normalizeSizeName(rawSize?: string): string {
   return rawSize.trim();
 }
 
+function getSizeRank(sizeStr?: string): number {
+  if (!sizeStr) return 999;
+  const s = normalizeSizeName(sizeStr).toUpperCase();
+  const SIZE_RANK_MAP: Record<string, number> = {
+    'XS': 1,
+    'EXTRA SMALL': 1,
+    'S': 2,
+    'SMALL': 2,
+    'M': 3,
+    'MEDIUM': 3,
+    'L': 4,
+    'LARGE': 4,
+    'XL': 5,
+    'X-LARGE': 5,
+    '2XL': 6,
+    'XXL': 6,
+    '2X': 6,
+    '3XL': 7,
+    'XXXL': 7,
+    '3X': 7,
+    '4XL': 8,
+    'XXXXL': 8,
+    '4X': 8,
+    '5XL': 9,
+    '5X': 9,
+    '6XL': 10,
+    '6X': 10,
+    '7XL': 11,
+    '7X': 11,
+    '8XL': 12,
+    'FREE SIZE': 900,
+    'FREE': 900,
+    'بدون مقاس': 900
+  };
+  return SIZE_RANK_MAP[s] ?? 500;
+}
+
 interface ParsedPieceDetail {
   pieceNum: number;
   size?: string;
@@ -324,6 +361,7 @@ export default function AdminDashboardPage() {
   const [pdfShowStatus, setPdfShowStatus] = useState(true);
   const [pdfShowEmbroiderySection, setPdfShowEmbroiderySection] = useState(true);
   const [pdfShowTickets, setPdfShowTickets] = useState(false);
+  const [exportSortBy, setExportSortBy] = useState<'default' | 'size' | 'product_size'>('size');
 
   // Backup & Restore State
   const [isRestoringBackup, setIsRestoringBackup] = useState(false);
@@ -2245,15 +2283,38 @@ export default function AdminDashboardPage() {
         }
       });
     });
+
+    if (exportSortBy === 'size') {
+      embRows.sort((a, b) => {
+        const diff = getSizeRank(a.size) - getSizeRank(b.size);
+        if (diff !== 0) return diff;
+        return a.product.localeCompare(b.product, 'ar');
+      });
+    } else if (exportSortBy === 'product_size') {
+      embRows.sort((a, b) => {
+        const prodDiff = a.product.localeCompare(b.product, 'ar');
+        if (prodDiff !== 0) return prodDiff;
+        return getSizeRank(a.size) - getSizeRank(b.size);
+      });
+    }
+
     return embRows;
   };
 
   const exportEmbroideryExcel = () => {
-    const rows: string[][] = [
-      ['مسلسل', 'كود الطلب', 'اسم العميل', 'رقم الموبايل', 'اسم المنتج', 'المقاس', 'العدد', 'نص التطريز / الطباعة المطلوبة', 'الإضافات الاختيارية (Add-ons)']
-    ];
+    interface ExportRowItem {
+      orderCode: string;
+      customerName: string;
+      customerPhone: string;
+      productTitle: string;
+      size: string;
+      quantity: string;
+      customText: string;
+      addons: string;
+    }
 
-    let rowNum = 1;
+    const collectedItems: ExportRowItem[] = [];
+
     orders.forEach(order => {
       const isConfirmed = order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered';
       if (!isConfirmed) return;
@@ -2267,49 +2328,81 @@ export default function AdminDashboardPage() {
         if (isMulti) {
           pieces.forEach(p => {
             if (p.customText || p.size || addons) {
-              rows.push([
-                String(rowNum++),
-                order.order_code || '',
-                order.customer_name || '',
-                order.customer_phone || '',
-                `${item.product_title || ''} (قطعة ${p.pieceNum})`,
-                p.size || item.selected_size || 'Free Size',
-                '1',
-                p.customText || '—',
-                addons || '—'
-              ]);
+              collectedItems.push({
+                orderCode: order.order_code || '',
+                customerName: order.customer_name || '',
+                customerPhone: order.customer_phone || '',
+                productTitle: `${item.product_title || ''} (قطعة ${p.pieceNum})`,
+                size: p.size || item.selected_size || 'Free Size',
+                quantity: '1',
+                customText: p.customText || '—',
+                addons: addons || '—'
+              });
             }
           });
         } else {
           const text = (item.custom_text || '').trim();
           if (text || addons) {
-            rows.push([
-              String(rowNum++),
-              order.order_code || '',
-              order.customer_name || '',
-              order.customer_phone || '',
-              item.product_title || '',
-              item.selected_size || 'Free Size',
-              String(item.quantity || 1),
-              text || '—',
-              addons || '—'
-            ]);
+            collectedItems.push({
+              orderCode: order.order_code || '',
+              customerName: order.customer_name || '',
+              customerPhone: order.customer_phone || '',
+              productTitle: item.product_title || '',
+              size: item.selected_size || 'Free Size',
+              quantity: String(item.quantity || 1),
+              customText: text || '—',
+              addons: addons || '—'
+            });
           }
         }
       });
     });
 
-    if (rows.length <= 1) {
+    if (collectedItems.length === 0) {
       alert('لا توجد طلبات مؤكدة تحتوي على نصوص تطريز حالياً');
       return;
     }
+
+    // Apply Sorting according to user selection
+    if (exportSortBy === 'size') {
+      collectedItems.sort((a, b) => {
+        const diff = getSizeRank(a.size) - getSizeRank(b.size);
+        if (diff !== 0) return diff;
+        return a.productTitle.localeCompare(b.productTitle, 'ar');
+      });
+    } else if (exportSortBy === 'product_size') {
+      collectedItems.sort((a, b) => {
+        const prodDiff = a.productTitle.localeCompare(b.productTitle, 'ar');
+        if (prodDiff !== 0) return prodDiff;
+        return getSizeRank(a.size) - getSizeRank(b.size);
+      });
+    }
+
+    const rows: string[][] = [
+      ['مسلسل', 'كود الطلب', 'اسم العميل', 'رقم الموبايل', 'اسم المنتج', 'المقاس', 'العدد', 'نص التطريز / الطباعة المطلوبة', 'الإضافات الاختيارية (Add-ons)']
+    ];
+
+    collectedItems.forEach((item, index) => {
+      rows.push([
+        String(index + 1),
+        item.orderCode,
+        item.customerName,
+        item.customerPhone,
+        item.productTitle,
+        item.size,
+        item.quantity,
+        item.customText,
+        item.addons
+      ]);
+    });
 
     const csvContent = '\uFEFF' + rows.map(r => r.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `شيت_التطريز_والطباعة_المصنع_${new Date().toISOString().slice(0, 10)}.csv`);
+    const sortSuffix = exportSortBy === 'size' ? '_مرتب_حسب_المقاسات' : exportSortBy === 'product_size' ? '_مرتب_حسب_المنتجات_والمقاسات' : '';
+    link.setAttribute('download', `شيت_التطريز_والطباعة_المصنع${sortSuffix}_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -4393,13 +4486,25 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 rounded-2xl px-3 py-1.5 shadow-sm">
+                  <span className="text-[11px] font-bold text-slate-300">ترتيب الشيت:</span>
+                  <select
+                    value={exportSortBy}
+                    onChange={(e) => setExportSortBy(e.target.value as any)}
+                    className="bg-transparent text-amber-400 font-extrabold text-xs focus:outline-none cursor-pointer pr-1"
+                  >
+                    <option value="size" className="bg-slate-900 text-slate-100">حسب المقاسات (S ➔ M ➔ L ➔ XL ...)</option>
+                    <option value="product_size" className="bg-slate-900 text-slate-100">حسب المنتج ثم المقاس</option>
+                    <option value="default" className="bg-slate-900 text-slate-100">ترتيب الطلبات الافتراضي</option>
+                  </select>
+                </div>
                 <button
                   type="button"
                   onClick={exportEmbroideryExcel}
                   className="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition"
                 >
                   <Download className="w-4 h-4" />
-                  <span>📥 تصدير شيت إكسيل التطريز (CSV)</span>
+                  <span>📥 تصدير شيت إكسيل (CSV)</span>
                 </button>
                 <button
                   type="button"
@@ -6269,6 +6374,18 @@ export default function AdminDashboardPage() {
                   <h3 className="text-lg font-extrabold text-slate-900">تقرير المبيعات وحصر المقاسات الشامل</h3>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-300 rounded-xl px-2.5 py-1.5">
+                    <span className="text-xs font-bold text-slate-700">الترتيب:</span>
+                    <select
+                      value={exportSortBy}
+                      onChange={(e) => setExportSortBy(e.target.value as any)}
+                      className="bg-transparent text-amber-800 font-extrabold text-xs focus:outline-none cursor-pointer"
+                    >
+                      <option value="size">حسب المقاسات (S ➔ M ➔ L ➔ XL ...)</option>
+                      <option value="product_size">حسب المنتج ثم المقاس</option>
+                      <option value="default">ترتيب الطلبات الافتراضي</option>
+                    </select>
+                  </div>
                   <button
                     onClick={exportEmbroideryExcel}
                     className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg transition"
@@ -6291,8 +6408,22 @@ export default function AdminDashboardPage() {
 
               {/* PDF Column Toggles */}
               <div className="p-4 rounded-2xl bg-slate-100 border border-slate-300 space-y-2 text-right dir-rtl">
-                <p className="text-xs font-extrabold text-slate-800">⚙️ تخصيص ومفتاح التحكم بالأعمدة قبل التصدير والطباعة:</p>
-                <div className="flex flex-wrap gap-4 text-xs font-bold text-slate-700">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                  <p className="text-xs font-extrabold text-slate-800">⚙️ تخصيص ومفتاح التحكم بالأعمدة والترتيب قبل التصدير والطباعة:</p>
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+                    <span>نظام الترتيب:</span>
+                    <select
+                      value={exportSortBy}
+                      onChange={(e) => setExportSortBy(e.target.value as any)}
+                      className="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-900 focus:outline-none"
+                    >
+                      <option value="size">ترتيب حسب المقاسات (S ➔ M ➔ L ➔ XL ...)</option>
+                      <option value="product_size">ترتيب حسب اسم المنتج ثم المقاس</option>
+                      <option value="default">الترتيب الافتراضي (حسب الطلبات)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-4 text-xs font-bold text-slate-700 pt-1">
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={pdfShowCode} onChange={e => setPdfShowCode(e.target.checked)} className="w-4 h-4 rounded text-amber-600" />
                     <span>كود الطلب (#OrderCode)</span>

@@ -13,7 +13,6 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    const bucket = (formData.get('bucket') as string) || 'receipts';
     const folder = (formData.get('folder') as string) || '';
 
     if (!file) {
@@ -29,58 +28,14 @@ export async function POST(req: NextRequest) {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8);
     const fileName = `${timestamp}-${random}.${ext}`;
-    const filePathInFolder = folder ? `${folder}/${fileName}` : fileName;
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 1. Try Supabase Storage First
-    if (supabaseKey) {
-      try {
-        let { data, error } = await supabaseAdmin.storage
-          .from(bucket)
-          .upload(filePathInFolder, buffer, {
-            contentType: file.type || 'image/jpeg',
-            upsert: true,
-          });
-
-        // Auto-create bucket if missing
-        if (error && (error.message.includes('not found') || error.message.includes('Bucket'))) {
-          try {
-            await supabaseAdmin.storage.createBucket(bucket, { public: true });
-            const retry = await supabaseAdmin.storage
-              .from(bucket)
-              .upload(filePathInFolder, buffer, {
-                contentType: file.type || 'image/jpeg',
-                upsert: true,
-              });
-            data = retry.data;
-            error = retry.error;
-          } catch (bErr) {}
-        }
-
-        if (!error && data?.path) {
-          const { data: urlData } = supabaseAdmin.storage
-            .from(bucket)
-            .getPublicUrl(data.path);
-
-          if (urlData?.publicUrl) {
-            return NextResponse.json({
-              success: true,
-              url: urlData.publicUrl,
-              path: data.path,
-              bucket,
-            });
-          }
-        }
-      } catch (storageErr) {
-        console.warn('Supabase storage upload attempt skipped/failed, using local storage fallback:', storageErr);
-      }
-    }
-
-    // 2. Fallback: Save file to public/uploads/ folder in Next.js app
+    // Save file directly to public/uploads/ folder in Next.js app to ensure 0 Supabase Egress
     try {
-      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+      const targetSubFolder = folder ? path.join('public', 'uploads', folder) : path.join('public', 'uploads');
+      const uploadsDir = path.join(process.cwd(), targetSubFolder);
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
@@ -88,7 +43,7 @@ export async function POST(req: NextRequest) {
       const destinationPath = path.join(uploadsDir, fileName);
       fs.writeFileSync(destinationPath, buffer);
 
-      const publicUrl = `/uploads/${fileName}`;
+      const publicUrl = folder ? `/uploads/${folder}/${fileName}` : `/uploads/${fileName}`;
       return NextResponse.json({
         success: true,
         url: publicUrl,
@@ -96,12 +51,8 @@ export async function POST(req: NextRequest) {
       });
     } catch (fsErr: any) {
       console.error('Local FS storage error:', fsErr);
+      return NextResponse.json({ error: 'خطأ في حفظ الملف محلياً: ' + fsErr.message }, { status: 500 });
     }
-
-    // 3. Ultra-fallback: Fail gracefully or return small truncated placeholder instead of injecting multi-MB base64 into database
-    return NextResponse.json({
-      error: 'تعذر رفع الصورة على السيرفر أو Supabase Storage. يرجى إنشاء Bucket اسمه "receipts" في لوحة Supabase.'
-    }, { status: 500 });
   } catch (err: any) {
     console.error('Upload API error:', err);
     return NextResponse.json({ error: 'خطأ في السيرفر: ' + err.message }, { status: 500 });
