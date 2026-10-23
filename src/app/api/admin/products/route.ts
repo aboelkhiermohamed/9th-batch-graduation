@@ -16,7 +16,7 @@ export async function GET() {
   const products = await fetchProductsFromSupabase();
   return NextResponse.json(products, {
     headers: {
-      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'
+      'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'
     }
   });
 }

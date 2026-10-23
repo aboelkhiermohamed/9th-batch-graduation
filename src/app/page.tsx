@@ -36,6 +36,7 @@ import {
 import { Product, CartItem, Order, PaymentMethod, StoreSettings, ProductAddon } from '@/types';
 import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS, cleanDisplayNotes, supabase } from '@/lib/supabaseClient';
 import OrdersHistory from '@/components/OrdersHistory';
+import { compressImageFile } from '@/lib/imageCompressor';
 
 const fireConfetti = (options?: any) => {
   if (typeof window === 'undefined') return;
@@ -284,15 +285,24 @@ export default function StoreFrontPage() {
     loadData();
   }, []);
 
-  // Poll tracked order status every 5 seconds if tracker is open
+  // Poll tracked order status every 15 seconds if tracker is open (with tab visibility & max poll cap)
   useEffect(() => {
     let interval: any;
+    let pollCount = 0;
+    const maxPolls = 20; // Stop polling after ~5 minutes to eliminate redundant egress
+
     if (isTrackerOpen && (searchQuery || latestCreatedOrder)) {
       const q = searchQuery || latestCreatedOrder?.order_code || latestCreatedOrder?.customer_phone;
       if (q) {
         interval = setInterval(() => {
+          if (typeof document !== 'undefined' && document.hidden) return;
+          pollCount++;
+          if (pollCount > maxPolls) {
+            clearInterval(interval);
+            return;
+          }
           fetchTrackedOrders(q, false);
-        }, 5000);
+        }, 15000);
       }
     }
     return () => clearInterval(interval);
@@ -359,38 +369,38 @@ export default function StoreFrontPage() {
     setIsCartOpen(true);
   };
 
-  // Receipt File Change Handler — uploads to Supabase Storage
+  // Receipt File Change Handler — compressed upload to server/storage
   const handleReceiptFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Show local preview immediately
-    const previewUrl = URL.createObjectURL(file);
+    // Compress client-side on canvas to reduce 5MB+ phone photos to ~40KB
+    const compressed = await compressImageFile(file);
+    const previewUrl = URL.createObjectURL(compressed);
     setReceiptPreview(previewUrl);
-    setReceiptFile(file);
-    setReceiptUrl(''); // clear old URL until upload finishes
+    setReceiptFile(compressed);
+    setReceiptUrl('');
 
-    // Upload to Supabase Storage
+    // Upload to server/storage
     setIsUploadingReceipt(true);
     try {
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', compressed);
       fd.append('bucket', 'receipts');
       fd.append('folder', 'orders');
 
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       const data = await res.json();
 
-      if (res.ok && data.url) {
+      if (res.ok && data.url && !data.url.startsWith('data:')) {
         setReceiptUrl(data.url);
       } else {
         console.warn('Receipt upload failed:', data.error);
-        // Fallback: keep local preview URL so order can still be placed
-        setReceiptUrl(previewUrl);
+        alert('تعذر حفظ صورة الإيصال على السيرفر، يرجى المحاولة مرة أخرى.');
       }
     } catch (err) {
       console.warn('Receipt upload error:', err);
-      setReceiptUrl(previewUrl);
+      alert('حدث خطأ أثناء رفع صورة الإيصال.');
     } finally {
       setIsUploadingReceipt(false);
     }

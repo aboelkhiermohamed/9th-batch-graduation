@@ -25,57 +25,8 @@ import {
   Camera
 } from 'lucide-react';
 import { Product, ProductAddon, CartItem, StoreSettings, EventAttendee } from '@/types';
-import { DEFAULT_PRODUCTS, fetchProductsFromSupabase, cleanProductDescription } from '@/lib/supabaseClient';
-const compressImageFile = async (file: File): Promise<File> => {
-  return new Promise((resolve) => {
-    if (!file.type.startsWith('image/') || file.size < 150 * 1024) {
-      resolve(file);
-      return;
-    }
-    const img = document.createElement('img');
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      img.src = e.target?.result as string;
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-        const maxDim = 800;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
-                type: 'image/jpeg',
-                lastModified: Date.now(),
-              });
-              resolve(compressedFile);
-            } else {
-              resolve(file);
-            }
-          },
-          'image/jpeg',
-          0.75
-        );
-      };
-      img.onerror = () => resolve(file);
-    };
-    reader.onerror = () => resolve(file);
-    reader.readAsDataURL(file);
-  });
-};
+import { DEFAULT_PRODUCTS, cleanProductDescription } from '@/lib/supabaseClient';
+import { compressImageFile } from '@/lib/imageCompressor';
 
 export default function StandaloneProductPage() {
   const router = useRouter();
@@ -270,11 +221,12 @@ export default function StandaloneProductPage() {
     async function loadProductData() {
       setIsLoading(true);
       try {
-        const fetchedProds = await fetchProductsFromSupabase();
+        const res = await fetch('/api/admin/products');
+        const fetchedProds = res.ok ? await res.json() : [];
         const fullList = fetchedProds && fetchedProds.length > 0 ? fetchedProds : DEFAULT_PRODUCTS;
         setAllProducts(fullList);
 
-        const found = fullList.find(p => p.id === productId);
+        const found = (fullList as Product[]).find((p: Product) => p.id === productId);
         if (found) {
           setProduct(found);
           if (found.sizes && found.sizes.length > 0) {

@@ -8,7 +8,7 @@ export async function GET() {
   const settings = await fetchSettingsFromSupabase();
   return NextResponse.json(settings, {
     headers: {
-      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate'
+      'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'
     }
   });
 }

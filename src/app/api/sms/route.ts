@@ -163,7 +163,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const txs = await fetchTransactionsFromSupabase();
+  const limit = Number(req.nextUrl.searchParams.get('limit')) || 100;
+  const txs = await fetchTransactionsFromSupabase(limit);
   return NextResponse.json(txs);
 }
 

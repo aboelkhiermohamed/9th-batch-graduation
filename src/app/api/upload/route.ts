@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const folder = (formData.get('folder') as string) || '';
+    const bucket = (formData.get('bucket') as string) || 'receipts';
 
     if (!file) {
       return NextResponse.json({ error: 'لم يتم إرفاق ملف' }, { status: 400 });
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Save file directly to public/uploads/ folder in Next.js app to ensure 0 Supabase Egress
+    // Primary strategy: Save file to local public/uploads/ (0 Supabase Storage & 0 Egress)
     try {
       const targetSubFolder = folder ? path.join('public', 'uploads', folder) : path.join('public', 'uploads');
       const uploadsDir = path.join(process.cwd(), targetSubFolder);
@@ -50,8 +51,46 @@ export async function POST(req: NextRequest) {
         filename: fileName
       });
     } catch (fsErr: any) {
-      console.error('Local FS storage error:', fsErr);
-      return NextResponse.json({ error: 'خطأ في حفظ الملف محلياً: ' + fsErr.message }, { status: 500 });
+      // Fallback strategy: On serverless hosts like Vercel with read-only filesystem,
+      // upload the compressed image to Supabase Storage instead of failing.
+      console.warn('Local FS write failed (serverless environment), falling back to Supabase Storage:', fsErr.message);
+
+      try {
+        const storagePath = folder ? `${folder}/${fileName}` : fileName;
+        const bucketName = bucket || 'receipts';
+
+        // Check if bucket exists, create if needed
+        const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+        const bucketExists = buckets?.some(b => b.name === bucketName);
+        if (!bucketExists) {
+          await supabaseAdmin.storage.createBucket(bucketName, { public: true });
+        }
+
+        const { error: uploadErr } = await supabaseAdmin.storage
+          .from(bucketName)
+          .upload(storagePath, buffer, {
+            contentType: file.type || 'image/jpeg',
+            upsert: true
+          });
+
+        if (uploadErr) {
+          console.error('Supabase storage upload error:', uploadErr);
+          return NextResponse.json({ error: 'خطأ أثناء رفع الصورة للتخزين السحابي: ' + uploadErr.message }, { status: 500 });
+        }
+
+        const { data: { publicUrl } } = supabaseAdmin.storage
+          .from(bucketName)
+          .getPublicUrl(storagePath);
+
+        return NextResponse.json({
+          success: true,
+          url: publicUrl,
+          filename: fileName
+        });
+      } catch (storageErr: any) {
+        console.error('Storage upload exception:', storageErr);
+        return NextResponse.json({ error: 'خطأ في التخزين السحابي: ' + storageErr.message }, { status: 500 });
+      }
     }
   } catch (err: any) {
     console.error('Upload API error:', err);

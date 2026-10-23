@@ -4,11 +4,15 @@ import {
   getMemoryOrders, 
   setMemoryOrders, 
   saveOrderToSupabase, 
-  fetchOrdersFromSupabase, 
+  fetchOrdersFromSupabase,
+  fetchSingleOrderFromSupabase,
+  fetchOrdersByPhone,
+  getOrderStatusOnly,
   updateOrderStatusInSupabase,
   fetchSettingsFromSupabase,
   clearOrdersInSupabase,
-  deleteOrderFromSupabase
+  deleteOrderFromSupabase,
+  supabase
 } from '@/lib/supabaseClient';
 import { matchOrderWithUnmatchedTransactions } from '@/lib/matchingEngine';
 import { isValidEgyptianPhone, normalizePhoneNumber } from '@/lib/smsParser';
@@ -101,17 +105,29 @@ export async function POST(req: NextRequest) {
     };
 
     // 0. Duplicate Transaction Ref Protection:
-    // Check if transaction_ref was already used in a previously verified order
+    // Check if transaction_ref was already used in a previously verified order using a targeted query
     if (newOrder.transaction_ref && newOrder.transaction_ref.trim().length >= 4) {
-      const cleanRef = newOrder.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-      const existingOrders = await fetchOrdersFromSupabase();
-      const isRefAlreadyUsed = existingOrders.some(o => {
-        if (o.id === newOrder.id) return false;
-        if (!o.transaction_ref) return false;
-        const oRef = o.transaction_ref.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-        const isVerified = o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered';
-        return isVerified && oRef === cleanRef;
-      });
+      const cleanRef = newOrder.transaction_ref.trim();
+      let isRefAlreadyUsed = false;
+      try {
+        const { data: dupOrders } = await supabase
+          .from('store_orders')
+          .select('id, order_code')
+          .eq('transaction_ref', cleanRef)
+          .in('status', ['auto_verified', 'manual_verified', 'ready_for_pickup', 'delivered'])
+          .limit(1);
+
+        if (dupOrders && dupOrders.length > 0) {
+          isRefAlreadyUsed = true;
+        }
+      } catch (e) {
+        // Fallback to memory
+        const memOrders = getMemoryOrders();
+        isRefAlreadyUsed = memOrders.some(o => 
+          o.transaction_ref === cleanRef && 
+          (o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered')
+        );
+      }
 
       if (isRefAlreadyUsed) {
         console.warn(`[Order Security Warning] Duplicate transaction_ref detected: "${newOrder.transaction_ref}" for order #${newOrder.order_code}`);
@@ -150,45 +166,40 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get('code');
   const phone = searchParams.get('phone') || searchParams.get('search');
   const orderId = searchParams.get('id');
+  const statusOnly = searchParams.get('statusOnly') === 'true';
 
-  const orders = await fetchOrdersFromSupabase();
+  // 1. Ultra-lightweight status check for checkout polling (<150 bytes egress)
+  if (orderId && statusOnly) {
+    const statusObj = await getOrderStatusOnly(orderId);
+    return NextResponse.json(statusObj || null);
+  }
 
+  // 2. Single Order lookup by ID
   if (orderId) {
-    const found = orders.find(o => o.id === orderId);
+    const found = await fetchSingleOrderFromSupabase({ id: orderId });
     return NextResponse.json(found || null);
   }
 
-  if (code) {
-    const found = orders.find(o => o.order_code.toLowerCase() === code.trim().toLowerCase());
+  // 3. Customer search by Code and/or Phone
+  if (code && !phone) {
+    const found = await fetchSingleOrderFromSupabase({ code });
     return NextResponse.json(found ? [found] : []);
   }
 
   if (phone && phone.trim()) {
-    const rawQuery = phone.trim().toLowerCase();
-    const cleanQuery = rawQuery.replace(/^#/, '').trim();
-    const cleanPhone = normalizePhoneNumber(rawQuery);
-    const digitsOnly = rawQuery.replace(/[^0-9]/g, '');
-    const queryDigits = cleanPhone || digitsOnly;
-
-    const found = orders.filter(o => {
-      const p1 = normalizePhoneNumber(o.customer_phone || '');
-      const p2 = normalizePhoneNumber(o.sender_phone || '');
-      const rawP1 = (o.customer_phone || '').replace(/[^0-9]/g, '');
-      const rawP2 = (o.sender_phone || '').replace(/[^0-9]/g, '');
-      const ref = (o.transaction_ref || '').toLowerCase();
-      const oCode = (o.order_code || '').toLowerCase();
-
-      if (oCode === rawQuery || oCode === cleanQuery || `#${oCode}` === rawQuery || ref === rawQuery || ref === cleanQuery || oCode.includes(cleanQuery)) return true;
-      if (queryDigits.length >= 6) {
-        return p1.includes(queryDigits) || p2.includes(queryDigits) || 
-               rawP1.includes(queryDigits) || rawP2.includes(queryDigits) ||
-               p1.endsWith(queryDigits) || p2.endsWith(queryDigits);
-      }
-      return false;
-    });
+    if (code && code.trim()) {
+      const codeFound = await fetchSingleOrderFromSupabase({ code });
+      if (codeFound) return NextResponse.json([codeFound]);
+    }
+    const found = await fetchOrdersByPhone(phone);
     return NextResponse.json(found);
   }
 
+  // 4. Admin List: Bounded to 1500 items to support full orders view on initial load while preventing runaway queries
+  const limitParam = searchParams.get('limit');
+  const allParam = searchParams.get('all') === 'true';
+  const limit = allParam ? 1500 : (limitParam ? Math.min(Number(limitParam) || 100, 1500) : 1000);
+  const orders = await fetchOrdersFromSupabase({ limit, syncTxs: true });
   return NextResponse.json(orders);
 }
 

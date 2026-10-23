@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { CartItem, Order, PaymentMethod, StoreSettings, ProductAddon } from '@/types';
 import { DEFAULT_SETTINGS, cleanDisplayNotes } from '@/lib/supabaseClient';
+import { compressImageFile } from '@/lib/imageCompressor';
 
 const fireConfetti = (options?: any) => {
   if (typeof window === 'undefined') return;
@@ -149,28 +150,53 @@ export default function CheckoutPage() {
   // Real-time live polling for order verification status when createdOrder exists
   useEffect(() => {
     let interval: any;
-    if (createdOrder && createdOrder.id) {
+    let pollCount = 0;
+    const maxPolls = 25; // Stop polling after ~3 minutes to avoid infinite egress
+
+    // Only poll if order is pending or pending_difference
+    const needsPolling = createdOrder?.id && 
+      createdOrder.status !== 'auto_verified' && 
+      createdOrder.status !== 'manual_verified' && 
+      createdOrder.status !== 'cancelled';
+
+    if (needsPolling) {
       interval = setInterval(async () => {
+        // Skip poll if user minimized or backgrounded browser tab
+        if (typeof document !== 'undefined' && document.hidden) return;
+
+        pollCount++;
+        if (pollCount > maxPolls) {
+          clearInterval(interval);
+          return;
+        }
+
         try {
-          const res = await fetch(`/api/orders?id=${createdOrder.id}`);
+          // Ultra-light status query (<100 bytes) instead of downloading entire database/order
+          const res = await fetch(`/api/orders?id=${createdOrder.id}&statusOnly=true`);
           if (res.ok) {
-            const updated = await res.json();
-            if (updated && updated.status && updated.status !== createdOrder.status) {
-              setCreatedOrder(updated);
-              if (updated.status === 'auto_verified' || updated.status === 'manual_verified') {
+            const statusData = await res.json();
+            if (statusData && statusData.status && statusData.status !== createdOrder.status) {
+              setCreatedOrder((prev: any) => ({
+                ...prev,
+                status: statusData.status,
+                paid_amount: statusData.paid_amount ?? prev?.paid_amount,
+                difference_amount: statusData.difference_amount ?? prev?.difference_amount
+              }));
+              if (statusData.status === 'auto_verified' || statusData.status === 'manual_verified') {
                 fireConfetti();
+                clearInterval(interval);
               }
             }
           }
         } catch (e) {
           console.warn('Polling status error', e);
         }
-      }, 3000);
+      }, 7000);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [createdOrder]);
+  }, [createdOrder?.id, createdOrder?.status]);
 
   // Cart total & Vodafone Cash fee calculations
   const cartTotal = cart.reduce((acc, item) => {
@@ -213,46 +239,37 @@ export default function CheckoutPage() {
     setTimeout(() => setCopiedText(null), 2500);
   };
 
-  // Receipt File Upload Handler
+  // Receipt File Upload Handler with client-side compression & zero Base64
   const handleReceiptFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const previewUrl = URL.createObjectURL(file);
+    // Compress on canvas before upload (reducing 5MB down to ~40KB)
+    const compressed = await compressImageFile(file);
+    const previewUrl = URL.createObjectURL(compressed);
     setReceiptPreview(previewUrl);
-    setReceiptFile(file);
+    setReceiptFile(compressed);
 
     setIsUploadingReceipt(true);
     try {
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', compressed);
       fd.append('bucket', 'receipts');
       fd.append('folder', 'orders');
 
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       const data = await res.json();
 
-      if (res.ok && data.url) {
+      if (res.ok && data.url && !data.url.startsWith('data:')) {
         setReceiptUrl(data.url);
       } else {
-        // Fallback to Base64 if upload endpoint returned error
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          if (evt.target?.result) {
-            setReceiptUrl(evt.target.result as string);
-          }
-        };
-        reader.readAsDataURL(file);
+        alert('تعذر حفظ صورة الإيصال على السيرفر. يرجى المحاولة مرة أخرى.');
+        setReceiptUrl('');
       }
     } catch (err) {
-      console.warn('Receipt upload fallback to Base64:', err);
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        if (evt.target?.result) {
-          setReceiptUrl(evt.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      console.warn('Receipt upload error:', err);
+      alert('حدث خطأ أثناء رفع الصورة، يرجى المحاولة مرة أخرى.');
+      setReceiptUrl('');
     } finally {
       setIsUploadingReceipt(false);
     }

@@ -193,9 +193,30 @@ export function addDeletedProductId(id: string) {
   memoryProducts = memoryProducts.filter(p => p.id !== id);
 }
 
+let productsCache: { data: Product[]; timestamp: number } | null = null;
+const PRODUCTS_CACHE_TTL_MS = 60 * 1000; // 60s memory cache to eliminate Supabase egress
+
+export function invalidateProductsCache() {
+  productsCache = null;
+}
+
+export function sanitizeImageString(url?: string | null): string | null {
+  if (!url) return null;
+  const str = String(url).trim();
+  if (str.startsWith('data:') && str.length > 500) {
+    console.warn('[Egress Protection] Blocked huge base64 data URL from entering Supabase');
+    return null;
+  }
+  return str;
+}
+
 // --- SUPABASE DATABASE PERSISTENCE HELPERS ---
 
-export async function fetchProductsFromSupabase(): Promise<Product[]> {
+export async function fetchProductsFromSupabase(forceRefresh = false): Promise<Product[]> {
+  if (!forceRefresh && productsCache && (Date.now() - productsCache.timestamp < PRODUCTS_CACHE_TTL_MS)) {
+    return productsCache.data;
+  }
+
   try {
     const { data, error } = await supabase
       .from('store_products')
@@ -277,6 +298,7 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
     const finalProducts = [...dbProds, ...extraLocal].filter(p => !deletedIds.has(p.id));
 
     setMemoryProducts(finalProducts);
+    productsCache = { data: finalProducts, timestamp: Date.now() };
     return finalProducts;
   } catch (err) {
     console.warn('Error reading products from Supabase:', err);
@@ -286,6 +308,7 @@ export async function fetchProductsFromSupabase(): Promise<Product[]> {
 }
 
 export async function saveProductToSupabase(product: Product): Promise<{ success: boolean; error?: string }> {
+  invalidateProductsCache();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id);
 
   const current = getMemoryProducts();
@@ -303,6 +326,9 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
 
   try {
     const rawImages = product.images && product.images.length > 0 ? product.images : [product.image_url];
+    const cleanImageUrl = sanitizeImageString(product.image_url) || '';
+    const cleanImages = rawImages.map(img => sanitizeImageString(img)).filter(Boolean) as string[];
+
     const rawSizes = product.sizes || [];
     const rawAddons = product.addons || [];
 
@@ -325,8 +351,8 @@ export async function saveProductToSupabase(product: Product): Promise<{ success
       description_ar: encodedDesc,
       price: Number(product.price) || 0,
       category: product.category || 'Apparel',
-      image_url: product.image_url,
-      images: rawImages,
+      image_url: cleanImageUrl,
+      images: cleanImages,
       size_chart_url: product.size_chart_url || null,
       size_chart_instructions: product.size_chart_instructions || null,
       has_customization: Boolean(product.has_customization),
@@ -510,7 +536,18 @@ export function decodeProdMeta(b64Str: string): any {
   return null;
 }
 
-export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
+let settingsCache: { data: StoreSettings; timestamp: number } | null = null;
+const SETTINGS_CACHE_TTL_MS = 60 * 1000; // 60s memory cache to eliminate Supabase egress
+
+export function invalidateSettingsCache() {
+  settingsCache = null;
+}
+
+export async function fetchSettingsFromSupabase(forceRefresh = false): Promise<StoreSettings> {
+  if (!forceRefresh && settingsCache && (Date.now() - settingsCache.timestamp < SETTINGS_CACHE_TTL_MS)) {
+    return settingsCache.data;
+  }
+
   try {
     const client = typeof window === 'undefined' ? supabaseAdmin : supabase;
     const { data: rows, error } = await client
@@ -623,6 +660,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
     };
 
     setMemorySettings(settings);
+    settingsCache = { data: settings, timestamp: Date.now() };
     return settings;
   } catch (err) {
     console.warn('Error reading settings from Supabase:', err);
@@ -631,6 +669,7 @@ export async function fetchSettingsFromSupabase(): Promise<StoreSettings> {
 }
 
 export async function saveSettingsToSupabase(settings: StoreSettings): Promise<boolean> {
+  invalidateSettingsCache();
   if (typeof window !== 'undefined' && window.localStorage) {
     localStorage.setItem('graduation_store_maintenance', settings.maintenance_mode ? 'true' : 'false');
     if (settings.vodafone_cash_numbers && settings.vodafone_cash_numbers.length > 0) {
@@ -749,7 +788,9 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(order.id);
 
     // Embed markers into notes as backup if columns are missing in DB schema
-    const receiptMarker = order.receipt_url ? ` [RECEIPT_URL:${order.receipt_url}]` : '';
+    const cleanReceiptUrl = sanitizeImageString(order.receipt_url);
+    order.receipt_url = cleanReceiptUrl || undefined;
+    const receiptMarker = cleanReceiptUrl ? ` [RECEIPT_URL:${cleanReceiptUrl}]` : '';
     const lineMarker = order.confirmed_line ? ` [CONFIRMED_LINE:${order.confirmed_line}]` : '';
     const devMarker = order.matched_device_name ? ` [MATCHED_DEV:${order.matched_device_name}]` : '';
     const partialMeta = ` [PARTIAL_META:${JSON.stringify({
@@ -760,12 +801,12 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
     })}]`;
 
     const cleanItemsMeta = (order.items || []).map(item => {
-      const copy = { ...item };
+      const { product, ...copy }: any = item;
       if (copy.attendees && Array.isArray(copy.attendees)) {
         copy.attendees = copy.attendees.map((a: any) => {
           let pUrl = a.photo_url;
-          if (pUrl && pUrl.length > 2000 && pUrl.startsWith('data:')) {
-            pUrl = pUrl.substring(0, 100) + '...';
+          if (pUrl && (pUrl.length > 500 || pUrl.startsWith('data:'))) {
+            pUrl = undefined;
           }
           return { ...a, photo_url: pUrl };
         });
@@ -779,6 +820,8 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
       .replace(/\[PARTIAL_META:.*?\]/g, '')
       .replace(/\[ITEMS_META_B64:[A-Za-z0-9+/=]+\]/g, '')
       .replace(/\[ITEMS_META:[\s\S]*?\]\]?/g, '')
+      .replace(/\[RECEIPT_URL:data:[\s\S]*?\]/g, '')
+      .replace(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/g, '')
       .replace(/ITEMS_META[\s\S]*/g, '')
       .trim();
     const orderNotes = (cleanBaseNotes + receiptMarker + lineMarker + devMarker + partialMeta + itemsMetaMarker).trim();
@@ -795,7 +838,7 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
       is_difference_pending: Boolean(order.is_difference_pending),
       sender_phone: order.sender_phone || order.customer_phone,
       transaction_ref: order.transaction_ref || null,
-      receipt_url: order.receipt_url || null,
+      receipt_url: cleanReceiptUrl || null,
       confirmed_line: order.confirmed_line || null,
       matched_device_name: order.matched_device_name || null,
       matched_device_id: order.matched_device_id || null,
@@ -947,12 +990,337 @@ export async function saveOrderToSupabase(order: Order): Promise<boolean> {
   }
 }
 
-export async function fetchOrdersFromSupabase(): Promise<Order[]> {
+export function parseSingleDbOrder(o: any, txSumMap: Record<string, number> = {}): Order {
+  let rawNotes = o.notes || '';
+  let extractedReceiptUrl = o.receipt_url || undefined;
+
+  // 1. Extract embedded items from notes FIRST before any string sanitization
+  let extractedItemsFromNotes: any[] | undefined = undefined;
+  if (rawNotes.includes('[ITEMS_META_B64:')) {
+    const b64Match = rawNotes.match(/\[ITEMS_META_B64:([A-Za-z0-9+/=]+)\]/);
+    if (b64Match && b64Match[1]) {
+      const decoded = decodeProdMeta(b64Match[1]);
+      if (decoded && Array.isArray(decoded)) {
+        extractedItemsFromNotes = decoded;
+      }
+    }
+  }
+
+  if (!extractedItemsFromNotes && rawNotes.includes('[ITEMS_META:')) {
+    const startIdx = rawNotes.indexOf('[ITEMS_META:');
+    if (startIdx !== -1) {
+      const rest = rawNotes.substring(startIdx + 12);
+      const trimmedRest = rest.trim();
+      const firstChar = trimmedRest[0];
+      if (firstChar === '[' || firstChar === '{') {
+        let depth = 0;
+        let jsonEnd = -1;
+        const startPos = rest.indexOf(firstChar);
+        for (let i = startPos; i < rest.length; i++) {
+          if (rest[i] === '[' || rest[i] === '{') depth++;
+          else if (rest[i] === ']' || rest[i] === '}') {
+            depth--;
+            if (depth === 0) {
+              jsonEnd = i;
+              break;
+            }
+          }
+        }
+        if (jsonEnd !== -1) {
+          const jsonStr = rest.substring(startPos, jsonEnd + 1);
+          try {
+            extractedItemsFromNotes = JSON.parse(jsonStr);
+          } catch (e) {}
+        }
+      }
+    }
+  }
+
+  // 2. Sanitize standalone base64 data URLs from notes
+  if (rawNotes.includes('data:image')) {
+    rawNotes = rawNotes.replace(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/g, '');
+  }
+  let verifiedBy = o.verified_by || undefined;
+  let confirmedLine = o.confirmed_line || undefined;
+  let matchedDevName = o.matched_device_name || undefined;
+  let matchedDevId = o.matched_device_id || undefined;
+
+  if (!extractedReceiptUrl && rawNotes.includes('[RECEIPT_URL:')) {
+    const match = rawNotes.match(/\[RECEIPT_URL:(.*?)\]/);
+    if (match && match[1]) {
+      extractedReceiptUrl = match[1];
+      rawNotes = rawNotes.replace(/\[RECEIPT_URL:.*?\]/, '').trim();
+    }
+  }
+
+  if (!verifiedBy && rawNotes.includes('[VERIFIED_BY:')) {
+    const match = rawNotes.match(/\[VERIFIED_BY:(.*?)\]/);
+    if (match && match[1]) {
+      verifiedBy = match[1];
+      rawNotes = rawNotes.replace(/\[VERIFIED_BY:.*?\]/, '').trim();
+    }
+  }
+
+  if (!confirmedLine && rawNotes.includes('[CONFIRMED_LINE:')) {
+    const match = rawNotes.match(/\[CONFIRMED_LINE:(.*?)\]/);
+    if (match && match[1]) {
+      confirmedLine = match[1];
+      rawNotes = rawNotes.replace(/\[CONFIRMED_LINE:.*?\]/, '').trim();
+    }
+  }
+
+  if (!matchedDevName && rawNotes.includes('[MATCHED_DEV:')) {
+    const match = rawNotes.match(/\[MATCHED_DEV:(.*?)\]/);
+    if (match && match[1]) {
+      matchedDevName = match[1];
+      rawNotes = rawNotes.replace(/\[MATCHED_DEV:.*?\]/, '').trim();
+    }
+  }
+
+  let paidAmount: number | undefined = (o.paid_amount !== null && o.paid_amount !== undefined) ? Number(o.paid_amount) : undefined;
+  let differenceAmount: number | undefined = (o.difference_amount !== null && o.difference_amount !== undefined) ? Number(o.difference_amount) : undefined;
+  let isDiffPending: boolean = (o.is_difference_pending !== null && o.is_difference_pending !== undefined) ? Boolean(o.is_difference_pending) : false;
+  let editHistory = o.edit_history || undefined;
+
+  if (rawNotes.includes('[PARTIAL_META:')) {
+    const match = rawNotes.match(/\[PARTIAL_META:(.*?)\]/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (parsed.p !== undefined) paidAmount = Number(parsed.p);
+        if (parsed.d !== undefined) differenceAmount = Number(parsed.d);
+        if (parsed.dp !== undefined) isDiffPending = Boolean(parsed.dp);
+        if (parsed.h && Array.isArray(parsed.h)) editHistory = parsed.h;
+        rawNotes = rawNotes.replace(/\[PARTIAL_META:.*?\]/, '').trim();
+      } catch (e) {}
+    }
+  }
+
+  if (rawNotes.includes('[ITEMS_META_B64:')) {
+    const b64Idx = rawNotes.indexOf('[ITEMS_META_B64:');
+    if (b64Idx !== -1) rawNotes = rawNotes.substring(0, b64Idx).trim();
+  }
+
+  if (rawNotes.includes('[ITEMS_META:')) {
+    const startIdx = rawNotes.indexOf('[ITEMS_META:');
+    if (startIdx !== -1) rawNotes = rawNotes.substring(0, startIdx).trim();
+  }
+
+  if (rawNotes.includes('ITEMS_META')) {
+    const idx = rawNotes.indexOf('ITEMS_META');
+    if (idx !== -1) rawNotes = rawNotes.substring(0, idx).trim();
+  }
+  if (rawNotes.includes('quantity:')) {
+    const idx = rawNotes.indexOf('quantity:');
+    if (idx !== -1) rawNotes = rawNotes.substring(0, idx).trim();
+  }
+
+  let items: OrderItem[] = (o.store_order_items || []).map((item: any) => {
+    let title = item.product_title || '';
+    let custOpt = item.customization_option || undefined;
+    let custText = item.custom_text || undefined;
+    let itemImg = item.image_url || item.product_image || undefined;
+
+    if (title.includes('[IMG:')) {
+      const match = title.match(/\[IMG:(.*?)\]/);
+      if (match && match[1]) {
+        if (!itemImg) itemImg = match[1];
+        title = title.replace(/\[IMG:.*?\]/, '').trim();
+      }
+    }
+
+    if (!custOpt && title.includes('[الإضافات:')) {
+      const match = title.match(/\[الإضافات:\s*(.*?)\]/);
+      if (match && match[1]) {
+        custOpt = match[1];
+        title = title.replace(/\[الإضافات:.*?\]/, '').trim();
+      }
+    }
+    if (!custText && title.includes('[التطريز:')) {
+      const match = title.match(/\[التطريز:\s*(.*?)\]/);
+      if (match && match[1]) {
+        custText = match[1];
+        title = title.replace(/\[التطريز:.*?\]/, '').trim();
+      }
+    }
+
+    let attendees: any = undefined;
+    if (custOpt && custOpt.includes('[ATTENDEES:')) {
+      const parsed = parseAttendeesAndCleanOpt(custOpt);
+      attendees = parsed.attendees;
+      custOpt = parsed.cleanOpt;
+    }
+
+    const noteItem = extractedItemsFromNotes?.find((ni: any) =>
+      (ni.id && item.id && ni.id === item.id) ||
+      (ni.product_id && item.product_id && ni.product_id === item.product_id) ||
+      (ni.product_title && title && ni.product_title === title)
+    );
+
+    return {
+      id: item.id,
+      order_id: item.order_id,
+      product_id: item.product_id,
+      product_title: title,
+      image_url: itemImg,
+      selected_size: item.selected_size,
+      custom_text: custText,
+      customization_option: custOpt,
+      attendees: attendees && Array.isArray(attendees) ? attendees : undefined,
+      quantity: Number(item.quantity || 1),
+      unit_price: Number(item.unit_price || 0),
+      selected_addons: item.selected_addons || noteItem?.selected_addons || undefined,
+      base_price: item.base_price !== undefined ? Number(item.base_price) : (noteItem?.base_price !== undefined ? Number(noteItem.base_price) : undefined)
+    };
+  });
+
+  if (items.length === 0) {
+    if (extractedItemsFromNotes && Array.isArray(extractedItemsFromNotes) && extractedItemsFromNotes.length > 0) {
+      items = extractedItemsFromNotes;
+    } else {
+      const memMatch = getMemoryOrders().find(m => m.id === o.id || m.order_code === o.order_code);
+      if (memMatch && memMatch.items && memMatch.items.length > 0) {
+        items = memMatch.items;
+      }
+    }
+  }
+
+  const orderTotal = Number(o.total_amount || 0);
+  const matchedTxSum = txSumMap[o.id] || txSumMap[o.order_code] || 0;
+  
+  // Effective paid amount MUST come strictly from matched transactions if order is pending
+  let effectivePaid = matchedTxSum;
+  if (o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered') {
+    effectivePaid = Math.max(paidAmount !== undefined ? paidAmount : 0, matchedTxSum);
+  }
+  let finalStatus = o.status;
+
+  // Auto-reconcile: If paidAmount or matchedTxSum fully covers total_amount, clear pending difference
+  if (effectivePaid >= (orderTotal - 0.01) && orderTotal > 0) {
+    isDiffPending = false;
+    differenceAmount = 0;
+    effectivePaid = Math.max(orderTotal, effectivePaid);
+    paidAmount = effectivePaid;
+    if (finalStatus === 'pending_difference' || finalStatus === 'pending') {
+      finalStatus = 'auto_verified';
+    }
+  } else if (effectivePaid < (orderTotal - 0.01) && orderTotal > 0 && effectivePaid > 0) {
+    isDiffPending = true;
+    differenceAmount = Math.max(0, orderTotal - effectivePaid);
+    paidAmount = effectivePaid;
+    if (finalStatus === 'auto_verified' || finalStatus === 'pending') {
+      finalStatus = 'pending_difference';
+    }
+  }
+
+  return {
+    id: o.id,
+    order_code: o.order_code,
+    customer_name: o.customer_name,
+    customer_phone: o.customer_phone,
+    sender_phone: o.sender_phone || o.customer_phone,
+    payment_method: o.payment_method,
+    status: finalStatus,
+    total_amount: orderTotal,
+    paid_amount: paidAmount,
+    difference_amount: differenceAmount,
+    is_difference_pending: isDiffPending,
+    edit_history: editHistory,
+    transaction_ref: o.transaction_ref || '',
+    receipt_url: extractedReceiptUrl,
+    notes: rawNotes,
+    matched_transaction_id: o.matched_transaction_id || undefined,
+    confirmed_line: confirmedLine,
+    matched_device_name: matchedDevName,
+    matched_device_id: matchedDevId,
+    verified_at: o.verified_at || undefined,
+    verified_by: verifiedBy,
+    created_at: o.created_at || new Date().toISOString(),
+    updated_at: o.updated_at || new Date().toISOString(),
+    items
+  };
+}
+
+export async function fetchSingleOrderFromSupabase({ id, code }: { id?: string; code?: string }): Promise<Order | null> {
   try {
-    const [{ data: dbOrders, error }, { data: dbTxs }] = await Promise.all([
-      supabase.from('store_orders').select('*, store_order_items(*)').order('created_at', { ascending: false }),
-      supabase.from('store_transactions').select('*')
-    ]);
+    let q = supabase.from('store_orders').select('*, store_order_items(*)');
+    if (id) {
+      q = q.eq('id', id);
+    } else if (code) {
+      const cleanCode = code.trim().replace(/^#/, '');
+      q = q.or(`order_code.eq.${cleanCode},order_code.eq.GRAD-${cleanCode},order_code.ilike.%${cleanCode}%`);
+    } else {
+      return null;
+    }
+    const { data, error } = await q.limit(1).maybeSingle();
+    if (error || !data) return null;
+    return parseSingleDbOrder(data);
+  } catch (err) {
+    console.warn('Error reading single order from Supabase:', err);
+    return null;
+  }
+}
+
+export async function fetchOrdersByPhone(phone: string): Promise<Order[]> {
+  try {
+    const clean = phone.trim().replace(/^#/, '');
+    const cleanDigits = clean.replace(/[^0-9]/g, '');
+    let q = supabase
+      .from('store_orders')
+      .select('*, store_order_items(*)')
+      .order('created_at', { ascending: false })
+      .limit(25);
+
+    if (cleanDigits.length >= 6) {
+      q = q.or(`customer_phone.ilike.%${cleanDigits}%,sender_phone.ilike.%${cleanDigits}%,order_code.ilike.%${clean}%`);
+    } else {
+      q = q.or(`customer_phone.eq.${clean},sender_phone.eq.${clean},order_code.eq.${clean}`);
+    }
+
+    const { data, error } = await q;
+    if (error || !data) return [];
+    return data.map(o => parseSingleDbOrder(o));
+  } catch (err) {
+    console.warn('Error reading customer orders from Supabase:', err);
+    return [];
+  }
+}
+
+export async function getOrderStatusOnly(orderId: string): Promise<{ id: string; status: string; total_amount: number; paid_amount: number; difference_amount: number; is_difference_pending: boolean } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('store_orders')
+      .select('id, status, total_amount, paid_amount, difference_amount, is_difference_pending')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      id: data.id,
+      status: data.status,
+      total_amount: Number(data.total_amount || 0),
+      paid_amount: Number(data.paid_amount || 0),
+      difference_amount: Number(data.difference_amount || 0),
+      is_difference_pending: Boolean(data.is_difference_pending)
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function fetchOrdersFromSupabase(options?: { limit?: number; status?: string[]; syncTxs?: boolean }): Promise<Order[]> {
+  try {
+    const orderLimit = options?.limit || 150;
+    let orderQuery = supabase
+      .from('store_orders')
+      .select('*, store_order_items(*)')
+      .order('created_at', { ascending: false })
+      .limit(orderLimit);
+
+    if (options?.status && options.status.length > 0) {
+      orderQuery = orderQuery.in('status', options.status);
+    }
+
+    const { data: dbOrders, error } = await orderQuery;
 
     if (error) {
       console.warn('Error reading from Supabase:', error);
@@ -969,14 +1337,21 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
       cleanupBase64InSupabase().catch(() => {});
     }
 
-    // Build map of sum of matched transaction amounts per order ID & order_code
+    // Only query matched transactions if explicitly requested, and ONLY 2 lightweight columns!
     const txSumMap: Record<string, number> = {};
-    if (dbTxs && Array.isArray(dbTxs)) {
-      dbTxs.forEach((t: any) => {
-        if (t.matched_order_id && t.amount) {
-          txSumMap[t.matched_order_id] = (txSumMap[t.matched_order_id] || 0) + Number(t.amount);
-        }
-      });
+    if (options?.syncTxs) {
+      const { data: matchedTxs } = await supabase
+        .from('store_transactions')
+        .select('matched_order_id, amount')
+        .not('matched_order_id', 'is', null)
+        .limit(300);
+      if (matchedTxs && Array.isArray(matchedTxs)) {
+        matchedTxs.forEach((t: any) => {
+          if (t.matched_order_id && t.amount) {
+            txSumMap[t.matched_order_id] = (txSumMap[t.matched_order_id] || 0) + Number(t.amount);
+          }
+        });
+      }
     }
 
     // Combine with memory transactions
@@ -987,285 +1362,7 @@ export async function fetchOrdersFromSupabase(): Promise<Order[]> {
       }
     });
 
-    const fetchedOrders: Order[] = dbOrders.map((o: any) => {
-      let rawNotes = o.notes || '';
-      let extractedReceiptUrl = o.receipt_url || undefined;
-
-      // 1. Extract embedded items from notes FIRST before any string sanitization
-      let extractedItemsFromNotes: any[] | undefined = undefined;
-      if (rawNotes.includes('[ITEMS_META_B64:')) {
-        const b64Match = rawNotes.match(/\[ITEMS_META_B64:([A-Za-z0-9+/=]+)\]/);
-        if (b64Match && b64Match[1]) {
-          const decoded = decodeProdMeta(b64Match[1]);
-          if (decoded && Array.isArray(decoded)) {
-            extractedItemsFromNotes = decoded;
-          }
-        }
-      }
-
-      if (!extractedItemsFromNotes && rawNotes.includes('[ITEMS_META:')) {
-        const startIdx = rawNotes.indexOf('[ITEMS_META:');
-        if (startIdx !== -1) {
-          const rest = rawNotes.substring(startIdx + 12);
-          const trimmedRest = rest.trim();
-          const firstChar = trimmedRest[0];
-          if (firstChar === '[' || firstChar === '{') {
-            let depth = 0;
-            let jsonEnd = -1;
-            const startPos = rest.indexOf(firstChar);
-            for (let i = startPos; i < rest.length; i++) {
-              if (rest[i] === '[' || rest[i] === '{') depth++;
-              else if (rest[i] === ']' || rest[i] === '}') {
-                depth--;
-                if (depth === 0) {
-                  jsonEnd = i;
-                  break;
-                }
-              }
-            }
-            if (jsonEnd !== -1) {
-              const jsonStr = rest.substring(startPos, jsonEnd + 1);
-              try {
-                extractedItemsFromNotes = JSON.parse(jsonStr);
-              } catch (e) {}
-            }
-          }
-        }
-      }
-
-      // 2. Sanitize standalone base64 data URLs from notes
-      if (rawNotes.includes('data:image')) {
-        rawNotes = rawNotes.replace(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/g, '');
-      }
-      let verifiedBy = o.verified_by || undefined;
-      let confirmedLine = o.confirmed_line || undefined;
-      let matchedDevName = o.matched_device_name || undefined;
-      let matchedDevId = o.matched_device_id || undefined;
-
-      if (!extractedReceiptUrl && rawNotes.includes('[RECEIPT_URL:')) {
-        const match = rawNotes.match(/\[RECEIPT_URL:(.*?)\]/);
-        if (match && match[1]) {
-          extractedReceiptUrl = match[1];
-          rawNotes = rawNotes.replace(/\[RECEIPT_URL:.*?\]/, '').trim();
-        }
-      }
-
-      if (!verifiedBy && rawNotes.includes('[VERIFIED_BY:')) {
-        const match = rawNotes.match(/\[VERIFIED_BY:(.*?)\]/);
-        if (match && match[1]) {
-          verifiedBy = match[1];
-          rawNotes = rawNotes.replace(/\[VERIFIED_BY:.*?\]/, '').trim();
-        }
-      }
-
-      if (!confirmedLine && rawNotes.includes('[CONFIRMED_LINE:')) {
-        const match = rawNotes.match(/\[CONFIRMED_LINE:(.*?)\]/);
-        if (match && match[1]) {
-          confirmedLine = match[1];
-          rawNotes = rawNotes.replace(/\[CONFIRMED_LINE:.*?\]/, '').trim();
-        }
-      }
-
-      if (!confirmedLine && dbTxs && Array.isArray(dbTxs)) {
-        const oRef = (o.transaction_ref || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-        const tx = dbTxs.find((t: any) => {
-          if (t.matched_order_id === o.id || (o.matched_transaction_id && t.id === o.matched_transaction_id)) return true;
-          if (oRef && oRef.length >= 4) {
-            // Do NOT match transaction if it is already assigned to a DIFFERENT order
-            if (t.matched_order_id && t.matched_order_id !== o.id) return false;
-            const tRef = (t.transaction_ref || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-            if (tRef && (tRef === oRef || tRef.includes(oRef) || oRef.includes(tRef))) return true;
-            if (t.raw_sms) {
-              const rawClean = t.raw_sms.toLowerCase().replace(/[^a-z0-9]/g, '');
-              if (rawClean.includes(oRef)) return true;
-            }
-          }
-          return false;
-        });
-
-        if (tx) {
-          if ((tx as any).recipient_phone) {
-            confirmedLine = (tx as any).recipient_phone;
-          } else if (tx.raw_sms) {
-            const match = tx.raw_sms.match(/(?:على رقم محفظتك|على محفظتك|محفظة|إلى رقم|إلى|خط)\s*(?:20)?(01[0125]\d{8})/i);
-            if (match && match[1]) confirmedLine = match[1];
-          }
-          if (!matchedDevName && (tx as any).device_name) matchedDevName = (tx as any).device_name;
-          if (!matchedDevId && (tx as any).device_id) matchedDevId = (tx as any).device_id;
-        }
-      }
-
-      if (!matchedDevName && rawNotes.includes('[MATCHED_DEV:')) {
-        const match = rawNotes.match(/\[MATCHED_DEV:(.*?)\]/);
-        if (match && match[1]) {
-          matchedDevName = match[1];
-          rawNotes = rawNotes.replace(/\[MATCHED_DEV:.*?\]/, '').trim();
-        }
-      }
-
-      let paidAmount: number | undefined = (o.paid_amount !== null && o.paid_amount !== undefined) ? Number(o.paid_amount) : undefined;
-      let differenceAmount: number | undefined = (o.difference_amount !== null && o.difference_amount !== undefined) ? Number(o.difference_amount) : undefined;
-      let isDiffPending: boolean = (o.is_difference_pending !== null && o.is_difference_pending !== undefined) ? Boolean(o.is_difference_pending) : false;
-      let editHistory = o.edit_history || undefined;
-
-      if (rawNotes.includes('[PARTIAL_META:')) {
-        const match = rawNotes.match(/\[PARTIAL_META:(.*?)\]/);
-        if (match && match[1]) {
-          try {
-            const parsed = JSON.parse(match[1]);
-            if (parsed.p !== undefined) paidAmount = Number(parsed.p);
-            if (parsed.d !== undefined) differenceAmount = Number(parsed.d);
-            if (parsed.dp !== undefined) isDiffPending = Boolean(parsed.dp);
-            if (parsed.h && Array.isArray(parsed.h)) editHistory = parsed.h;
-            rawNotes = rawNotes.replace(/\[PARTIAL_META:.*?\]/, '').trim();
-          } catch (e) {}
-        }
-      }
-
-      if (rawNotes.includes('[ITEMS_META_B64:')) {
-        const b64Idx = rawNotes.indexOf('[ITEMS_META_B64:');
-        if (b64Idx !== -1) rawNotes = rawNotes.substring(0, b64Idx).trim();
-      }
-
-      if (rawNotes.includes('[ITEMS_META:')) {
-        const startIdx = rawNotes.indexOf('[ITEMS_META:');
-        if (startIdx !== -1) rawNotes = rawNotes.substring(0, startIdx).trim();
-      }
-
-      if (rawNotes.includes('ITEMS_META')) {
-        const idx = rawNotes.indexOf('ITEMS_META');
-        if (idx !== -1) rawNotes = rawNotes.substring(0, idx).trim();
-      }
-      if (rawNotes.includes('quantity:')) {
-        const idx = rawNotes.indexOf('quantity:');
-        if (idx !== -1) rawNotes = rawNotes.substring(0, idx).trim();
-      }
-
-      let items: OrderItem[] = (o.store_order_items || []).map((item: any) => {
-        let title = item.product_title || '';
-        let custOpt = item.customization_option || undefined;
-        let custText = item.custom_text || undefined;
-        let itemImg = item.image_url || item.product_image || undefined;
-
-        if (title.includes('[IMG:')) {
-          const match = title.match(/\[IMG:(.*?)\]/);
-          if (match && match[1]) {
-            if (!itemImg) itemImg = match[1];
-            title = title.replace(/\[IMG:.*?\]/, '').trim();
-          }
-        }
-
-        if (!custOpt && title.includes('[الإضافات:')) {
-          const match = title.match(/\[الإضافات:\s*(.*?)\]/);
-          if (match && match[1]) {
-            custOpt = match[1];
-            title = title.replace(/\[الإضافات:.*?\]/, '').trim();
-          }
-        }
-        if (!custText && title.includes('[التطريز:')) {
-          const match = title.match(/\[التطريز:\s*(.*?)\]/);
-          if (match && match[1]) {
-            custText = match[1];
-            title = title.replace(/\[التطريز:.*?\]/, '').trim();
-          }
-        }
-
-        let attendees: any = undefined;
-        if (custOpt && custOpt.includes('[ATTENDEES:')) {
-          const parsed = parseAttendeesAndCleanOpt(custOpt);
-          attendees = parsed.attendees;
-          custOpt = parsed.cleanOpt;
-        }
-
-        const noteItem = extractedItemsFromNotes?.find((ni: any) =>
-          (ni.id && item.id && ni.id === item.id) ||
-          (ni.product_id && item.product_id && ni.product_id === item.product_id) ||
-          (ni.product_title && title && ni.product_title === title)
-        );
-
-        return {
-          id: item.id,
-          order_id: item.order_id,
-          product_id: item.product_id,
-          product_title: title,
-          image_url: itemImg,
-          selected_size: item.selected_size,
-          custom_text: custText,
-          customization_option: custOpt,
-          attendees: attendees && Array.isArray(attendees) ? attendees : undefined,
-          quantity: Number(item.quantity || 1),
-          unit_price: Number(item.unit_price || 0),
-          selected_addons: item.selected_addons || noteItem?.selected_addons || undefined,
-          base_price: item.base_price !== undefined ? Number(item.base_price) : (noteItem?.base_price !== undefined ? Number(noteItem.base_price) : undefined)
-        };
-      });
-
-      if (items.length === 0) {
-        if (extractedItemsFromNotes && Array.isArray(extractedItemsFromNotes) && extractedItemsFromNotes.length > 0) {
-          items = extractedItemsFromNotes;
-        } else {
-          const memMatch = getMemoryOrders().find(m => m.id === o.id || m.order_code === o.order_code);
-          if (memMatch && memMatch.items && memMatch.items.length > 0) {
-            items = memMatch.items;
-          }
-        }
-      }
-
-      const orderTotal = Number(o.total_amount || 0);
-      const matchedTxSum = txSumMap[o.id] || txSumMap[o.order_code] || 0;
-      
-      // Effective paid amount MUST come strictly from matched transactions if order is pending
-      let effectivePaid = matchedTxSum;
-      if (o.status === 'auto_verified' || o.status === 'manual_verified' || o.status === 'ready_for_pickup' || o.status === 'delivered') {
-        effectivePaid = Math.max(paidAmount !== undefined ? paidAmount : 0, matchedTxSum);
-      }
-      let finalStatus = o.status;
-
-      // Auto-reconcile: If paidAmount or matchedTxSum fully covers total_amount, clear pending difference
-      if (effectivePaid >= (orderTotal - 0.01) && orderTotal > 0) {
-        isDiffPending = false;
-        differenceAmount = 0;
-        effectivePaid = Math.max(orderTotal, effectivePaid);
-        paidAmount = effectivePaid;
-        if (finalStatus === 'pending_difference' || finalStatus === 'pending') {
-          finalStatus = 'auto_verified';
-        }
-      } else if (effectivePaid < (orderTotal - 0.01) && orderTotal > 0 && effectivePaid > 0) {
-        isDiffPending = true;
-        differenceAmount = Math.max(0, orderTotal - effectivePaid);
-        paidAmount = effectivePaid;
-        if (finalStatus === 'auto_verified' || finalStatus === 'pending') {
-          finalStatus = 'pending_difference';
-        }
-      }
-
-      return {
-        id: o.id,
-        order_code: o.order_code,
-        customer_name: o.customer_name,
-        customer_phone: o.customer_phone,
-        sender_phone: o.sender_phone || o.customer_phone,
-        payment_method: o.payment_method,
-        status: finalStatus,
-        total_amount: orderTotal,
-        paid_amount: paidAmount,
-        difference_amount: differenceAmount,
-        is_difference_pending: isDiffPending,
-        edit_history: editHistory,
-        transaction_ref: o.transaction_ref || '',
-        receipt_url: extractedReceiptUrl,
-        notes: rawNotes,
-        matched_transaction_id: o.matched_transaction_id || undefined,
-        confirmed_line: confirmedLine,
-        matched_device_name: matchedDevName,
-        matched_device_id: matchedDevId,
-        verified_at: o.verified_at || undefined,
-        verified_by: verifiedBy,
-        created_at: o.created_at || new Date().toISOString(),
-        updated_at: o.updated_at || new Date().toISOString(),
-        items
-      };
-    });
+    const fetchedOrders: Order[] = dbOrders.map((o: any) => parseSingleDbOrder(o, txSumMap));
 
     setMemoryOrders(fetchedOrders);
     return fetchedOrders;
@@ -1352,12 +1449,12 @@ export async function updateOrderStatusInSupabase(
       })}]`;
 
       const cleanItemsMeta = (target.items || []).map(item => {
-        const copy = { ...item };
+        const { product, ...copy }: any = item;
         if (copy.attendees && Array.isArray(copy.attendees)) {
           copy.attendees = copy.attendees.map((a: any) => {
             let pUrl = a.photo_url;
-            if (pUrl && pUrl.length > 2000 && pUrl.startsWith('data:')) {
-              pUrl = pUrl.substring(0, 100) + '...';
+            if (pUrl && (pUrl.length > 500 || pUrl.startsWith('data:'))) {
+              pUrl = undefined;
             }
             return { ...a, photo_url: pUrl };
           });
@@ -1421,12 +1518,12 @@ export async function updateOrderInSupabase(updatedOrder: Order): Promise<boolea
     })}]`;
 
     const cleanItemsMeta = (updatedOrder.items || []).map(item => {
-      const copy = { ...item };
+      const { product, ...copy }: any = item;
       if (copy.attendees && Array.isArray(copy.attendees)) {
         copy.attendees = copy.attendees.map((a: any) => {
           let pUrl = a.photo_url;
-          if (pUrl && pUrl.length > 2000 && pUrl.startsWith('data:')) {
-            pUrl = pUrl.substring(0, 100) + '...';
+          if (pUrl && (pUrl.length > 500 || pUrl.startsWith('data:'))) {
+            pUrl = undefined;
           }
           return { ...a, photo_url: pUrl };
         });
@@ -1577,12 +1674,13 @@ export async function saveTransactionToSupabase(tx: IncomingTransaction): Promis
   }
 }
 
-export async function fetchTransactionsFromSupabase(): Promise<IncomingTransaction[]> {
+export async function fetchTransactionsFromSupabase(limit = 100): Promise<IncomingTransaction[]> {
   try {
     const { data, error } = await supabase
       .from('store_transactions')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
     if (error) {
       console.warn('Error fetching transactions from Supabase:', error);
@@ -1938,18 +2036,34 @@ export async function cleanupBase64InSupabase(): Promise<{ success: boolean; cle
       let newReceiptUrl = r.receipt_url;
       let newNotes = r.notes;
 
-      if (newReceiptUrl && newReceiptUrl.startsWith('data:') && newReceiptUrl.length > 500) {
-        newReceiptUrl = null;
-        needsUpdate = true;
+      if (newReceiptUrl && newReceiptUrl.startsWith('data:image')) {
+        try {
+          const match = newReceiptUrl.match(/^data:image\/([a-zA-Z0-9.+_-]+);base64,(.+)$/);
+          if (match) {
+            const ext = match[1].includes('png') ? 'png' : 'jpg';
+            const buffer = Buffer.from(match[2], 'base64');
+            const fileName = `legacy-receipts/${r.id}-${Date.now()}.${ext}`;
+            const { error: upErr } = await client.storage
+              .from('receipts')
+              .upload(fileName, buffer, { contentType: `image/${match[1]}`, upsert: true });
+            if (!upErr) {
+              const { data: { publicUrl } } = client.storage.from('receipts').getPublicUrl(fileName);
+              newReceiptUrl = publicUrl;
+              needsUpdate = true;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not migrate receipt base64 to storage:', e);
+        }
       }
 
       if (newNotes && newNotes.includes('data:image')) {
-        newNotes = newNotes.replace(/data:image\/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+/g, '[IMAGE_REMOVED]');
-        needsUpdate = true;
-      }
-
-      if (newNotes && newNotes.includes('[RECEIPT_URL:data:')) {
-        newNotes = newNotes.replace(/\[RECEIPT_URL:data:[\s\S]*?\]/g, '');
+        newNotes = newNotes.replace(/data:image\/[a-zA-Z0-9.+_-]+;base64,[A-Za-z0-9+/=]+/g, '[IMAGE_SAVED]');
+        if (newReceiptUrl && !newReceiptUrl.startsWith('data:')) {
+          newNotes = newNotes.replace(/\[RECEIPT_URL:data:[\s\S]*?\]/g, `[RECEIPT_URL:${newReceiptUrl}]`);
+        } else {
+          newNotes = newNotes.replace(/\[RECEIPT_URL:data:[\s\S]*?\]/g, '');
+        }
         needsUpdate = true;
       }
 
@@ -1962,12 +2076,42 @@ export async function cleanupBase64InSupabase(): Promise<{ success: boolean; cle
       }
     }
 
+    // Also clean any huge base64 strings in store_products
+    try {
+      const { data: prods } = await client
+        .from('store_products')
+        .select('id, image_url, images');
+      if (prods) {
+        for (const p of prods) {
+          let pUpdate = false;
+          let newImg = p.image_url;
+          let newImgs = p.images;
+          if (newImg && newImg.startsWith('data:') && newImg.length > 500) {
+            newImg = 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&auto=format&fit=crop&q=80';
+            pUpdate = true;
+          }
+          if (Array.isArray(newImgs)) {
+            const filtered = newImgs.filter((img: string) => !(img && typeof img === 'string' && img.startsWith('data:') && img.length > 500));
+            if (filtered.length !== newImgs.length) {
+              newImgs = filtered;
+              pUpdate = true;
+            }
+          }
+          if (pUpdate) {
+            await client.from('store_products').update({ image_url: newImg, images: newImgs }).eq('id', p.id);
+            cleanedCount++;
+          }
+        }
+      }
+    } catch (pe) {}
+
     return { success: true, cleanedCount };
   } catch (err) {
     console.error('Error cleaning Base64 in Supabase:', err);
     return { success: false, cleanedCount: 0 };
   }
 }
+
 
 
 

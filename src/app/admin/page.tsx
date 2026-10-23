@@ -59,8 +59,9 @@ import {
   X
 } from 'lucide-react';
 import { Product, ProductAddon, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
-import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, fetchOrdersFromSupabase, parseAttendeesAndCleanOpt, clearOrdersInSupabase, deleteOrderFromSupabase, cleanupBase64InSupabase, decodeProdMeta } from '@/lib/supabaseClient';
+import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, parseAttendeesAndCleanOpt, clearOrdersInSupabase, deleteOrderFromSupabase, cleanupBase64InSupabase, decodeProdMeta } from '@/lib/supabaseClient';
 import { normalizePhoneNumber, isValidEgyptianPhone } from '@/lib/smsParser';
+import { compressImageFile } from '@/lib/imageCompressor';
 
 function generateUUID() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -749,19 +750,32 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
-  // Periodic polling to keep orders & transactions list live updated (every 30 seconds)
+  // Periodic polling to keep orders & transactions list live updated (every 60s with tab visibility check)
   useEffect(() => {
     let interval: any;
     if (isAuthenticated) {
       interval = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return;
         Promise.all([
-          fetchOrdersFromSupabase(),
-          fetch('/api/sms', { cache: 'no-store' }).then(r => r.ok ? r.json() : [])
+          fetch('/api/orders?limit=40').then(r => r.ok ? r.json() : []),
+          fetch('/api/sms?limit=50', { cache: 'no-store' }).then(r => r.ok ? r.json() : [])
         ]).then(([ordRes, txRes]) => {
-          if (ordRes && ordRes.length > 0) setOrders(ordRes);
-          if (txRes && Array.isArray(txRes) && txRes.length > 0) setTransactions(txRes);
-        });
-      }, 30000);
+          if (ordRes && Array.isArray(ordRes) && ordRes.length > 0) {
+            setOrders(prev => {
+              const map = new Map(prev.map(o => [o.id, o]));
+              ordRes.forEach((o: Order) => map.set(o.id, o));
+              return Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            });
+          }
+          if (txRes && Array.isArray(txRes) && txRes.length > 0) {
+            setTransactions(prev => {
+              const map = new Map(prev.map(t => [t.id, t]));
+              txRes.forEach((t: IncomingTransaction) => map.set(t.id, t));
+              return Array.from(map.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            });
+          }
+        }).catch(err => console.warn('Admin polling error:', err));
+      }, 60000);
     }
     return () => clearInterval(interval);
   }, [isAuthenticated]);
@@ -989,14 +1003,15 @@ export default function AdminDashboardPage() {
     return filteredOrders.slice(0, visibleCount);
   }, [filteredOrders, visibleCount]);
 
-  // Periodic poll for devices when gateway tab is active (Every 10 seconds)
+  // Periodic poll for devices when gateway tab is active (Every 15s with tab visibility check)
   useEffect(() => {
     let interval: any;
     if (isAuthenticated && activeTab === 'gateway') {
       fetchDevices();
       interval = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return;
         fetchDevices();
-      }, 10000);
+      }, 15000);
     }
     return () => clearInterval(interval);
   }, [isAuthenticated, activeTab]);
@@ -1329,13 +1344,14 @@ export default function AdminDashboardPage() {
     if (!file) return;
     try {
       setIsUploadingReceipt(true);
+      const compressed = await compressImageFile(file, 800, 0.65);
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', compressed);
       fd.append('bucket', 'receipts');
       fd.append('folder', 'manual');
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       const data = await res.json();
-      if (!res.ok || !data.url) throw new Error(data.error || 'فشل رفع الصورة');
+      if (!res.ok || !data.url || data.url.startsWith('data:')) throw new Error(data.error || 'فشل رفع الصورة');
 
       const updatedOrder = { ...order, receipt_url: data.url };
       await updateOrderInSupabase(updatedOrder);
@@ -1349,15 +1365,16 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Upload a single image file to Supabase Storage products bucket
+  // Upload a single image file to Supabase Storage products bucket (compressed)
   const uploadProductImage = async (file: File): Promise<string> => {
+    const compressed = await compressImageFile(file, 1200, 0.7);
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append('file', compressed);
     fd.append('bucket', 'products');
     fd.append('folder', 'catalog');
     const res = await fetch('/api/upload', { method: 'POST', body: fd });
     const data = await res.json();
-    if (res.ok && data.url) return data.url;
+    if (res.ok && data.url && !data.url.startsWith('data:')) return data.url;
     throw new Error(data.error || 'Upload failed');
   };
 
@@ -1377,14 +1394,10 @@ export default function AdminDashboardPage() {
         setNewProdImagePreview(url);
       }
     } catch (err) {
-      console.warn('Upload fallback to data URL');
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        if (evt.target?.result) {
-          setNewProdImage(evt.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      console.warn('Upload error:', err);
+      alert('فشل رفع صورة المنتج، يرجى المحاولة مرة أخرى.');
+      setNewProdImage('');
+      setNewProdImagePreview('');
     } finally {
       setNewProdImageUploading(false);
     }
@@ -1660,9 +1673,11 @@ export default function AdminDashboardPage() {
       setIsCleaningBase64(true);
       const res = await cleanupBase64InSupabase();
       if (res.success) {
-        alert(`تم تنظيف وحذف الصور القديمة الضخمة من ${res.cleanedCount} طلب بنجاح وتسريع القاعدة 🚀`);
-        const freshOrders = await fetchOrdersFromSupabase();
-        setOrders(freshOrders);
+        const ordRes = await fetch('/api/orders?all=true');
+        if (ordRes.ok) {
+          const freshOrders = await ordRes.json();
+          setOrders(freshOrders);
+        }
       } else {
         alert('لم يتم العثور على سجلات تحتاج تنظيف');
       }

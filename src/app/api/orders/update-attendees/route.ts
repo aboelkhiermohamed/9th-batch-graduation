@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchOrdersFromSupabase, updateOrderInSupabase } from '@/lib/supabaseClient';
+import { fetchSingleOrderFromSupabase, updateOrderInSupabase } from '@/lib/supabaseClient';
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,8 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'بيانات غير مكتملة' }, { status: 400 });
     }
 
-    const orders = await fetchOrdersFromSupabase();
-    const order = orders.find(o => (order_id && o.id === order_id) || (order_code && o.order_code === order_code));
+    const order = await fetchSingleOrderFromSupabase({ id: order_id, code: order_code });
 
     if (!order) {
       return NextResponse.json({ error: 'الطلب غير موجود' }, { status: 404 });

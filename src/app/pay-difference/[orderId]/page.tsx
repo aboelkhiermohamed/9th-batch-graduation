@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Order, StoreSettings } from '@/types';
-import { fetchOrdersFromSupabase, fetchSettingsFromSupabase, updateOrderInSupabase } from '@/lib/supabaseClient';
+import { updateOrderInSupabase } from '@/lib/supabaseClient';
 import { matchOrderWithUnmatchedTransactions } from '@/lib/matchingEngine';
+import { compressImageFile } from '@/lib/imageCompressor';
 import { 
   ArrowRight, 
   CreditCard, 
@@ -60,23 +61,30 @@ export default function PayDifferencePage() {
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
-      const [orders, storeSettings] = await Promise.all([
-        fetchOrdersFromSupabase(),
-        fetchSettingsFromSupabase()
-      ]);
+      try {
+        const [ordRes, setRes] = await Promise.all([
+          fetch(`/api/orders?id=${encodeURIComponent(orderId)}`),
+          fetch('/api/admin/settings')
+        ]);
 
-      setSettings(storeSettings);
+        if (setRes.ok) {
+          const storeSettings = await setRes.json();
+          setSettings(storeSettings);
+        }
 
-      const foundOrder = orders.find(
-        o => o.id === orderId || o.order_code === orderId || o.order_code === `GRAD-${orderId}`
-      );
-
-      if (foundOrder) {
-        setOrder(foundOrder);
-        setSenderPhone(foundOrder.sender_phone || foundOrder.customer_phone || '');
-        if (foundOrder.payment_method) setPaymentMethod(foundOrder.payment_method);
+        if (ordRes.ok) {
+          const foundOrder = await ordRes.json();
+          if (foundOrder) {
+            setOrder(foundOrder);
+            setSenderPhone(foundOrder.sender_phone || foundOrder.customer_phone || '');
+            if (foundOrder.payment_method) setPaymentMethod(foundOrder.payment_method);
+          }
+        }
+      } catch (e) {
+        console.warn('Error loading difference order details:', e);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     if (orderId) {
@@ -90,13 +98,12 @@ export default function PayDifferencePage() {
     setTimeout(() => setCopiedText(null), 2500);
   };
 
-  const handleReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReceiptChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setReceiptFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setReceiptPreview(reader.result as string);
-      reader.readAsDataURL(file);
+      const compressed = await compressImageFile(file);
+      setReceiptFile(compressed);
+      setReceiptPreview(URL.createObjectURL(compressed));
     }
   };
 
@@ -112,20 +119,20 @@ export default function PayDifferencePage() {
     try {
       let receiptUrl = order.receipt_url;
 
-      if (receiptFile && receiptPreview) {
+      if (receiptFile) {
         try {
+          const fd = new FormData();
+          fd.append('file', receiptFile);
+          fd.append('bucket', 'receipts');
+          fd.append('folder', 'differences');
           const res = await fetch('/api/upload', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              file: receiptPreview,
-              fileName: `partial-receipt-${order.order_code}-${Date.now()}.jpg`
-            })
+            body: fd
           });
           const data = await res.json();
-          if (data.url) receiptUrl = data.url;
+          if (data.url && !data.url.startsWith('data:')) receiptUrl = data.url;
         } catch (e) {
-          console.warn('Receipt upload failed fallback to data url');
+          console.warn('Receipt upload failed');
         }
       }
 

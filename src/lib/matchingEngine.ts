@@ -27,10 +27,13 @@ export interface MatchResult {
  * Attempts to match an incoming parsed transaction against pending orders.
  */
 export async function matchTransactionWithOrders(tx: IncomingTransaction): Promise<MatchResult> {
-  const orders = await fetchOrdersFromSupabase();
-  const pendingOrders = orders.filter(
+  const dbPending = await fetchOrdersFromSupabase({ status: ['pending', 'pending_difference'], limit: 50 });
+  const memPending = getMemoryOrders().filter(
     o => o.status === 'pending' || o.status === 'pending_difference' || (o.is_difference_pending && (o.difference_amount || 0) > 0)
   );
+  const pendingMap = new Map<string, Order>();
+  [...dbPending, ...memPending].forEach(o => pendingMap.set(o.id, o));
+  const pendingOrders = Array.from(pendingMap.values());
 
   if (pendingOrders.length === 0) {
     return { matched: false, message: 'No pending orders or partial invoices found' };
@@ -138,7 +141,7 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
     const isDiffPending = !isFullyPaid;
 
     // Update order status in memory & Supabase
-    const updatedOrders = orders.map(o => {
+    const updatedOrders = pendingOrders.map((o: Order) => {
       if (o.id === matchedOrder!.id) {
         return {
           ...o,
@@ -158,7 +161,7 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
     });
 
     setMemoryOrders(updatedOrders);
-    const updatedMatchedOrder = updatedOrders.find(o => o.id === matchedOrder!.id);
+    const updatedMatchedOrder = updatedOrders.find((o: Order) => o.id === matchedOrder!.id);
     if (updatedMatchedOrder) {
       await updateOrderInSupabase(updatedMatchedOrder);
     }
@@ -210,14 +213,11 @@ export async function matchTransactionWithOrders(tx: IncomingTransaction): Promi
  */
 export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Promise<{ matched: boolean; matchedTx?: IncomingTransaction }> {
   try {
-    const transactions = await fetchTransactionsFromSupabase();
-    const now = Date.now();
-    const MAX_AGE_MS = 48 * 60 * 60 * 1000; // 48 hours max age for SMS matching without ref
-
-    const unmatchedTxs = transactions.filter(t => {
-      if (t.status === 'matched' || t.matched_order_id) return false;
-      return true;
-    });
+    const dbTxs = await fetchTransactionsFromSupabase(30);
+    const memTxs = getMemoryTransactions().filter(t => t.status !== 'matched' && !t.matched_order_id);
+    const txMap = new Map<string, IncomingTransaction>();
+    [...dbTxs, ...memTxs].forEach(t => txMap.set(t.id, t));
+    const unmatchedTxs = Array.from(txMap.values());
 
     if (unmatchedTxs.length === 0) {
       return { matched: false };
@@ -246,6 +246,8 @@ export async function matchOrderWithUnmatchedTransactions(newOrder: Order): Prom
 
     // 2. Priority 2: Amount + Phone Match (Requires fresh SMS < 48h AND phone match)
     if (!matchedTx) {
+      const now = Date.now();
+      const MAX_AGE_MS = 48 * 60 * 60 * 1000;
       for (const tx of unmatchedTxs) {
         const txAge = tx.created_at ? (now - new Date(tx.created_at).getTime()) : 0;
         if (txAge > MAX_AGE_MS) continue; // Ignore old SMS for general phone/amount matching
