@@ -49,6 +49,97 @@ export function cleanDisplayOrderDetails(text?: string | null): string {
     .trim() || 'بدون تفاصيل';
 }
 
+export interface ParsedOrderItem {
+  title: string;
+  size?: string;
+  qty?: number;
+  customization?: string;
+}
+
+export function parseOrderDetailsToItems(text?: string | null, rawItems?: DeliveryItemSummary[]): ParsedOrderItem[] {
+  if (rawItems && rawItems.length > 0) {
+    return rawItems.map(item => ({
+      title: cleanDisplayOrderDetails(item.product_title) || 'منتج',
+      size: item.selected_size ? cleanDisplayOrderDetails(item.selected_size) : undefined,
+      qty: item.quantity > 1 ? item.quantity : undefined,
+      customization: (item.custom_text || item.customization_option)
+        ? cleanDisplayOrderDetails(item.custom_text ? `تطريز: ${item.custom_text}` : item.customization_option)
+        : undefined
+    }));
+  }
+
+  if (!text) return [];
+
+  const rawParts = text.split(/\s*\+\s*/);
+  return rawParts.map(part => {
+    const clean = cleanDisplayOrderDetails(part);
+    const match = clean.match(/^(.*?)(?:\s*\((.*?)\))?$/);
+    if (!match) return { title: clean };
+
+    const title = match[1].trim() || 'منتج';
+    const extraStr = match[2] || '';
+    const extraParts = extraStr.split('|').map(s => s.trim()).filter(Boolean);
+
+    let size: string | undefined = undefined;
+    let qty: number | undefined = undefined;
+    let customization: string | undefined = undefined;
+
+    extraParts.forEach(p => {
+      if (p.startsWith('مقاس:')) {
+        size = p.replace('مقاس:', '').trim();
+      } else if (p.startsWith('كمية:')) {
+        qty = parseInt(p.replace('كمية:', '').trim(), 10) || undefined;
+      } else if (p.startsWith('تطريز:') || p.startsWith('تخصيص:')) {
+        customization = p;
+      } else if (p) {
+        customization = customization ? `${customization} | ${p}` : p;
+      }
+    });
+
+    return { title, size, qty, customization };
+  });
+}
+
+function OrderItemsList({ text, items }: { text?: string | null; items?: DeliveryItemSummary[] }) {
+  const parsed = useMemo(() => parseOrderDetailsToItems(text, items), [text, items]);
+
+  if (parsed.length === 0) {
+    return <span className="text-slate-500 text-xs">بدون تفاصيل</span>;
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 py-0.5">
+      {parsed.map((item, idx) => (
+        <div
+          key={idx}
+          className="flex items-center gap-1.5 flex-wrap bg-slate-950/80 border border-slate-800/90 hover:border-slate-700 px-2.5 py-1 rounded-xl text-xs transition"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+          <span className="font-bold text-white tracking-wide">{item.title}</span>
+
+          {item.size && (
+            <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono font-bold text-[10px]" dir="ltr">
+              مقاس: {item.size}
+            </span>
+          )}
+
+          {item.qty && item.qty > 1 && (
+            <span className="px-2 py-0.5 rounded-lg bg-slate-800 text-amber-300 border border-slate-700 font-mono font-bold text-[10px]">
+              ×{item.qty}
+            </span>
+          )}
+
+          {item.customization && (
+            <span className="px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-200 border border-amber-500/30 text-[10px] font-medium">
+              {item.customization}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesManagerProps) {
   // Navigation: Sub-sections
   const [subTab, setSubTab] = useState<'create' | 'delivery' | 'edit'>('delivery');
@@ -820,13 +911,23 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
         ? `<span style="display: inline-block; padding: 2px 8px; background: #ecfdf5; color: #047857; border: 1px solid #10b981; border-radius: 4px; font-weight: bold; font-size: 10px;">تم التسليم (${ord.delivered_by || 'Admin'})</span>`
         : `<span style="display: inline-block; padding: 2px 8px; background: #fff7ed; color: #c2410c; border: 1px solid #f97316; border-radius: 4px; font-weight: bold; font-size: 10px;">قيد التسليم</span>`;
 
+      const parsedList = parseOrderDetailsToItems(ord.items_summary || ord.order_details, ord.items);
+      const itemsPrintHtml = parsedList.map(it => `
+        <div style="margin-bottom: 2px; padding: 2px 0; border-bottom: 1px dotted #e2e8f0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+          <span style="font-weight: 700; color: #0f172a;">&bull; ${it.title}</span>
+          ${it.size ? `<span style="background: #e0e7ff; color: #3730a3; padding: 1px 5px; border-radius: 4px; font-weight: bold; font-size: 10px; font-family: monospace;" dir="ltr">مقاس: ${it.size}</span>` : ''}
+          ${it.qty && it.qty > 1 ? `<span style="background: #f1f5f9; color: #0f172a; padding: 1px 4px; border-radius: 4px; font-weight: bold; font-size: 10px;">×${it.qty}</span>` : ''}
+          ${it.customization ? `<span style="background: #fef3c7; color: #92400e; padding: 1px 5px; border-radius: 4px; font-size: 10px;">${it.customization}</span>` : ''}
+        </div>
+      `).join('') || '<span style="color: #64748b;">بدون تفاصيل</span>';
+
       return `
         <tr>
           <td style="text-align: center; font-weight: bold; color: #64748b;">${idx + 1}</td>
           <td style="font-family: monospace; font-weight: 900; font-size: 13px; color: #0f172a; text-align: center;">${ord.order_code}</td>
           <td style="font-weight: 700; color: #0f172a;">${ord.customer_name}</td>
           <td style="font-family: monospace; font-size: 11px; color: #334155; text-align: center;" dir="ltr">${ord.customer_phone}</td>
-          <td style="font-size: 11px; color: #1e293b; line-height: 1.4;">${cleanDisplayOrderDetails(ord.items_summary || ord.order_details)}</td>
+          <td style="font-size: 11px; color: #1e293b; line-height: 1.4;">${itemsPrintHtml}</td>
           <td style="text-align: center; font-size: 11px; font-weight: 600; color: #4338ca;">${ord.delivery_time}</td>
           <td style="text-align: center;">${statusBadge}</td>
           <td style="width: 80px; text-align: center; border-bottom: 1px dashed #cbd5e1;"></td>
@@ -1270,11 +1371,11 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           {foundOrder.customer_phone}
                         </span>
                       </div>
-                      <p className="text-xs text-indigo-200 leading-relaxed">
-                        <strong className="text-indigo-300 font-bold">المحتويات: </strong>
-                        <span className="text-slate-100 font-medium">{cleanDisplayOrderDetails(foundOrder.items_summary)}</span>
-                      </p>
-                      <p className="text-[11px] text-slate-400">
+                      <div className="pt-1.5">
+                        <span className="text-[11px] font-bold text-indigo-300 block mb-1">تفاصيل ومحتويات الطلب:</span>
+                        <OrderItemsList text={foundOrder.items_summary} items={foundOrder.items} />
+                      </div>
+                      <p className="text-[11px] text-slate-400 pt-1">
                         <strong className="text-slate-300">موعد التسليم: </strong>
                         <span className="text-indigo-300 font-mono font-bold">{createCustomTime || createDefaultTime}</span>
                       </p>
@@ -1332,7 +1433,9 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           <td className="py-3 px-4 text-center font-mono font-bold text-amber-300">{ord.order_code}</td>
                           <td className="py-3 px-4 font-bold text-white">{ord.customer_name}</td>
                           <td className="py-3 px-4 text-center font-mono text-slate-400" dir="ltr">{ord.customer_phone}</td>
-                          <td className="py-3 px-4 text-[11px] text-slate-300 max-w-xs leading-relaxed">{cleanDisplayOrderDetails(ord.items_summary)}</td>
+                          <td className="py-3 px-4 max-w-md">
+                            <OrderItemsList text={ord.items_summary} items={ord.items} />
+                          </td>
                           <td className="py-3 px-4 text-center">
                             <input
                               type="text"
@@ -1764,8 +1867,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                               <td className="py-3.5 px-4 text-center font-mono text-slate-400" dir="ltr">
                                 {ord.customer_phone}
                               </td>
-                              <td className="py-3.5 px-4 text-[11px] text-slate-300 max-w-xs leading-relaxed">
-                                {cleanDisplayOrderDetails(ord.items_summary || ord.order_details)}
+                              <td className="py-3.5 px-4 max-w-md">
+                                <OrderItemsList text={ord.items_summary || ord.order_details} items={ord.items} />
                               </td>
                               <td className="py-3.5 px-4 text-center font-mono text-indigo-300 font-bold">
                                 {ord.delivery_time}
@@ -2083,7 +2186,9 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                             <td className="py-3 px-3 text-center font-mono font-bold text-amber-300">#{ord.order_code}</td>
                             <td className="py-3 px-3 font-bold text-white">{ord.customer_name}</td>
                             <td className="py-3 px-3 text-center font-mono text-slate-400" dir="ltr">{ord.customer_phone}</td>
-                            <td className="py-3 px-3 text-[11px] text-slate-300 max-w-xs leading-relaxed">{cleanDisplayOrderDetails(ord.items_summary || ord.order_details)}</td>
+                            <td className="py-3 px-3 max-w-md">
+                              <OrderItemsList text={ord.items_summary || ord.order_details} items={ord.items} />
+                            </td>
                             <td className="py-3 px-3 text-center">
                               <input
                                 type="text"
