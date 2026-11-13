@@ -249,8 +249,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   const [statusUpdatingOrderId, setStatusUpdatingOrderId] = useState<string | null>(null);
   const [undoModalOrder, setUndoModalOrder] = useState<DeliveryZoneOrder | null>(null);
 
-  // Ref for table rows scrolling
-  const orderRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  // Ref for table rows / mobile cards scrolling
+  const orderRowRefs = useRef<Record<string, HTMLElement | null>>({});
 
   // -------------------------------------------------------------
   // SUB-SECTION 3: ZONES EDIT STATE
@@ -1138,21 +1138,21 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       )}
 
       {/* Main Delivery Zones Header */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl backdrop-blur-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30 flex-shrink-0">
                 <Layers className="w-5 h-5" />
               </div>
               <div>
-                <h1 className="text-xl md:text-2xl font-black text-white flex items-center gap-2">
+                <h1 className="text-lg sm:text-xl md:text-2xl font-black text-white flex items-center gap-2 flex-wrap">
                   <span>إدارة زونات ومحطات التسليم</span>
                   <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full font-mono font-bold">
                     Delivery Zones
                   </span>
                 </h1>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-[11px] sm:text-xs text-slate-400 mt-1">
                   تقسيم أوردرات الدفعة على زونات ومحطات، تنظيم مواعيد التسليم، البحث السريع بالأكواد، وتوثيق استلام كل طالب لحظياً.
                 </p>
               </div>
@@ -1160,23 +1160,23 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
           </div>
 
           {/* Quick Stats Pill */}
-          <div className="flex items-center gap-3">
-            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl px-4 py-2 flex items-center gap-3">
+          <div className="w-full sm:w-auto">
+            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-2.5 sm:px-4 sm:py-2 grid grid-cols-3 sm:flex items-center gap-2 sm:gap-3">
               <div className="text-center">
                 <span className="block text-[10px] text-slate-400 font-bold">عدد الزونات</span>
-                <span className="font-mono font-black text-sm text-indigo-400">{zones.length}</span>
+                <span className="font-mono font-black text-sm sm:text-base text-indigo-400">{zones.length}</span>
               </div>
-              <div className="h-6 w-px bg-slate-800" />
-              <div className="text-center">
+              <div className="hidden sm:block h-6 w-px bg-slate-800" />
+              <div className="text-center border-x sm:border-x-0 border-slate-800/80 px-1">
                 <span className="block text-[10px] text-slate-400 font-bold">إجمالي الأوردرات</span>
-                <span className="font-mono font-black text-sm text-white">
+                <span className="font-mono font-black text-sm sm:text-base text-white">
                   {zones.reduce((acc, z) => acc + (z.total_orders || 0), 0)}
                 </span>
               </div>
-              <div className="h-6 w-px bg-slate-800" />
+              <div className="hidden sm:block h-6 w-px bg-slate-800" />
               <div className="text-center">
                 <span className="block text-[10px] text-emerald-400 font-bold">تم التسليم</span>
-                <span className="font-mono font-black text-sm text-emerald-400">
+                <span className="font-mono font-black text-sm sm:text-base text-emerald-400">
                   {zones.reduce((acc, z) => acc + (z.delivered_orders || 0), 0)}
                 </span>
               </div>
@@ -1187,17 +1187,17 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
         {/* ------------------------------------------------------------- */}
         {/* SUB-SECTION TABS (The 3 Sub-sections required)                */}
         {/* ------------------------------------------------------------- */}
-        <div className="flex items-center gap-2 mt-6 pt-5 border-t border-slate-800/80 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2 mt-4 sm:mt-6 pt-4 sm:pt-5 border-t border-slate-800/80 overflow-x-auto pb-2 scrollbar-none -mx-1 px-1 sm:mx-0 sm:px-0">
           <button
             onClick={() => setSubTab('delivery')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold text-xs transition-all duration-200 whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-xs transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
               subTab === 'delivery'
                 ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500/50'
                 : 'bg-slate-950/60 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-slate-800'
             }`}
           >
             <CheckCircle2 className={`w-4 h-4 ${subTab === 'delivery' ? 'text-amber-300' : 'text-slate-400'}`} />
-            <span>2. محطة تسليم الزونات (Zones Delivery)</span>
+            <span>2. محطة تسليم الزونات <span className="hidden md:inline">(Zones Delivery)</span></span>
             {zones.length > 0 && (
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-white/20 text-white font-black">
                 {zones.length}
@@ -1207,26 +1207,26 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
           <button
             onClick={() => setSubTab('create')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold text-xs transition-all duration-200 whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-xs transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
               subTab === 'create'
                 ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500/50'
                 : 'bg-slate-950/60 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-slate-800'
             }`}
           >
             <Plus className={`w-4 h-4 ${subTab === 'create' ? 'text-amber-300' : 'text-slate-400'}`} />
-            <span>1. إنشاء زون جديد (Create Zones)</span>
+            <span>1. إنشاء زون جديد <span className="hidden md:inline">(Create Zones)</span></span>
           </button>
 
           <button
             onClick={() => setSubTab('edit')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold text-xs transition-all duration-200 whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-xs transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
               subTab === 'edit'
                 ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500/50'
                 : 'bg-slate-950/60 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-slate-800'
             }`}
           >
             <SlidersHorizontal className={`w-4 h-4 ${subTab === 'edit' ? 'text-amber-300' : 'text-slate-400'}`} />
-            <span>3. إدارة وتعديل الكشوفات (Zones Edit)</span>
+            <span>3. إدارة وتعديل الكشوفات <span className="hidden md:inline">(Zones Edit)</span></span>
           </button>
         </div>
       </div>
@@ -1236,23 +1236,23 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       {/* ============================================================= */}
       {subTab === 'create' && (
         <div className="space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-5 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
               <div>
-                <h2 className="text-lg font-black text-white flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                   <span>إنشاء كشف زون تسليم جديد</span>
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
                   اكتب اسم الزون، وابحث عن الطلبات بالرقم أو الكود لإضافتها إلى الكشف مباشرة، ثم احفظ الكشف.
                 </p>
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
                 {createSheetOrders.length > 0 && (
-                  <span className="text-[11px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold animate-in fade-in">
-                    <Save className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>المسودة محفوظة تلقائياً ضد الـ Refresh</span>
+                  <span className="text-[10px] sm:text-[11px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold animate-in fade-in">
+                    <Save className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                    <span>المسودة محفوظة ضد الـ Refresh</span>
                   </span>
                 )}
                 <button
@@ -1277,7 +1277,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
             </div>
 
             {/* Zone Name & Default Time Inputs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5">
                   اسم الزون / الكشف <span className="text-rose-400">*</span>
@@ -1306,14 +1306,14 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
             </div>
 
             {/* Order Search Bar */}
-            <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 space-y-4">
+            <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3 sm:p-4 space-y-3 sm:space-y-4">
               <h3 className="text-xs font-bold text-slate-300 flex items-center gap-2">
                 <Search className="w-4 h-4 text-indigo-400" />
                 <span>البحث المباشر عن الطلب في قاعدة البيانات</span>
               </h3>
 
-              <form onSubmit={handleSearchOrderForCreate} className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <div className="md:col-span-6">
+              <form onSubmit={handleSearchOrderForCreate} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 sm:gap-3">
+                <div className="sm:col-span-6">
                   <input
                     type="text"
                     value={createSearchQuery}
@@ -1324,22 +1324,22 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                         handleSearchOrderForCreate();
                       }
                     }}
-                    placeholder="أدخل كود الطلب (مثل 41454 أو GRAD-41454) أو رقم الهاتف أو اسم الطالب واضغط Enter..."
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                    placeholder="أدخل كود الطلب (مثل 41454 أو GRAD-41454) أو الهاتف أو الاسم..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
                   />
                 </div>
 
-                <div className="md:col-span-4">
+                <div className="sm:col-span-4">
                   <input
                     type="text"
                     value={createCustomTime}
                     onChange={e => setCreateCustomTime(e.target.value)}
                     placeholder={`موعد هذا الطلب (افتراضي: ${createDefaultTime})`}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition"
                   />
                 </div>
 
-                <div className="md:col-span-2">
+                <div className="sm:col-span-2">
                   <button
                     type="submit"
                     disabled={isSearchingOrder}
@@ -1359,17 +1359,22 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
               {/* Found Order Card */}
               {foundOrder && (
-                <div className="bg-indigo-950/40 border border-indigo-500/40 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <span className="font-mono font-black text-sm text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded-lg border border-amber-500/30" dir="ltr">
+                <div className="bg-indigo-950/40 border border-indigo-500/40 rounded-2xl p-3.5 sm:p-4 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-black text-xs sm:text-sm text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded-lg border border-amber-500/30" dir="ltr">
                           #{foundOrder.order_code.replace(/^#/, '')}
                         </span>
-                        <span className="font-bold text-white text-sm">{foundOrder.customer_name}</span>
-                        <span className="text-xs font-mono text-slate-300 bg-slate-900/80 px-2.5 py-0.5 rounded-lg border border-slate-800" dir="ltr">
-                          {foundOrder.customer_phone}
-                        </span>
+                        <span className="font-bold text-white text-xs sm:text-sm">{foundOrder.customer_name}</span>
+                        <a
+                          href={`tel:${foundOrder.customer_phone}`}
+                          className="text-[11px] font-mono text-slate-300 bg-slate-900/80 px-2.5 py-0.5 rounded-lg border border-slate-800 flex items-center gap-1 hover:text-indigo-300"
+                          dir="ltr"
+                        >
+                          <Phone className="w-3 h-3 text-emerald-400" />
+                          <span>{foundOrder.customer_phone}</span>
+                        </a>
                       </div>
                       <div className="pt-1.5">
                         <span className="text-[11px] font-bold text-indigo-300 block mb-1">تفاصيل ومحتويات الطلب:</span>
@@ -1381,11 +1386,11 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                       </p>
                     </div>
 
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 w-full sm:w-auto">
                       <button
                         type="button"
                         onClick={handleAddFoundOrderToSheet}
-                        className="w-full md:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition"
+                        className="w-full sm:w-auto px-5 py-3 sm:py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition"
                       >
                         <Plus className="w-4 h-4" />
                         <span>إضافة للكشف (Add to Sheet)</span>
@@ -1396,7 +1401,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
               )}
             </div>
 
-            {/* Sheet Preview Table */}
+            {/* Sheet Preview Table (Desktop) + Cards (Mobile/Tablet) */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-slate-300 flex items-center gap-2">
@@ -1407,71 +1412,129 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
               </div>
 
               {createSheetOrders.length === 0 ? (
-                <div className="bg-slate-950/40 border border-dashed border-slate-800 rounded-2xl p-8 text-center text-slate-500">
+                <div className="bg-slate-950/40 border border-dashed border-slate-800 rounded-2xl p-6 sm:p-8 text-center text-slate-500">
                   <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-xs font-bold">لم تتم إضافة أي طلبات لهذا الكشف بعد.</p>
                   <p className="text-[11px] text-slate-600 mt-1">ابحث بالأعلى عن الطلبات واضغط &quot;إضافة للكشف&quot; لتجميعها هنا.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
-                  <table className="w-full text-right text-xs">
-                    <thead className="bg-slate-900/90 text-slate-400 font-bold border-b border-slate-800">
-                      <tr>
-                        <th className="py-3 px-4 w-12 text-center">#</th>
-                        <th className="py-3 px-4 w-32 text-center">رقم الطلب</th>
-                        <th className="py-3 px-4">اسم الطالب</th>
-                        <th className="py-3 px-4 text-center">الهاتف</th>
-                        <th className="py-3 px-4">تفاصيل الطلب</th>
-                        <th className="py-3 px-4 text-center w-36">موعد التسليم</th>
-                        <th className="py-3 px-4 w-20 text-center">إجراء</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/80 text-slate-200">
-                      {createSheetOrders.map((ord, idx) => (
-                        <tr key={ord.order_id} className="hover:bg-slate-900/40 transition">
-                          <td className="py-3 px-4 text-center font-mono text-slate-500">{idx + 1}</td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-amber-300">{ord.order_code}</td>
-                          <td className="py-3 px-4 font-bold text-white">{ord.customer_name}</td>
-                          <td className="py-3 px-4 text-center font-mono text-slate-400" dir="ltr">{ord.customer_phone}</td>
-                          <td className="py-3 px-4 max-w-md">
-                            <OrderItemsList text={ord.items_summary} items={ord.items} />
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <input
-                              type="text"
-                              value={ord.delivery_time}
-                              onChange={e => {
-                                const val = e.target.value;
-                                setCreateSheetOrders(prev => prev.map((item, i) => i === idx ? { ...item, delivery_time: val } : item));
-                              }}
-                              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-center text-indigo-200 focus:outline-none focus:border-indigo-500"
-                            />
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveOrderFromCreateSheet(ord.order_id)}
-                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
-                              title="حذف من الكشف"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
+                <>
+                  {/* Desktop / Tablet Table View */}
+                  <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+                    <table className="w-full text-right text-xs">
+                      <thead className="bg-slate-900/90 text-slate-400 font-bold border-b border-slate-800">
+                        <tr>
+                          <th className="py-3 px-4 w-12 text-center">#</th>
+                          <th className="py-3 px-4 w-32 text-center">رقم الطلب</th>
+                          <th className="py-3 px-4">اسم الطالب</th>
+                          <th className="py-3 px-4 text-center">الهاتف</th>
+                          <th className="py-3 px-4">تفاصيل الطلب</th>
+                          <th className="py-3 px-4 text-center w-36">موعد التسليم</th>
+                          <th className="py-3 px-4 w-20 text-center">إجراء</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/80 text-slate-200">
+                        {createSheetOrders.map((ord, idx) => (
+                          <tr key={ord.order_id} className="hover:bg-slate-900/40 transition">
+                            <td className="py-3 px-4 text-center font-mono text-slate-500">{idx + 1}</td>
+                            <td className="py-3 px-4 text-center font-mono font-bold text-amber-300">{ord.order_code}</td>
+                            <td className="py-3 px-4 font-bold text-white">{ord.customer_name}</td>
+                            <td className="py-3 px-4 text-center font-mono text-slate-400" dir="ltr">{ord.customer_phone}</td>
+                            <td className="py-3 px-4 max-w-md">
+                              <OrderItemsList text={ord.items_summary} items={ord.items} />
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <input
+                                type="text"
+                                value={ord.delivery_time}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setCreateSheetOrders(prev => prev.map((item, i) => i === idx ? { ...item, delivery_time: val } : item));
+                                }}
+                                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-center text-indigo-200 focus:outline-none focus:border-indigo-500"
+                              />
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveOrderFromCreateSheet(ord.order_id)}
+                                className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
+                                title="حذف من الكشف"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Cards View (< md) */}
+                  <div className="md:hidden space-y-3">
+                    {createSheetOrders.map((ord, idx) => (
+                      <div key={ord.order_id} className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-slate-500">#{idx + 1}</span>
+                            <span className="font-mono font-black text-amber-300 text-xs bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md" dir="ltr">
+                              #{ord.order_code.replace(/^#/, '')}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveOrderFromCreateSheet(ord.order_id)}
+                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
+                            title="حذف من الكشف"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
+                          <span className="font-bold text-white text-sm">{ord.customer_name}</span>
+                          {ord.customer_phone && (
+                            <a
+                              href={`tel:${ord.customer_phone}`}
+                              className="font-mono text-slate-300 text-xs flex items-center gap-1 bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
+                              dir="ltr"
+                            >
+                              <Phone className="w-3 h-3 text-emerald-400" />
+                              <span>{ord.customer_phone}</span>
+                            </a>
+                          )}
+                        </div>
+
+                        <div>
+                          <OrderItemsList text={ord.items_summary} items={ord.items} />
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-slate-400">موعد التسليم:</span>
+                          <input
+                            type="text"
+                            value={ord.delivery_time}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setCreateSheetOrders(prev => prev.map((item, i) => i === idx ? { ...item, delivery_time: val } : item));
+                            }}
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-center text-indigo-200 focus:outline-none focus:border-indigo-500 w-36"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
 
               {/* Actions Footer */}
               {createSheetOrders.length > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-800">
-                  <div className="text-xs text-slate-400">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-slate-800">
+                  <div className="text-xs text-slate-400 text-center sm:text-right">
                     إجمالي الطلبات في الكشف: <strong className="text-white font-mono">{createSheetOrders.length}</strong>
                   </div>
 
-                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="flex items-center gap-2.5 w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={() => handlePrintSheet({
@@ -1495,7 +1558,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           updated_at: new Date().toISOString()
                         }))
                       })}
-                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition"
+                      className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 transition min-h-[42px]"
                     >
                       <Printer className="w-4 h-4" />
                       <span>طباعة الكشف</span>
@@ -1505,14 +1568,14 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                       type="button"
                       disabled={isSavingNewSheet}
                       onClick={handleSaveNewZoneSheet}
-                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition flex-1 sm:flex-initial"
+                      className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition min-h-[42px]"
                     >
                       {isSavingNewSheet ? (
                         <RefreshCw className="w-4 h-4 animate-spin" />
                       ) : (
                         <>
                           <Check className="w-4 h-4" />
-                          <span>حفظ كشف التسليم (Save Sheet)</span>
+                          <span>حفظ الكشف</span>
                         </>
                       )}
                     </button>
@@ -1576,7 +1639,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {zones.map(z => {
                     const total = z.total_orders || 0;
                     const delivered = z.delivered_orders || 0;
@@ -1586,16 +1649,16 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                     return (
                       <div
                         key={z.id}
-                        className="bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 rounded-3xl p-5 shadow-xl transition-all duration-200 flex flex-col justify-between group"
+                        className="bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 rounded-3xl p-4 sm:p-5 shadow-xl transition-all duration-200 flex flex-col justify-between group"
                       >
                         <div className="space-y-3">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <h3 className="text-base font-black text-white group-hover:text-indigo-300 transition">
+                              <h3 className="text-sm sm:text-base font-black text-white group-hover:text-indigo-300 transition">
                                 {z.name}
                               </h3>
-                              <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                                <User className="w-3.5 h-3.5 text-slate-500" />
+                              <p className="text-[10px] sm:text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                <User className="w-3 h-3 text-slate-500" />
                                 <span>أنشئ بواسطة: {z.created_by || 'Admin'}</span>
                               </p>
                             </div>
@@ -1612,7 +1675,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                                 style={{ width: `${progress}%` }}
                               />
                             </div>
-                            <div className="flex items-center justify-between text-[11px] font-mono">
+                            <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-mono">
                               <span className="text-emerald-400 font-bold">{delivered} مستلم</span>
                               <span className="text-amber-400 font-bold">{pending} متبقي</span>
                               <span className="text-slate-400">إجمالي: {total}</span>
@@ -1620,11 +1683,11 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           </div>
                         </div>
 
-                        <div className="pt-4 mt-4 border-t border-slate-800/80 flex items-center gap-2">
+                        <div className="pt-3.5 mt-3.5 border-t border-slate-800/80 flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => openDeliverySheet(z.id)}
-                            className="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/30 transition"
+                            className="flex-1 py-2.5 px-3 sm:px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/30 transition min-h-[42px]"
                           >
                             <span>فتح الكشف للتسليم</span>
                             <ArrowRight className="w-4 h-4 rotate-180" />
@@ -1633,7 +1696,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           <button
                             type="button"
                             onClick={() => handlePrintSheet(z)}
-                            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition min-h-[42px] min-w-[42px] flex items-center justify-center"
                             title="طباعة الكشف"
                           >
                             <Printer className="w-4 h-4" />
@@ -1649,10 +1712,10 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
           {/* VIEW B: INSIDE THE OPENED DELIVERY SHEET */}
           {openedZoneId && openedZone && (
-            <div className="space-y-6 animate-in fade-in">
+            <div className="space-y-4 sm:space-y-6 animate-in fade-in">
               {/* Top Navigation & Sheet Header */}
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
@@ -1660,29 +1723,29 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                         setOpenedZoneId(null);
                         setOpenedZone(null);
                       }}
-                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+                      className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex-shrink-0"
                       title="العودة لجميع الكشوفات"
                     >
                       <ArrowRight className="w-4 h-4" />
                     </button>
                     <div>
-                      <h2 className="text-lg font-black text-white flex items-center gap-2">
+                      <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2 flex-wrap">
                         <span>{openedZone.name}</span>
-                        <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full font-bold">
+                        <span className="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-bold">
                           محطة التسليم الميداني
                         </span>
                       </h2>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
                         مشرف الكشف: <strong>{openedZone.created_by}</strong> &bull; تاريخ الإنشاء: {new Date(openedZone.created_at).toLocaleDateString('ar-EG')}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={() => handlePrintSheet(openedZone)}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 transition"
+                      className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition min-h-[40px]"
                     >
                       <Printer className="w-4 h-4" />
                       <span>طباعة الكشف</span>
@@ -1691,7 +1754,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                       type="button"
                       onClick={() => openDeliverySheet(openedZone.id)}
                       disabled={isLoadingOpenedZone}
-                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                      className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition min-h-[40px] min-w-[40px] flex items-center justify-center"
                       title="تحديث البيانات"
                     >
                       <RefreshCw className={`w-4 h-4 ${isLoadingOpenedZone ? 'animate-spin' : ''}`} />
@@ -1700,22 +1763,22 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 </div>
 
                 {/* Progress KPIs */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-800">
-                  <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 text-center">
-                    <span className="block text-[11px] text-slate-400 font-bold">إجمالي الطلبات</span>
-                    <span className="font-mono font-black text-lg text-white">{openedZone.total_orders || 0}</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 pt-3 border-t border-slate-800">
+                  <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-2.5 sm:p-3 text-center">
+                    <span className="block text-[10px] sm:text-[11px] text-slate-400 font-bold">إجمالي الطلبات</span>
+                    <span className="font-mono font-black text-base sm:text-lg text-white">{openedZone.total_orders || 0}</span>
                   </div>
-                  <div className="bg-slate-950/80 border border-emerald-900/40 rounded-2xl p-3 text-center">
-                    <span className="block text-[11px] text-emerald-400 font-bold">تم التسليم ✅</span>
-                    <span className="font-mono font-black text-lg text-emerald-400">{openedZone.delivered_orders || 0}</span>
+                  <div className="bg-slate-950/80 border border-emerald-900/40 rounded-2xl p-2.5 sm:p-3 text-center">
+                    <span className="block text-[10px] sm:text-[11px] text-emerald-400 font-bold">تم التسليم ✅</span>
+                    <span className="font-mono font-black text-base sm:text-lg text-emerald-400">{openedZone.delivered_orders || 0}</span>
                   </div>
-                  <div className="bg-slate-950/80 border border-amber-900/40 rounded-2xl p-3 text-center">
-                    <span className="block text-[11px] text-amber-400 font-bold">قيد التسليم ⏳</span>
-                    <span className="font-mono font-black text-lg text-amber-400">{openedZone.pending_orders || 0}</span>
+                  <div className="bg-slate-950/80 border border-amber-900/40 rounded-2xl p-2.5 sm:p-3 text-center">
+                    <span className="block text-[10px] sm:text-[11px] text-amber-400 font-bold">قيد التسليم ⏳</span>
+                    <span className="font-mono font-black text-base sm:text-lg text-amber-400">{openedZone.pending_orders || 0}</span>
                   </div>
-                  <div className="bg-slate-950/80 border border-indigo-900/40 rounded-2xl p-3 text-center">
-                    <span className="block text-[11px] text-indigo-400 font-bold">نسبة الإنجاز</span>
-                    <span className="font-mono font-black text-lg text-indigo-300">
+                  <div className="bg-slate-950/80 border border-indigo-900/40 rounded-2xl p-2.5 sm:p-3 text-center">
+                    <span className="block text-[10px] sm:text-[11px] text-indigo-400 font-bold">نسبة الإنجاز</span>
+                    <span className="font-mono font-black text-base sm:text-lg text-indigo-300">
                       {openedZone.total_orders && openedZone.total_orders > 0
                         ? Math.round(((openedZone.delivered_orders || 0) / openedZone.total_orders) * 100)
                         : 0}%
@@ -1725,8 +1788,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
               </div>
 
               {/* SEARCH ORDERS BY CODE (Critical Requirement) */}
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
-                <form onSubmit={handleDeliverySearchByCode} className="flex flex-col sm:flex-row gap-3">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-3.5 sm:space-y-4">
+                <form onSubmit={handleDeliverySearchByCode} className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
                   <div className="relative flex-1">
                     <Search className="w-5 h-5 absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -1745,14 +1808,14 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           handleDeliverySearchByCode();
                         }
                       }}
-                      placeholder="امسح الباركود بالكاميرا أو اكتب كود الطلب أو اسم الطالب أو الموبايل واضغط Enter..."
-                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl pr-12 pl-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition font-mono font-bold"
+                      placeholder="امسح الباركود أو اكتب الكود أو الاسم أو الموبايل واضغط Enter..."
+                      className="w-full bg-slate-950 border border-slate-800 rounded-2xl pr-12 pl-4 py-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition font-mono font-bold"
                     />
                   </div>
 
                   <button
                     type="submit"
-                    className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition flex-shrink-0"
+                    className="px-5 sm:px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition flex-shrink-0 min-h-[46px]"
                   >
                     <Search className="w-4 h-4" />
                     <span>بحث وتحديد الطلب</span>
@@ -1778,12 +1841,12 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 )}
 
                 {/* Filters */}
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
-                  <span className="text-xs text-slate-400 font-bold ml-2">فلترة الكشف:</span>
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80 overflow-x-auto pb-1 scrollbar-none">
+                  <span className="text-xs text-slate-400 font-bold ml-1 whitespace-nowrap">فلترة:</span>
                   <button
                     type="button"
                     onClick={() => setDeliveryFilter('all')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
                       deliveryFilter === 'all'
                         ? 'bg-indigo-600 text-white'
                         : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
@@ -1794,7 +1857,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   <button
                     type="button"
                     onClick={() => setDeliveryFilter('pending')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
                       deliveryFilter === 'pending'
                         ? 'bg-amber-600 text-white'
                         : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
@@ -1805,7 +1868,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   <button
                     type="button"
                     onClick={() => setDeliveryFilter('delivered')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
                       deliveryFilter === 'delivered'
                         ? 'bg-emerald-600 text-white'
                         : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
@@ -1816,9 +1879,10 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 </div>
               </div>
 
-              {/* Orders Table */}
+              {/* Orders Container (Desktop Table + Mobile Cards) */}
               <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-                <div className="overflow-x-auto">
+                {/* Desktop View Table (hidden on mobile, visible on md+) */}
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-right text-xs">
                     <thead className="bg-slate-950/90 text-slate-400 font-bold border-b border-slate-800">
                       <tr>
@@ -1930,6 +1994,127 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                     </tbody>
                   </table>
                 </div>
+
+                {/* Mobile View Cards (md:hidden) - Optimized for smartphones & touch */}
+                <div className="md:hidden divide-y divide-slate-800/80">
+                  {filteredOpenedOrders.length === 0 ? (
+                    <div className="p-8 text-center text-slate-500 text-xs">
+                      لا توجد طلبات تطابق الفلتر الحالي في هذا الكشف.
+                    </div>
+                  ) : (
+                    filteredOpenedOrders.map((ord, idx) => {
+                      const isDelivered = ord.delivery_status === 'delivered';
+                      const isHighlighted = highlightedOrderId === ord.order_id;
+                      const isUpdating = statusUpdatingOrderId === ord.order_id;
+
+                      return (
+                        <div
+                          key={ord.order_id}
+                          ref={el => {
+                            // Support smooth scroll & highlight on mobile screen
+                            if (el) orderRowRefs.current[ord.order_id] = el;
+                          }}
+                          className={`p-4 space-y-3 transition-all duration-300 ${
+                            isHighlighted
+                              ? 'bg-amber-500/20 ring-2 ring-amber-400'
+                              : isDelivered
+                              ? 'bg-emerald-950/20'
+                              : 'bg-slate-900/50 hover:bg-slate-800/30'
+                          }`}
+                        >
+                          {/* Card Header: Order Code, Index, Status */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-bold text-slate-500">#{idx + 1}</span>
+                              <span className="font-mono font-black text-xs sm:text-sm text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-lg" dir="ltr">
+                                #{ord.order_code.replace(/^#/, '')}
+                              </span>
+                            </div>
+
+                            {isDelivered ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                <span>تم التسليم</span>
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-amber-400" />
+                                <span>قيد التسليم</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Student Info & Phone Call Link */}
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block font-medium">اسم الطالب:</span>
+                              <span className="font-bold text-white text-sm">{ord.customer_name}</span>
+                            </div>
+                            {ord.customer_phone && (
+                              <a
+                                href={`tel:${ord.customer_phone}`}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-indigo-300 hover:text-white text-xs font-mono font-bold transition active:bg-indigo-600/20"
+                                dir="ltr"
+                              >
+                                <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>{ord.customer_phone}</span>
+                              </a>
+                            )}
+                          </div>
+
+                          {/* Order Details / Items */}
+                          <div className="pt-0.5">
+                            <span className="text-[10px] text-slate-400 block font-medium mb-1">المحتويات:</span>
+                            <OrderItemsList text={ord.items_summary || ord.order_details} items={ord.items} />
+                          </div>
+
+                          {/* Delivery Time & Admin Meta */}
+                          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
+                            <span className="text-[11px] text-slate-400">
+                              موعد التسليم: <strong className="text-indigo-300 font-mono">{ord.delivery_time}</strong>
+                            </span>
+                            {isDelivered && ord.delivered_by && (
+                              <span className="text-[10px] text-slate-400">
+                                بواسطة: <span className="text-slate-200 font-bold">{ord.delivered_by}</span>
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Action Button: Touch-optimized */}
+                          <div className="pt-1">
+                            {isDelivered ? (
+                              <button
+                                type="button"
+                                disabled={isUpdating}
+                                onClick={() => setUndoModalOrder(ord)}
+                                className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-[0.99]"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                                <span>تراجع عن التسليم (إعادة لقيد التسليم)</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isUpdating}
+                                onClick={() => handleMarkAsDelivered(ord)}
+                                className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition active:scale-[0.98] min-h-[48px]"
+                              >
+                                {isUpdating ? (
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Check className="w-5 h-5" />
+                                    <span>تسليم الطلب للطالب الآن</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -1970,7 +2155,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   <p className="text-xs">لا توجد كشوفات للتعديل. أنشئ كشفاً أولاً من تبويب إنشاء زون جديد.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   {zones.map(z => {
                     const total = z.total_orders || 0;
                     const delivered = z.delivered_orders || 0;
@@ -1979,17 +2164,17 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                     return (
                       <div
                         key={z.id}
-                        className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between space-y-4"
+                        className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col justify-between space-y-4"
                       >
                         <div className="space-y-2">
-                          <h3 className="text-base font-black text-white">{z.name}</h3>
-                          <div className="text-[11px] text-slate-400 space-y-1">
+                          <h3 className="text-sm sm:text-base font-black text-white">{z.name}</h3>
+                          <div className="text-[10px] sm:text-[11px] text-slate-400 space-y-0.5">
                             <p>أنشئ بواسطة: <strong className="text-slate-300">{z.created_by}</strong></p>
                             <p>تاريخ الإنشاء: <span className="font-mono">{new Date(z.created_at).toLocaleDateString('ar-EG')}</span></p>
                             <p>آخر تحديث: <span className="font-mono">{new Date(z.updated_at).toLocaleDateString('ar-EG')}</span></p>
                           </div>
 
-                          <div className="flex items-center gap-2 pt-2 text-[11px] font-mono">
+                          <div className="flex items-center gap-2 pt-2 text-[10px] sm:text-[11px] font-mono flex-wrap">
                             <span className="px-2 py-0.5 rounded bg-slate-950 text-slate-300 border border-slate-800">
                               إجمالي: {total}
                             </span>
@@ -2007,7 +2192,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           <button
                             type="button"
                             onClick={() => startEditingZone(z.id)}
-                            className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition"
+                            className="flex-1 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition min-h-[42px]"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                             <span>تعديل الكشف</span>
@@ -2016,7 +2201,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           <button
                             type="button"
                             onClick={() => handlePrintSheet(z)}
-                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition min-h-[42px] min-w-[42px] flex items-center justify-center"
                             title="طباعة الكشف"
                           >
                             <Printer className="w-4 h-4" />
@@ -2025,7 +2210,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           <button
                             type="button"
                             onClick={() => setDeleteConfirmZone(z)}
-                            className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
+                            className="p-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition min-h-[42px] min-w-[42px] flex items-center justify-center"
                             title="حذف الكشف"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -2041,8 +2226,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
           {/* EDITING INTERFACE FOR SELECTED ZONE */}
           {editingZoneId && editingZone && (
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-6 animate-in fade-in">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-5 sm:space-y-6 animate-in fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -2050,24 +2235,24 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                       setEditingZoneId(null);
                       setEditingZone(null);
                     }}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+                    className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex-shrink-0"
                   >
                     <ArrowRight className="w-4 h-4" />
                   </button>
                   <div>
-                    <h2 className="text-lg font-black text-white">تعديل كشف: {editingZone.name}</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      تعديل الاسم وإضافة/حذف طلبات. لاحظ أن التعديل يحافظ على حالات التسليم السابقة ولا يحذف أي طلب من المتجر.
+                    <h2 className="text-base sm:text-lg font-black text-white">تعديل كشف: {editingZone.name}</h2>
+                    <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
+                      تعديل الاسم وإضافة/حذف طلبات. يحافظ التعديل على حالات التسليم السابقة.
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto">
                   <button
                     type="button"
                     disabled={isSavingEdit}
                     onClick={handleSaveEditZone}
-                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition"
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition min-h-[42px]"
                   >
                     {isSavingEdit ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
@@ -2095,13 +2280,13 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
               </div>
 
               {/* Add Order to this Zone */}
-              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3 sm:p-4 space-y-3">
                 <h3 className="text-xs font-bold text-slate-300 flex items-center gap-2">
                   <Plus className="w-4 h-4 text-emerald-400" />
                   <span>إضافة طلب جديد إلى هذا الكشف</span>
                 </h3>
 
-                <form onSubmit={handleSearchOrderForEdit} className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <form onSubmit={handleSearchOrderForEdit} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 sm:gap-3">
                   <div className="sm:col-span-6">
                     <input
                       type="text"
@@ -2114,7 +2299,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                         }
                       }}
                       placeholder="رقم أو كود الطلب أو اسم الطالب أو الموبايل واضغط Enter..."
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                   <div className="sm:col-span-4">
@@ -2123,14 +2308,14 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                       value={editSearchOrderTime}
                       onChange={e => setEditSearchOrderTime(e.target.value)}
                       placeholder="موعد التسليم (مثل: 10:00 ص - 11:30 ص)"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                   <div className="sm:col-span-2">
                     <button
                       type="submit"
                       disabled={isEditSearching}
-                      className="w-full h-full min-h-[36px] bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1"
+                      className="w-full h-full min-h-[40px] bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition"
                     >
                       {isEditSearching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : 'بحث'}
                     </button>
@@ -2138,17 +2323,19 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 </form>
 
                 {editFoundOrder && (
-                  <div className="bg-emerald-950/30 border border-emerald-500/40 rounded-xl p-3 flex items-center justify-between gap-3">
+                  <div className="bg-emerald-950/30 border border-emerald-500/40 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="text-xs">
                       <span className="font-mono font-bold text-amber-300 ml-2" dir="ltr">#{editFoundOrder.order_code.replace(/^#/, '')}</span>
                       <span className="font-bold text-white ml-2">{editFoundOrder.customer_name}</span>
                       <span className="text-slate-400 font-mono" dir="ltr">{editFoundOrder.customer_phone}</span>
-                      <p className="text-[11px] text-slate-300 mt-1">{cleanDisplayOrderDetails(editFoundOrder.items_summary)}</p>
+                      <div className="pt-1">
+                        <OrderItemsList text={editFoundOrder.items_summary} items={editFoundOrder.items} />
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={handleAddFoundOrderToEditZone}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition flex-shrink-0"
+                      className="w-full sm:w-auto px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition flex-shrink-0"
                     >
                       إضافة للكشف
                     </button>
@@ -2162,7 +2349,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   الطلبات المدرجة في الكشف ({editingZone.orders?.length || 0} طلب)
                 </h3>
 
-                <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+                {/* Desktop View Table */}
+                <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
                   <table className="w-full text-right text-xs">
                     <thead className="bg-slate-900/90 text-slate-400 font-bold border-b border-slate-800">
                       <tr>
@@ -2250,6 +2438,104 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                       })}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Mobile View Cards (md:hidden) */}
+                <div className="md:hidden space-y-3">
+                  {editingZone.orders?.map((ord, idx) => {
+                    const isDelivered = ord.delivery_status === 'delivered';
+                    return (
+                      <div key={ord.order_id} className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-slate-500">#{idx + 1}</span>
+                            <span className="font-mono font-black text-amber-300 text-xs bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md" dir="ltr">
+                              #{ord.order_code.replace(/^#/, '')}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {isDelivered ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                مستلم ✅
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                قيد التسليم
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveOrderFromEditZone(ord.order_id)}
+                              className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
+                              title="إزالة من الكشف"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
+                          <span className="font-bold text-white text-sm">{ord.customer_name}</span>
+                          {ord.customer_phone && (
+                            <a
+                              href={`tel:${ord.customer_phone}`}
+                              className="font-mono text-slate-300 text-xs flex items-center gap-1 bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
+                              dir="ltr"
+                            >
+                              <Phone className="w-3 h-3 text-emerald-400" />
+                              <span>{ord.customer_phone}</span>
+                            </a>
+                          )}
+                        </div>
+
+                        <div>
+                          <OrderItemsList text={ord.items_summary || ord.order_details} items={ord.items} />
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 flex-1">
+                            <span className="text-[11px] text-slate-400 whitespace-nowrap">الموعد:</span>
+                            <input
+                              type="text"
+                              value={ord.delivery_time}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setEditingZone(prev => {
+                                  if (!prev || !prev.orders) return prev;
+                                  const updated = prev.orders.map((o, i) => i === idx ? { ...o, delivery_time: val } : o);
+                                  return { ...prev, orders: updated };
+                                });
+                              }}
+                              className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-center text-indigo-200 focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+
+                          {/* Touch-friendly reorder controls */}
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveOrderInEdit(idx, 'up')}
+                              disabled={idx === 0}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 min-h-[32px] min-w-[32px] flex items-center justify-center"
+                              title="تحريك لأعلى"
+                            >
+                              <ChevronUp className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveOrderInEdit(idx, 'down')}
+                              disabled={idx === (editingZone.orders?.length || 1) - 1}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 min-h-[32px] min-w-[32px] flex items-center justify-center"
+                              title="تحريك لأسفل"
+                            >
+                              <ChevronDown className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
