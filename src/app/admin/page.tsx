@@ -59,6 +59,7 @@ import {
   X
 } from 'lucide-react';
 import { Product, ProductAddon, Order, StoreSettings, IncomingTransaction, GatewayDevice } from '@/types';
+import DeliveryZonesManager from '@/components/admin/DeliveryZonesManager';
 import { cleanDisplayNotes, addDeletedProductId, saveSettingsToSupabase, updateOrderInSupabase, parseAttendeesAndCleanOpt, clearOrdersInSupabase, deleteOrderFromSupabase, cleanupBase64InSupabase, decodeProdMeta } from '@/lib/supabaseClient';
 import { normalizePhoneNumber, isValidEgyptianPhone } from '@/lib/smsParser';
 import { compressImageFile } from '@/lib/imageCompressor';
@@ -326,7 +327,7 @@ export default function AdminDashboardPage() {
   const [currentAdmin, setCurrentAdmin] = useState<{ id: string; username: string; display_name: string; role: string } | null>(null);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'admins' | 'settings' | 'sms' | 'gateway' | 'analytics' | 'maintenance'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'delivery_zones' | 'products' | 'admins' | 'settings' | 'sms' | 'gateway' | 'analytics' | 'maintenance'>('orders');
 
   // Data state
   const [orders, setOrders] = useState<Order[]>([]);
@@ -3140,6 +3141,7 @@ export default function AdminDashboardPage() {
       items: [
         { id: 'analytics', label: 'إحصائيات ومبيعات 📊', badge: 'حي', badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', icon: BarChart3 },
         { id: 'orders', label: 'إدارة الطلبات', badge: totalEventTickets > 0 ? `${orders.length} | 🎟️ ${totalEventTickets}` : `${orders.length}`, badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30', icon: ShoppingBag },
+        { id: 'delivery_zones', label: 'زونات التسليم (Delivery Zones) 🚚', badge: 'جديد', badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', icon: Layers },
         { id: 'products', label: 'المنتجات والمعرض', badge: `${products.length}`, badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30', icon: Package }
       ]
     },
@@ -3344,6 +3346,11 @@ export default function AdminDashboardPage() {
       {/* Main Content Area */}
       <main className="flex-1 w-full max-w-full px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         
+        {/* --- DELIVERY ZONES TAB --- */}
+        {activeTab === 'delivery_zones' && (
+          <DeliveryZonesManager currentAdmin={currentAdmin} />
+        )}
+
         {/* --- ORDERS TAB --- */}
         {activeTab === 'orders' && (
           <div className="space-y-4 sm:space-y-6">

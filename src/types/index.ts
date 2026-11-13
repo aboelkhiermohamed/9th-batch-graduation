@@ -181,3 +181,44 @@ export interface CustomerUser {
   full_name: string;
   created_at?: string;
 }
+
+// Delivery Zones Management Types
+export type DeliveryItemSummary = {
+  product_title: string;
+  selected_size?: string;
+  quantity: number;
+  custom_text?: string;
+  customization_option?: string;
+};
+
+export interface DeliveryZoneOrder {
+  id: string;
+  zone_id: string;
+  order_id: string;
+  order_code: string;
+  customer_name: string;
+  customer_phone: string;
+  order_details?: string;
+  items_summary?: string;
+  items?: DeliveryItemSummary[];
+  delivery_time: string;
+  delivery_status: 'pending' | 'delivered';
+  delivered_at?: string | null;
+  delivered_by?: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  total_orders?: number;
+  delivered_orders?: number;
+  pending_orders?: number;
+  orders?: DeliveryZoneOrder[];
+}
+
