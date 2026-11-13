@@ -19,6 +19,7 @@ import {
   Phone,
   Check,
   X,
+  Save,
   Filter,
   ArrowRight,
   ChevronDown,
@@ -87,6 +88,62 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
     delivery_time: string;
   }[]>([]);
   const [isSavingNewSheet, setIsSavingNewSheet] = useState(false);
+
+  // Local storage draft key for unsaved new sheets
+  const DRAFT_STORAGE_KEY = 'graduation_delivery_create_draft';
+
+  // 1. Restore draft on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed.name) setCreateZoneName(parsed.name);
+          if (parsed.defaultTime) setCreateDefaultTime(parsed.defaultTime);
+          if (Array.isArray(parsed.orders) && parsed.orders.length > 0) {
+            setCreateSheetOrders(parsed.orders);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed restoring create sheet draft:', e);
+      }
+    }
+  }, []);
+
+  // 2. Auto-save draft on every change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        if (createSheetOrders.length > 0) {
+          localStorage.setItem(
+            DRAFT_STORAGE_KEY,
+            JSON.stringify({
+              name: createZoneName,
+              defaultTime: createDefaultTime,
+              orders: createSheetOrders
+            })
+          );
+        } else {
+          localStorage.removeItem(DRAFT_STORAGE_KEY);
+        }
+      } catch (e) {
+        console.warn('Failed saving create sheet draft:', e);
+      }
+    }
+  }, [createZoneName, createDefaultTime, createSheetOrders]);
+
+  // 3. Warn user before leaving/refreshing if they have unsaved orders
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (createSheetOrders.length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [createSheetOrders.length]);
 
   // -------------------------------------------------------------
   // SUB-SECTION 2: ZONES DELIVERY STATE
@@ -257,10 +314,13 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
       showToast(`تم إنشاء كشف "${name}" بنجاح بإجمالي ${createSheetOrders.length} طلب`, 'success');
 
-      // Reset form
+      // Reset form and remove draft
       setCreateSheetOrders([]);
       setCreateZoneName('Zone B - كشف جديد');
       setFoundOrder(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+      }
 
       // Refresh zones list and navigate to Delivery section
       await fetchZonesList();
@@ -1087,13 +1147,26 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {createSheetOrders.length > 0 && (
+                  <span className="text-[11px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-bold animate-in fade-in">
+                    <Save className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>المسودة محفوظة تلقائياً ضد الـ Refresh</span>
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => {
+                    if (createSheetOrders.length > 0 && !confirm('هل أنت متأكد من رغبتك في مسح مسودة الكشف الحالي؟')) {
+                      return;
+                    }
                     setCreateSheetOrders([]);
                     setFoundOrder(null);
                     setCreateSearchQuery('');
+                    if (typeof window !== 'undefined') {
+                      localStorage.removeItem(DRAFT_STORAGE_KEY);
+                    }
+                    showToast('تم مسح مسودة الكشف', 'info');
                   }}
                   className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
                 >
