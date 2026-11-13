@@ -36,6 +36,18 @@ interface DeliveryZonesManagerProps {
   currentAdmin: { id: string; username: string; display_name: string; role: string } | null;
 }
 
+// Clean internal image tags, brackets, and metadata markers for human presentation
+export function cleanDisplayOrderDetails(text?: string | null): string {
+  if (!text) return 'بدون تفاصيل';
+  return text
+    .replace(/\[IMG:[\s\S]*?\]/gi, '')
+    .replace(/\[ATTENDEES:[\s\S]*?\]/gi, '')
+    .replace(/\[الإضافات:[\s\S]*?\]/gi, '')
+    .replace(/\[التطريز:[\s\S]*?\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim() || 'بدون تفاصيل';
+}
+
 export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesManagerProps) {
   // Navigation: Sub-sections
   const [subTab, setSubTab] = useState<'create' | 'delivery' | 'edit'>('delivery');
@@ -754,7 +766,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
           <td style="font-family: monospace; font-weight: 900; font-size: 13px; color: #0f172a; text-align: center;">${ord.order_code}</td>
           <td style="font-weight: 700; color: #0f172a;">${ord.customer_name}</td>
           <td style="font-family: monospace; font-size: 11px; color: #334155; text-align: center;" dir="ltr">${ord.customer_phone}</td>
-          <td style="font-size: 11px; color: #1e293b; line-height: 1.4;">${ord.items_summary || ord.order_details || 'بدون تفاصيل'}</td>
+          <td style="font-size: 11px; color: #1e293b; line-height: 1.4;">${cleanDisplayOrderDetails(ord.items_summary || ord.order_details)}</td>
           <td style="text-align: center; font-size: 11px; font-weight: 600; color: #4338ca;">${ord.delivery_time}</td>
           <td style="text-align: center;">${statusBadge}</td>
           <td style="width: 80px; text-align: center; border-bottom: 1px dashed #cbd5e1;"></td>
@@ -1176,20 +1188,22 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 <div className="bg-indigo-950/40 border border-indigo-500/40 rounded-2xl p-4 animate-in fade-in slide-in-from-top-2">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-sm text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded-lg border border-amber-500/30">
-                          #{foundOrder.order_code}
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="font-mono font-black text-sm text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded-lg border border-amber-500/30" dir="ltr">
+                          #{foundOrder.order_code.replace(/^#/, '')}
                         </span>
                         <span className="font-bold text-white text-sm">{foundOrder.customer_name}</span>
-                        <span className="text-xs font-mono text-slate-400" dir="ltr">{foundOrder.customer_phone}</span>
+                        <span className="text-xs font-mono text-slate-300 bg-slate-900/80 px-2.5 py-0.5 rounded-lg border border-slate-800" dir="ltr">
+                          {foundOrder.customer_phone}
+                        </span>
                       </div>
-                      <p className="text-xs text-indigo-200">
+                      <p className="text-xs text-indigo-200 leading-relaxed">
                         <strong className="text-indigo-300 font-bold">المحتويات: </strong>
-                        {foundOrder.items_summary}
+                        <span className="text-slate-100 font-medium">{cleanDisplayOrderDetails(foundOrder.items_summary)}</span>
                       </p>
                       <p className="text-[11px] text-slate-400">
                         <strong className="text-slate-300">موعد التسليم: </strong>
-                        {createCustomTime || createDefaultTime}
+                        <span className="text-indigo-300 font-mono font-bold">{createCustomTime || createDefaultTime}</span>
                       </p>
                     </div>
 
@@ -1245,7 +1259,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           <td className="py-3 px-4 text-center font-mono font-bold text-amber-300">{ord.order_code}</td>
                           <td className="py-3 px-4 font-bold text-white">{ord.customer_name}</td>
                           <td className="py-3 px-4 text-center font-mono text-slate-400" dir="ltr">{ord.customer_phone}</td>
-                          <td className="py-3 px-4 text-[11px] text-slate-300 max-w-xs">{ord.items_summary}</td>
+                          <td className="py-3 px-4 text-[11px] text-slate-300 max-w-xs leading-relaxed">{cleanDisplayOrderDetails(ord.items_summary)}</td>
                           <td className="py-3 px-4 text-center">
                             <input
                               type="text"
@@ -1678,7 +1692,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                                 {ord.customer_phone}
                               </td>
                               <td className="py-3.5 px-4 text-[11px] text-slate-300 max-w-xs leading-relaxed">
-                                {ord.items_summary || ord.order_details}
+                                {cleanDisplayOrderDetails(ord.items_summary || ord.order_details)}
                               </td>
                               <td className="py-3.5 px-4 text-center font-mono text-indigo-300 font-bold">
                                 {ord.delivery_time}
@@ -1950,14 +1964,15 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 {editFoundOrder && (
                   <div className="bg-emerald-950/30 border border-emerald-500/40 rounded-xl p-3 flex items-center justify-between gap-3">
                     <div className="text-xs">
-                      <span className="font-mono font-bold text-amber-300 ml-2">#{editFoundOrder.order_code}</span>
+                      <span className="font-mono font-bold text-amber-300 ml-2" dir="ltr">#{editFoundOrder.order_code.replace(/^#/, '')}</span>
                       <span className="font-bold text-white ml-2">{editFoundOrder.customer_name}</span>
                       <span className="text-slate-400 font-mono" dir="ltr">{editFoundOrder.customer_phone}</span>
+                      <p className="text-[11px] text-slate-300 mt-1">{cleanDisplayOrderDetails(editFoundOrder.items_summary)}</p>
                     </div>
                     <button
                       type="button"
                       onClick={handleAddFoundOrderToEditZone}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition"
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition flex-shrink-0"
                     >
                       إضافة للكشف
                     </button>
@@ -1995,7 +2010,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                             <td className="py-3 px-3 text-center font-mono font-bold text-amber-300">#{ord.order_code}</td>
                             <td className="py-3 px-3 font-bold text-white">{ord.customer_name}</td>
                             <td className="py-3 px-3 text-center font-mono text-slate-400" dir="ltr">{ord.customer_phone}</td>
-                            <td className="py-3 px-3 text-[11px] text-slate-300 max-w-xs">{ord.items_summary}</td>
+                            <td className="py-3 px-3 text-[11px] text-slate-300 max-w-xs leading-relaxed">{cleanDisplayOrderDetails(ord.items_summary || ord.order_details)}</td>
                             <td className="py-3 px-3 text-center">
                               <input
                                 type="text"

@@ -64,6 +64,18 @@ function generateUUID(): string {
   return 'z' + Date.now().toString(16).padStart(11, '0') + '-4000-8000-' + Math.random().toString(36).substring(2, 10);
 }
 
+// Helper to clean meta markers from product titles and customization text
+export function cleanTextMeta(raw?: string | null): string {
+  if (!raw) return '';
+  return raw
+    .replace(/\[IMG:[\s\S]*?\]/gi, '')
+    .replace(/\[ATTENDEES:[\s\S]*?\]/gi, '')
+    .replace(/\[الإضافات:[\s\S]*?\]/gi, '')
+    .replace(/\[التطريز:[\s\S]*?\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Format items into clean human-readable summary for printing & display
 export function formatOrderItemsSummary(items: any[]): { summary: string; parsedItems: DeliveryItemSummary[] } {
   if (!items || items.length === 0) {
@@ -71,11 +83,11 @@ export function formatOrderItemsSummary(items: any[]): { summary: string; parsed
   }
 
   const parsedItems: DeliveryItemSummary[] = items.map(item => ({
-    product_title: item.product_title || 'منتج',
-    selected_size: item.selected_size || undefined,
+    product_title: cleanTextMeta(item.product_title) || 'منتج',
+    selected_size: item.selected_size ? cleanTextMeta(item.selected_size) : undefined,
     quantity: Number(item.quantity || 1),
-    custom_text: item.custom_text || undefined,
-    customization_option: item.customization_option || undefined
+    custom_text: item.custom_text ? cleanTextMeta(item.custom_text) : undefined,
+    customization_option: item.customization_option ? cleanTextMeta(item.customization_option) : undefined
   }));
 
   const parts = parsedItems.map(item => {
@@ -338,6 +350,8 @@ export async function getDeliveryZoneById(zoneId: string): Promise<DeliveryZone 
         if (dbOrders && dbOrders.length > 0) {
           const orderMap = new Map(dbOrders.map(o => [o.id, o]));
           found.orders.forEach(o => {
+            o.order_details = cleanTextMeta(o.order_details);
+            o.items_summary = cleanTextMeta(o.items_summary);
             const live = orderMap.get(o.order_id);
             if (live) {
               o.order_code = live.order_code || o.order_code;
