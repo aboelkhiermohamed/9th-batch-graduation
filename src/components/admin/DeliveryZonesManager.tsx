@@ -29,7 +29,8 @@ import {
   RefreshCw,
   Sparkles,
   SlidersHorizontal,
-  ExternalLink
+  ExternalLink,
+  LayoutGrid
 } from 'lucide-react';
 import { DeliveryZone, DeliveryZoneOrder, DeliveryItemSummary } from '@/types';
 
@@ -405,6 +406,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   const [itemDeliveryModalOrder, setItemDeliveryModalOrder] = useState<DeliveryZoneOrder | null>(null);
   const [selectedItemIndices, setSelectedItemIndices] = useState<number[]>([]);
   const [isSavingItemDelivery, setIsSavingItemDelivery] = useState(false);
+  const [viewPreference, setViewPreference] = useState<'auto' | 'cards' | 'table'>('auto');
 
   // Global Unified Search State (for Add-ons, Kids & All Zones)
   const [globalSearchInput, setGlobalSearchInput] = useState('');
@@ -1803,8 +1805,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 </div>
               ) : (
                 <>
-                  {/* Desktop / Tablet Table View */}
-                  <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+                  {/* Desktop Table View (lg+) */}
+                  <div className="hidden lg:block overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
                     <table className="w-full text-right text-xs">
                       <thead className="bg-slate-900/90 text-slate-400 font-bold border-b border-slate-800">
                         <tr>
@@ -1854,8 +1856,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                     </table>
                   </div>
 
-                  {/* Mobile Cards View (< md) */}
-                  <div className="md:hidden space-y-3">
+                  {/* Mobile & Tablet Cards View (< lg) */}
+                  <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-3">
                     {createSheetOrders.map((ord, idx) => (
                       <div key={ord.order_id} className="bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3">
                         <div className="flex items-center justify-between">
@@ -2501,62 +2503,97 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   const deliveredCount = openedZone.orders?.filter(o => o.delivery_status === 'delivered').length || 0;
 
                   return (
-                    <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80 overflow-x-auto pb-1 scrollbar-none">
-                      <span className="text-xs text-slate-400 font-bold ml-1 whitespace-nowrap">فلترة:</span>
-                      <button
-                        type="button"
-                        onClick={() => setDeliveryFilter('all')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
-                          deliveryFilter === 'all'
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                        }`}
-                      >
-                        الكل ({openedZone.orders?.length || 0})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeliveryFilter('pending')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
-                          deliveryFilter === 'pending'
-                            ? 'bg-amber-600 text-white'
-                            : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                        }`}
-                      >
-                        قيد التسليم ({pendingCount})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeliveryFilter('partial')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
-                          deliveryFilter === 'partial'
-                            ? 'bg-amber-500 text-slate-950 font-black'
-                            : 'bg-slate-950 text-amber-400/80 hover:text-amber-300 border border-slate-800'
-                        }`}
-                      >
-                        تسليم جزئي ({partialCount})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeliveryFilter('delivered')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
-                          deliveryFilter === 'delivered'
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                        }`}
-                      >
-                        تم التسليم ({deliveredCount})
-                      </button>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-800/80">
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none flex-1">
+                        <span className="text-xs text-slate-400 font-bold ml-1 whitespace-nowrap">فلترة:</span>
+                        <button
+                          type="button"
+                          onClick={() => setDeliveryFilter('all')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap text-center ${
+                            deliveryFilter === 'all'
+                              ? 'bg-indigo-600 text-white shadow-sm'
+                              : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                          }`}
+                        >
+                          الكل ({openedZone.orders?.length || 0})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeliveryFilter('pending')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap text-center ${
+                            deliveryFilter === 'pending'
+                              ? 'bg-amber-600 text-white shadow-sm'
+                              : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                          }`}
+                        >
+                          قيد التسليم ({pendingCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeliveryFilter('partial')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap text-center ${
+                            deliveryFilter === 'partial'
+                              ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                              : 'bg-slate-950 text-amber-400/80 hover:text-amber-300 border border-slate-800'
+                          }`}
+                        >
+                          تسليم جزئي ({partialCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeliveryFilter('delivered')}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap text-center ${
+                            deliveryFilter === 'delivered'
+                              ? 'bg-emerald-600 text-white shadow-sm'
+                              : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                          }`}
+                        >
+                          تم التسليم ({deliveredCount})
+                        </button>
+                      </div>
+
+                      {/* View Preference Toggle (Cards / Table) */}
+                      <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl p-0.5 self-end sm:self-auto shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setViewPreference(viewPreference === 'cards' ? 'auto' : 'cards')}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 ${
+                            viewPreference === 'cards'
+                              ? 'bg-indigo-600 text-white shadow-sm'
+                              : viewPreference === 'auto'
+                              ? 'text-indigo-300 hover:text-white'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                          title="عرض بنظام البطاقات (مثالي للموبايل والتابلت)"
+                        >
+                          <LayoutGrid className="w-3.5 h-3.5" />
+                          <span>كروت</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setViewPreference(viewPreference === 'table' ? 'auto' : 'table')}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 ${
+                            viewPreference === 'table'
+                              ? 'bg-indigo-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                          title="عرض بنظام الجدول الكلاسيكي"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>جدول</span>
+                        </button>
+                      </div>
                     </div>
                   );
                 })()}
               </div>
 
-              {/* Orders Container (Desktop Table + Mobile Cards) */}
+              {/* Orders Container (Desktop Table + Mobile/Tablet Cards) */}
               <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-                {/* Desktop View Table (hidden on mobile, visible on md+) */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-right text-xs">
+                {/* Desktop / Large Screen Table View */}
+                {(viewPreference === 'table' || viewPreference === 'auto') && (
+                  <div className={`${viewPreference === 'auto' ? 'hidden lg:block' : 'block'} overflow-x-auto`}>
+                    <table className="w-full text-right text-xs">
                     <thead className="bg-slate-950/90 text-slate-400 font-bold border-b border-slate-800">
                       <tr>
                         <th className="py-3.5 px-4 w-12 text-center">#</th>
@@ -2745,11 +2782,13 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                     </tbody>
                   </table>
                 </div>
+              )}
 
-                {/* Mobile View Cards (md:hidden) - Optimized for smartphones & touch */}
-                <div className="md:hidden divide-y divide-slate-800/80">
+              {/* Mobile & Tablet View Cards (Touch-Optimized) */}
+              {(viewPreference === 'cards' || viewPreference === 'auto') && (
+                <div className={`${viewPreference === 'auto' ? 'lg:hidden' : 'block'} p-3 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-3`}>
                   {filteredOpenedOrders.length === 0 ? (
-                    <div className="p-8 text-center text-slate-500 text-xs">
+                    <div className="col-span-full p-8 text-center text-slate-500 text-xs">
                       لا توجد طلبات تطابق الفلتر الحالي في هذا الكشف.
                     </div>
                   ) : (
@@ -2773,14 +2812,14 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           ref={el => {
                             if (el) orderRowRefs.current[ord.order_id] = el;
                           }}
-                          className={`p-4 space-y-3 transition-all duration-300 ${
+                          className={`p-4 space-y-3 transition-all duration-300 rounded-2xl border ${
                             isHighlighted
-                              ? 'bg-amber-500/20 ring-2 ring-amber-400'
+                              ? 'bg-amber-500/20 border-amber-400 ring-2 ring-amber-400'
                               : isDelivered
-                              ? 'bg-emerald-950/20'
+                              ? 'bg-emerald-950/20 border-emerald-500/30'
                               : isPartial
-                              ? 'bg-amber-950/20'
-                              : 'bg-slate-900/50 hover:bg-slate-800/30'
+                              ? 'bg-amber-950/20 border-amber-500/30'
+                              : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
                           }`}
                         >
                           {/* Card Header: Order Code, Index, Status */}
@@ -2930,6 +2969,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                     })
                   )}
                 </div>
+              )}
               </div>
             </div>
           )}
@@ -3164,8 +3204,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   الطلبات المدرجة في الكشف ({editingZone.orders?.length || 0} طلب)
                 </h3>
 
-                {/* Desktop View Table */}
-                <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+                {/* Desktop View Table (lg+) */}
+                <div className="hidden lg:block overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
                   <table className="w-full text-right text-xs">
                     <thead className="bg-slate-900/90 text-slate-400 font-bold border-b border-slate-800">
                       <tr>
@@ -3255,8 +3295,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   </table>
                 </div>
 
-                {/* Mobile View Cards (md:hidden) */}
-                <div className="md:hidden space-y-3">
+                {/* Mobile & Tablet View Cards (< lg) */}
+                <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-3">
                   {editingZone.orders?.map((ord, idx) => {
                     const isDelivered = ord.delivery_status === 'delivered';
                     return (
