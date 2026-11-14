@@ -1314,7 +1314,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
     const rowsHtml = ordersList.map((ord, idx) => {
       const isDelivered = ord.delivery_status === 'delivered';
       const statusBadge = isDelivered
-        ? `<span style="display: inline-block; padding: 2px 8px; background: #ecfdf5; color: #047857; border: 1px solid #10b981; border-radius: 4px; font-weight: bold; font-size: 10px;">تم التسليم (${ord.delivered_by || 'Admin'})</span>`
+        ? `<span style="display: inline-block; padding: 2px 8px; background: #ecfdf5; color: #047857; border: 1px solid #10b981; border-radius: 4px; font-weight: bold; font-size: 10px;">تم التسليم (${ord.delivered_by || 'Admin'})${ord.recipient_name ? `<br><span style="color: #6b21a8; font-size: 9px;">🤝 ${ord.recipient_name}</span>` : ''}</span>`
         : `<span style="display: inline-block; padding: 2px 8px; background: #fff7ed; color: #c2410c; border: 1px solid #f97316; border-radius: 4px; font-weight: bold; font-size: 10px;">قيد التسليم</span>`;
 
       const parsedList = parseOrderDetailsToItems(ord.items_summary || ord.order_details, ord.items);
@@ -1332,7 +1332,6 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
           <td style="text-align: center; font-weight: bold; color: #64748b;">${idx + 1}</td>
           <td style="font-family: monospace; font-weight: 900; font-size: 13px; color: #0f172a; text-align: center;">${ord.order_code}</td>
           <td style="font-weight: 700; color: #0f172a;">${ord.customer_name}</td>
-          <td style="font-family: monospace; font-size: 11px; color: #334155; text-align: center;" dir="ltr">${ord.customer_phone}</td>
           <td style="font-size: 11px; color: #1e293b; line-height: 1.4;">${itemsPrintHtml}</td>
           <td style="text-align: center; font-size: 11px; font-weight: 600; color: #4338ca;">${ord.delivery_time}</td>
           <td style="text-align: center;">${statusBadge}</td>
@@ -1466,13 +1465,12 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
           <thead>
             <tr>
               <th style="width: 28px; text-align: center;">#</th>
-              <th style="width: 95px; text-align: center;">كود الطلب</th>
-              <th style="width: 140px;">اسم الطالب</th>
-              <th style="width: 85px; text-align: center;">رقم الهاتف</th>
+              <th style="width: 100px; text-align: center;">كود الطلب</th>
+              <th style="width: 155px;">اسم الطالب</th>
               <th>تفاصيل ومحتويات الكيس</th>
-              <th style="width: 80px; text-align: center;">موعد التسليم</th>
-              <th style="width: 85px; text-align: center;">الحالة</th>
-              <th style="width: 75px; text-align: center;">توقيع الطالب</th>
+              <th style="width: 85px; text-align: center;">موعد التسليم</th>
+              <th style="width: 90px; text-align: center;">الحالة</th>
+              <th style="width: 80px; text-align: center;">توقيع الطالب</th>
             </tr>
           </thead>
           <tbody>
