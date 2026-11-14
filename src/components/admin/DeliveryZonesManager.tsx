@@ -100,7 +100,17 @@ export function parseOrderDetailsToItems(text?: string | null, rawItems?: Delive
   });
 }
 
-function OrderItemsList({ text, items }: { text?: string | null; items?: DeliveryItemSummary[] }) {
+function OrderItemsList({
+  text,
+  items,
+  deliveredIndices,
+  orderStatus
+}: {
+  text?: string | null;
+  items?: DeliveryItemSummary[];
+  deliveredIndices?: number[];
+  orderStatus?: 'pending' | 'delivered' | 'partial';
+}) {
   const parsed = useMemo(() => parseOrderDetailsToItems(text, items), [text, items]);
 
   if (parsed.length === 0) {
@@ -109,33 +119,60 @@ function OrderItemsList({ text, items }: { text?: string | null; items?: Deliver
 
   return (
     <div className="flex flex-col gap-1.5 py-0.5">
-      {parsed.map((item, idx) => (
-        <div
-          key={idx}
-          className="flex items-center gap-1.5 flex-wrap bg-slate-950/80 border border-slate-800/90 hover:border-slate-700 px-2.5 py-1 rounded-xl text-xs transition"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
-          <span className="font-bold text-white tracking-wide">{item.title}</span>
+      {parsed.map((item, idx) => {
+        const isItemDelivered = orderStatus === 'delivered' || (orderStatus === 'partial' && (deliveredIndices?.includes(idx) ?? false));
+        const isOrderPartial = orderStatus === 'partial';
 
-          {item.size && (
-            <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono font-bold text-[10px]" dir="ltr">
-              مقاس: {item.size}
-            </span>
-          )}
+        return (
+          <div
+            key={idx}
+            className={`flex items-center gap-1.5 flex-wrap px-2.5 py-1.5 rounded-xl text-xs transition border ${
+              isItemDelivered
+                ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-100'
+                : isOrderPartial
+                ? 'bg-amber-950/20 border-amber-500/30 text-slate-300'
+                : 'bg-slate-950/80 border-slate-800/90 hover:border-slate-700 text-white'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+              isItemDelivered ? 'bg-emerald-400 shadow-sm shadow-emerald-400' : 'bg-slate-500'
+            }`} />
+            
+            <span className="font-bold tracking-wide">{item.title}</span>
 
-          {item.qty && item.qty > 1 && (
-            <span className="px-2 py-0.5 rounded-lg bg-slate-800 text-amber-300 border border-slate-700 font-mono font-bold text-[10px]">
-              ×{item.qty}
-            </span>
-          )}
+            {item.size && (
+              <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono font-bold text-[10px]" dir="ltr">
+                مقاس: {item.size}
+              </span>
+            )}
 
-          {item.customization && (
-            <span className="px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-200 border border-amber-500/30 text-[10px] font-medium">
-              {item.customization}
-            </span>
-          )}
-        </div>
-      ))}
+            {item.qty && item.qty > 1 && (
+              <span className="px-2 py-0.5 rounded-lg bg-slate-800 text-amber-300 border border-slate-700 font-mono font-bold text-[10px]">
+                ×{item.qty}
+              </span>
+            )}
+
+            {item.customization && (
+              <span className="px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-200 border border-amber-500/30 text-[10px] font-medium">
+                {item.customization}
+              </span>
+            )}
+
+            {/* Individual Item Delivery Badge */}
+            {isItemDelivered ? (
+              <span className="mr-auto px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-bold flex items-center gap-0.5">
+                <Check className="w-2.5 h-2.5" />
+                <span>مستلم</span>
+              </span>
+            ) : isOrderPartial ? (
+              <span className="mr-auto px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold flex items-center gap-0.5">
+                <Clock className="w-2.5 h-2.5" />
+                <span>معلق</span>
+              </span>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -245,9 +282,12 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   const [deliveryCodeSearch, setDeliveryCodeSearch] = useState('');
   const [deliverySearchFeedback, setDeliverySearchFeedback] = useState<{ type: 'found' | 'not_found'; message: string } | null>(null);
   const [highlightedOrderId, setHighlightedOrderId] = useState<string | null>(null);
-  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'pending' | 'delivered'>('all');
+  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'pending' | 'partial' | 'delivered'>('all');
   const [statusUpdatingOrderId, setStatusUpdatingOrderId] = useState<string | null>(null);
   const [undoModalOrder, setUndoModalOrder] = useState<DeliveryZoneOrder | null>(null);
+  const [itemDeliveryModalOrder, setItemDeliveryModalOrder] = useState<DeliveryZoneOrder | null>(null);
+  const [selectedItemIndices, setSelectedItemIndices] = useState<number[]>([]);
+  const [isSavingItemDelivery, setIsSavingItemDelivery] = useState(false);
 
   // Ref for table rows / mobile cards scrolling
   const orderRowRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -509,9 +549,125 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
     }
   };
 
+  // Open item-by-item delivery selection modal
+  const openItemDeliveryModal = (order: DeliveryZoneOrder) => {
+    setItemDeliveryModalOrder(order);
+    const parsedItems = parseOrderDetailsToItems(order.items_summary || order.order_details, order.items);
+    if (order.delivery_status === 'delivered') {
+      setSelectedItemIndices(parsedItems.map((_, i) => i));
+    } else if (order.delivery_status === 'partial' && order.delivered_items && order.delivered_items.length > 0) {
+      setSelectedItemIndices([...order.delivered_items]);
+    } else {
+      // Default: select all items so a single tap confirms everything if ready, or uncheck specific ones
+      setSelectedItemIndices(parsedItems.map((_, i) => i));
+    }
+  };
+
+  // Toggle single item selection in modal
+  const handleToggleItemIndex = (index: number) => {
+    setSelectedItemIndices(prev => {
+      if (prev.includes(index)) {
+        return prev.filter(i => i !== index);
+      } else {
+        return [...prev, index].sort((a, b) => a - b);
+      }
+    });
+  };
+
+  // Save item-by-item delivery
+  const handleSaveItemDelivery = async () => {
+    if (!itemDeliveryModalOrder || !openedZoneId || !openedZone) return;
+
+    const order = itemDeliveryModalOrder;
+    const parsedItems = parseOrderDetailsToItems(order.items_summary || order.order_details, order.items);
+    const totalItems = parsedItems.length;
+    const selectedCount = selectedItemIndices.length;
+
+    let newStatus: 'pending' | 'delivered' | 'partial' = 'pending';
+    if (selectedCount === totalItems && totalItems > 0) {
+      newStatus = 'delivered';
+    } else if (selectedCount > 0) {
+      newStatus = 'partial';
+    } else {
+      newStatus = 'pending';
+    }
+
+    try {
+      setIsSavingItemDelivery(true);
+      setStatusUpdatingOrderId(order.order_id);
+
+      const now = new Date().toISOString();
+      const adminName = currentAdmin?.display_name || 'Admin';
+
+      // Optimistic update
+      setOpenedZone(prev => {
+        if (!prev || !prev.orders) return prev;
+        const updatedOrders = prev.orders.map(o => {
+          if (o.order_id === order.order_id) {
+            return {
+              ...o,
+              delivery_status: newStatus,
+              delivered_items: newStatus === 'partial' ? selectedItemIndices : (newStatus === 'delivered' ? parsedItems.map((_, i) => i) : []),
+              delivered_at: newStatus !== 'pending' ? now : null,
+              delivered_by: newStatus !== 'pending' ? adminName : null
+            };
+          }
+          return o;
+        });
+
+        const deliveredCount = updatedOrders.filter(o => o.delivery_status === 'delivered').length;
+        return {
+          ...prev,
+          orders: updatedOrders,
+          delivered_orders: deliveredCount,
+          pending_orders: (prev.total_orders || updatedOrders.length) - deliveredCount
+        };
+      });
+
+      const res = await fetch(`/api/admin/zones/${openedZoneId}/delivery`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.order_id,
+          status: newStatus,
+          adminName,
+          deliveredItems: selectedItemIndices
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'فشل حفظ حالة تسليم القطع');
+      }
+
+      if (newStatus === 'delivered') {
+        showToast(`تم تأكيد تسليم كامل قطع الطلب: ${order.customer_name} (#${order.order_code}) ✅`, 'success');
+      } else if (newStatus === 'partial') {
+        showToast(`تم حفظ تسليم (${selectedCount} من ${totalItems}) قطع للطالب: ${order.customer_name} 📦`, 'info');
+      } else {
+        showToast(`تم ضبط الطلب كـ قيد التسليم (لم يستلم أي قطعة) ⏳`, 'info');
+      }
+
+      setItemDeliveryModalOrder(null);
+    } catch (err: any) {
+      console.error('Error saving item delivery:', err);
+      showToast('تعذر حفظ عناصر التسليم، يرجى المحاولة ثانية', 'error');
+      openDeliverySheet(openedZoneId);
+    } finally {
+      setIsSavingItemDelivery(false);
+      setStatusUpdatingOrderId(null);
+    }
+  };
+
   // Mark an order as delivered
-  const handleMarkAsDelivered = async (order: DeliveryZoneOrder) => {
+  const handleMarkAsDelivered = async (order: DeliveryZoneOrder, forceAll: boolean = false) => {
     if (!openedZoneId || !openedZone) return;
+
+    const parsedItems = parseOrderDetailsToItems(order.items_summary || order.order_details, order.items);
+    if (parsedItems.length > 1 && !forceAll) {
+      openItemDeliveryModal(order);
+      return;
+    }
 
     try {
       setStatusUpdatingOrderId(order.order_id);
@@ -527,6 +683,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
             return {
               ...o,
               delivery_status: 'delivered' as const,
+              delivered_items: parsedItems.map((_, i) => i),
               delivered_at: now,
               delivered_by: adminName
             };
@@ -550,7 +707,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
         body: JSON.stringify({
           orderId: order.order_id,
           status: 'delivered',
-          adminName
+          adminName,
+          deliveredItems: parsedItems.map((_, i) => i)
         })
       });
 
@@ -598,6 +756,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
             return {
               ...o,
               delivery_status: 'pending' as const,
+              delivered_items: [],
               delivered_at: null,
               delivered_by: null
             };
@@ -620,7 +779,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
         body: JSON.stringify({
           orderId: targetOrder.order_id,
           status: 'pending',
-          adminName: currentAdmin?.display_name || 'Admin'
+          adminName: currentAdmin?.display_name || 'Admin',
+          deliveredItems: []
         })
       });
 
@@ -654,6 +814,9 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
     if (!openedZone?.orders) return [];
     if (deliveryFilter === 'pending') {
       return openedZone.orders.filter(o => o.delivery_status === 'pending');
+    }
+    if (deliveryFilter === 'partial') {
+      return openedZone.orders.filter(o => o.delivery_status === 'partial');
     }
     if (deliveryFilter === 'delivered') {
       return openedZone.orders.filter(o => o.delivery_status === 'delivered');
@@ -1841,42 +2004,61 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 )}
 
                 {/* Filters */}
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80 overflow-x-auto pb-1 scrollbar-none">
-                  <span className="text-xs text-slate-400 font-bold ml-1 whitespace-nowrap">فلترة:</span>
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryFilter('all')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
-                      deliveryFilter === 'all'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                  >
-                    الكل ({openedZone.total_orders || 0})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryFilter('pending')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
-                      deliveryFilter === 'pending'
-                        ? 'bg-amber-600 text-white'
-                        : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                  >
-                    قيد التسليم ({openedZone.pending_orders || 0})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryFilter('delivered')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
-                      deliveryFilter === 'delivered'
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                  >
-                    تم التسليم ({openedZone.delivered_orders || 0})
-                  </button>
-                </div>
+                {(() => {
+                  const pendingCount = openedZone.orders?.filter(o => o.delivery_status === 'pending').length || 0;
+                  const partialCount = openedZone.orders?.filter(o => o.delivery_status === 'partial').length || 0;
+                  const deliveredCount = openedZone.orders?.filter(o => o.delivery_status === 'delivered').length || 0;
+
+                  return (
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-800/80 overflow-x-auto pb-1 scrollbar-none">
+                      <span className="text-xs text-slate-400 font-bold ml-1 whitespace-nowrap">فلترة:</span>
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryFilter('all')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
+                          deliveryFilter === 'all'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                        }`}
+                      >
+                        الكل ({openedZone.orders?.length || 0})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryFilter('pending')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
+                          deliveryFilter === 'pending'
+                            ? 'bg-amber-600 text-white'
+                            : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                        }`}
+                      >
+                        قيد التسليم ({pendingCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryFilter('partial')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
+                          deliveryFilter === 'partial'
+                            ? 'bg-amber-500 text-slate-950 font-black'
+                            : 'bg-slate-950 text-amber-400/80 hover:text-amber-300 border border-slate-800'
+                        }`}
+                      >
+                        تسليم جزئي ({partialCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeliveryFilter('delivered')}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-1 sm:flex-initial text-center ${
+                          deliveryFilter === 'delivered'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                        }`}
+                      >
+                        تم التسليم ({deliveredCount})
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Orders Container (Desktop Table + Mobile Cards) */}
@@ -1906,8 +2088,17 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                       ) : (
                         filteredOpenedOrders.map((ord, idx) => {
                           const isDelivered = ord.delivery_status === 'delivered';
+                          const isPartial = ord.delivery_status === 'partial';
+                          const isPending = ord.delivery_status === 'pending';
                           const isHighlighted = highlightedOrderId === ord.order_id;
                           const isUpdating = statusUpdatingOrderId === ord.order_id;
+                          const parsedItems = parseOrderDetailsToItems(ord.items_summary || ord.order_details, ord.items);
+                          const totalItemsCount = parsedItems.length;
+                          const deliveredItemsCount = isDelivered 
+                            ? totalItemsCount 
+                            : isPartial && ord.delivered_items 
+                            ? ord.delivered_items.length 
+                            : 0;
 
                           return (
                             <tr
@@ -1918,12 +2109,14 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                                   ? 'bg-amber-500/20 ring-2 ring-amber-400 ring-inset'
                                   : isDelivered
                                   ? 'bg-emerald-950/15 hover:bg-emerald-950/30'
+                                  : isPartial
+                                  ? 'bg-amber-950/15 hover:bg-amber-950/30'
                                   : 'hover:bg-slate-800/40'
                               }`}
                             >
                               <td className="py-3.5 px-4 text-center font-mono text-slate-500">{idx + 1}</td>
                               <td className="py-3.5 px-4 text-center font-mono font-black text-amber-300">
-                                #{ord.order_code}
+                                #{ord.order_code.replace(/^#/, '')}
                               </td>
                               <td className="py-3.5 px-4 font-bold text-white">
                                 {ord.customer_name}
@@ -1932,7 +2125,12 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                                 {ord.customer_phone}
                               </td>
                               <td className="py-3.5 px-4 max-w-md">
-                                <OrderItemsList text={ord.items_summary || ord.order_details} items={ord.items} />
+                                <OrderItemsList
+                                  text={ord.items_summary || ord.order_details}
+                                  items={ord.items}
+                                  deliveredIndices={ord.delivered_items}
+                                  orderStatus={ord.delivery_status}
+                                />
                               </td>
                               <td className="py-3.5 px-4 text-center font-mono text-indigo-300 font-bold">
                                 {ord.delivery_time}
@@ -1942,7 +2140,19 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                                   <div className="inline-flex flex-col items-center">
                                     <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                                       <Check className="w-3 h-3 text-emerald-400" />
-                                      <span>تم التسليم</span>
+                                      <span>تم التسليم ({totalItemsCount}/{totalItemsCount})</span>
+                                    </span>
+                                    {ord.delivered_by && (
+                                      <span className="text-[9px] text-slate-400 mt-0.5">
+                                        بواسطة: {ord.delivered_by}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : isPartial ? (
+                                  <div className="inline-flex flex-col items-center">
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                                      <SlidersHorizontal className="w-3 h-3 text-amber-400" />
+                                      <span>تسليم جزئي ({deliveredItemsCount}/{totalItemsCount})</span>
                                     </span>
                                     {ord.delivered_by && (
                                       <span className="text-[9px] text-slate-400 mt-0.5">
@@ -1951,40 +2161,90 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                                     )}
                                   </div>
                                 ) : (
-                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1 justify-center">
-                                    <Clock className="w-3 h-3 text-amber-400" />
-                                    <span>قيد التسليم</span>
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1 justify-center">
+                                    <Clock className="w-3 h-3 text-slate-400" />
+                                    <span>قيد التسليم (0/{totalItemsCount})</span>
                                   </span>
                                 )}
                               </td>
                               <td className="py-3.5 px-4 text-center">
                                 {isDelivered ? (
-                                  <button
-                                    type="button"
-                                    disabled={isUpdating}
-                                    onClick={() => setUndoModalOrder(ord)}
-                                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-[11px] inline-flex items-center gap-1 transition"
-                                    title="تراجع عن التسليم"
-                                  >
-                                    <RotateCcw className="w-3 h-3" />
-                                    <span>تراجع</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    disabled={isUpdating}
-                                    onClick={() => handleMarkAsDelivered(ord)}
-                                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition"
-                                  >
-                                    {isUpdating ? (
-                                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                    ) : (
-                                      <>
-                                        <Check className="w-3.5 h-3.5" />
-                                        <span>تسليم الطلب</span>
-                                      </>
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    {totalItemsCount > 1 && (
+                                      <button
+                                        type="button"
+                                        disabled={isUpdating}
+                                        onClick={() => openItemDeliveryModal(ord)}
+                                        className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-[11px] inline-flex items-center gap-1 transition"
+                                        title="تعديل القطع المسلمة"
+                                      >
+                                        <Edit3 className="w-3 h-3" />
+                                        <span>تعديل</span>
+                                      </button>
                                     )}
-                                  </button>
+                                    <button
+                                      type="button"
+                                      disabled={isUpdating}
+                                      onClick={() => setUndoModalOrder(ord)}
+                                      className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 font-bold text-[11px] inline-flex items-center gap-1 transition"
+                                      title="تراجع عن التسليم"
+                                    >
+                                      <RotateCcw className="w-3 h-3" />
+                                      <span>تراجع</span>
+                                    </button>
+                                  </div>
+                                ) : isPartial ? (
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      disabled={isUpdating}
+                                      onClick={() => openItemDeliveryModal(ord)}
+                                      className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-[11px] inline-flex items-center gap-1.5 shadow-md shadow-amber-600/30 transition"
+                                      title="استكمال أو تعديل تسليم باقي القطع"
+                                    >
+                                      <Check className="w-3 h-3" />
+                                      <span>تسليم الباقي</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isUpdating}
+                                      onClick={() => setUndoModalOrder(ord)}
+                                      className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                                      title="إلغاء وإعادة للانتظار"
+                                    >
+                                      <RotateCcw className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    {totalItemsCount > 1 ? (
+                                      <button
+                                        type="button"
+                                        disabled={isUpdating}
+                                        onClick={() => openItemDeliveryModal(ord)}
+                                        className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-indigo-600/30 transition"
+                                      >
+                                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                                        <span>اختيار القطع ({totalItemsCount})</span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        disabled={isUpdating}
+                                        onClick={() => handleMarkAsDelivered(ord, true)}
+                                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition"
+                                      >
+                                        {isUpdating ? (
+                                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                          <>
+                                            <Check className="w-3.5 h-3.5" />
+                                            <span>تسليم الطلب</span>
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
+                                  </div>
                                 )}
                               </td>
                             </tr>
@@ -2004,14 +2264,22 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   ) : (
                     filteredOpenedOrders.map((ord, idx) => {
                       const isDelivered = ord.delivery_status === 'delivered';
+                      const isPartial = ord.delivery_status === 'partial';
+                      const isPending = ord.delivery_status === 'pending';
                       const isHighlighted = highlightedOrderId === ord.order_id;
                       const isUpdating = statusUpdatingOrderId === ord.order_id;
+                      const parsedItems = parseOrderDetailsToItems(ord.items_summary || ord.order_details, ord.items);
+                      const totalItemsCount = parsedItems.length;
+                      const deliveredItemsCount = isDelivered 
+                        ? totalItemsCount 
+                        : isPartial && ord.delivered_items 
+                        ? ord.delivered_items.length 
+                        : 0;
 
                       return (
                         <div
                           key={ord.order_id}
                           ref={el => {
-                            // Support smooth scroll & highlight on mobile screen
                             if (el) orderRowRefs.current[ord.order_id] = el;
                           }}
                           className={`p-4 space-y-3 transition-all duration-300 ${
@@ -2019,6 +2287,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                               ? 'bg-amber-500/20 ring-2 ring-amber-400'
                               : isDelivered
                               ? 'bg-emerald-950/20'
+                              : isPartial
+                              ? 'bg-amber-950/20'
                               : 'bg-slate-900/50 hover:bg-slate-800/30'
                           }`}
                         >
@@ -2034,12 +2304,17 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                             {isDelivered ? (
                               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                                 <Check className="w-3 h-3 text-emerald-400" />
-                                <span>تم التسليم</span>
+                                <span>تم التسليم بالكامل ({totalItemsCount}/{totalItemsCount})</span>
+                              </span>
+                            ) : isPartial ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                                <SlidersHorizontal className="w-3 h-3 text-amber-400" />
+                                <span>تسليم جزئي ({deliveredItemsCount}/{totalItemsCount})</span>
                               </span>
                             ) : (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-amber-400" />
-                                <span>قيد التسليم</span>
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-slate-400" />
+                                <span>قيد التسليم (0/{totalItemsCount})</span>
                               </span>
                             )}
                           </div>
@@ -2065,7 +2340,12 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           {/* Order Details / Items */}
                           <div className="pt-0.5">
                             <span className="text-[10px] text-slate-400 block font-medium mb-1">المحتويات:</span>
-                            <OrderItemsList text={ord.items_summary || ord.order_details} items={ord.items} />
+                            <OrderItemsList
+                              text={ord.items_summary || ord.order_details}
+                              items={ord.items}
+                              deliveredIndices={ord.delivered_items}
+                              orderStatus={ord.delivery_status}
+                            />
                           </div>
 
                           {/* Delivery Time & Admin Meta */}
@@ -2073,7 +2353,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                             <span className="text-[11px] text-slate-400">
                               موعد التسليم: <strong className="text-indigo-300 font-mono">{ord.delivery_time}</strong>
                             </span>
-                            {isDelivered && ord.delivered_by && (
+                            {ord.delivered_by && (
                               <span className="text-[10px] text-slate-400">
                                 بواسطة: <span className="text-slate-200 font-bold">{ord.delivered_by}</span>
                               </span>
@@ -2083,20 +2363,64 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           {/* Action Button: Touch-optimized */}
                           <div className="pt-1">
                             {isDelivered ? (
+                              <div className="flex items-center gap-2">
+                                {totalItemsCount > 1 && (
+                                  <button
+                                    type="button"
+                                    disabled={isUpdating}
+                                    onClick={() => openItemDeliveryModal(ord)}
+                                    className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-[0.99]"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                    <span>تعديل القطع المسلمة</span>
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  disabled={isUpdating}
+                                  onClick={() => setUndoModalOrder(ord)}
+                                  className="flex-1 py-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-rose-300 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-[0.99]"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                  <span>تراجع عن التسليم</span>
+                                </button>
+                              </div>
+                            ) : isPartial ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  disabled={isUpdating}
+                                  onClick={() => openItemDeliveryModal(ord)}
+                                  className="flex-1 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-600/30 transition active:scale-[0.99]"
+                                >
+                                  <Check className="w-4 h-4" />
+                                  <span>تسليم باقي القطع</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isUpdating}
+                                  onClick={() => setUndoModalOrder(ord)}
+                                  className="py-3 px-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 font-bold text-xs flex items-center justify-center transition active:scale-[0.99]"
+                                  title="إلغاء وإعادة للانتظار"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : totalItemsCount > 1 ? (
                               <button
                                 type="button"
                                 disabled={isUpdating}
-                                onClick={() => setUndoModalOrder(ord)}
-                                className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-[0.99]"
+                                onClick={() => openItemDeliveryModal(ord)}
+                                className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition active:scale-[0.98] min-h-[48px]"
                               >
-                                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                                <span>تراجع عن التسليم (إعادة لقيد التسليم)</span>
+                                <SlidersHorizontal className="w-5 h-5" />
+                                <span>اختيار القطع المسلمة ({totalItemsCount} قطع)</span>
                               </button>
                             ) : (
                               <button
                                 type="button"
                                 disabled={isUpdating}
-                                onClick={() => handleMarkAsDelivered(ord)}
+                                onClick={() => handleMarkAsDelivered(ord, true)}
                                 className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition active:scale-[0.98] min-h-[48px]"
                               >
                                 {isUpdating ? (
@@ -2542,6 +2866,193 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
           )}
         </div>
       )}
+
+      {/* ITEM-BY-ITEM DELIVERY MODAL */}
+      {itemDeliveryModalOrder && (() => {
+        const parsedItems = parseOrderDetailsToItems(
+          itemDeliveryModalOrder.items_summary || itemDeliveryModalOrder.order_details,
+          itemDeliveryModalOrder.items
+        );
+        const totalItems = parsedItems.length;
+        const selectedCount = selectedItemIndices.length;
+        const isAllSelected = totalItems > 0 && selectedCount === totalItems;
+        const isNoneSelected = selectedCount === 0;
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 flex items-center justify-center shrink-0">
+                    <Package className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-white">
+                      تحديد عناصر التسليم للطلب
+                    </h3>
+                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                      <span className="font-mono font-bold text-amber-400">#{itemDeliveryModalOrder.order_code}</span>
+                      <span>•</span>
+                      <span className="font-semibold text-slate-200">{itemDeliveryModalOrder.customer_name}</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setItemDeliveryModalOrder(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                  title="إغلاق"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Quick Actions & Helper */}
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-slate-400 text-[11px] sm:text-xs">
+                  اختر القطع التي تم تسليمها للطالب الآن:
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedItemIndices(parsedItems.map((_, i) => i))}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 font-bold text-[11px] transition"
+                  >
+                    تحديد الكل
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedItemIndices([])}
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 font-bold text-[11px] transition"
+                  >
+                    إلغاء التحديد
+                  </button>
+                </div>
+              </div>
+
+              {/* Items Checklist (Scrollable) */}
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {parsedItems.map((item, idx) => {
+                  const isChecked = selectedItemIndices.includes(idx);
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => handleToggleItemIndex(idx)}
+                      className={`p-3 rounded-2xl border cursor-pointer transition flex items-center justify-between gap-3 ${
+                        isChecked
+                          ? 'bg-emerald-950/25 border-emerald-500/40 hover:bg-emerald-950/35'
+                          : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800/70 opacity-75'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div
+                          className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 transition ${
+                            isChecked
+                              ? 'bg-emerald-600 border-emerald-500 text-white'
+                              : 'bg-slate-800 border-slate-600 text-transparent'
+                          }`}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="space-y-1 min-w-0">
+                          <div className="font-bold text-xs sm:text-sm text-white truncate">
+                            {item.title}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {item.size && (
+                              <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono font-bold text-[10px]" dir="ltr">
+                                مقاس: {item.size}
+                              </span>
+                            )}
+                            {item.qty && item.qty > 1 && (
+                              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-amber-300 border border-slate-700 font-mono font-bold text-[10px]">
+                                ×{item.qty}
+                              </span>
+                            )}
+                            {item.customization && (
+                              <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-200 border border-amber-500/30 text-[10px] font-medium">
+                                {item.customization}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-left">
+                        {isChecked ? (
+                          <span className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold inline-flex items-center gap-1">
+                            <Check className="w-3 h-3" />
+                            <span>مستلم</span>
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-medium inline-flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            <span>معلق</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Status Outcome Preview */}
+              <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-2 text-xs">
+                <span className="text-slate-400 font-medium">الحالة الناتجة:</span>
+                <div>
+                  {isAllSelected ? (
+                    <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold inline-flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>تسليم كامل (جميع القطع مستلمة {selectedCount}/{totalItems})</span>
+                    </span>
+                  ) : isNoneSelected ? (
+                    <span className="px-2.5 py-1 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 font-bold inline-flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>قيد التسليم (لم يستلم أي قطعة بعد)</span>
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold inline-flex items-center gap-1">
+                      <Package className="w-3.5 h-3.5" />
+                      <span>تسليم جزئي ({selectedCount} من {totalItems} قطع)</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setItemDeliveryModalOrder(null)}
+                  disabled={isSavingItemDelivery}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition disabled:opacity-50"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveItemDelivery}
+                  disabled={isSavingItemDelivery}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition flex items-center gap-2 shadow-lg shadow-emerald-950/40 disabled:opacity-50"
+                >
+                  {isSavingItemDelivery ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>جاري الحفظ...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>تأكيد وحفظ حالة التسليم</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* CONFIRM UNDO DELIVERY MODAL */}
       {undoModalOrder && (

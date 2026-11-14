@@ -202,7 +202,8 @@ export interface DeliveryZoneOrder {
   items_summary?: string;
   items?: DeliveryItemSummary[];
   delivery_time: string;
-  delivery_status: 'pending' | 'delivered';
+  delivery_status: 'pending' | 'delivered' | 'partial';
+  delivered_items?: number[];
   delivered_at?: string | null;
   delivered_by?: string | null;
   sort_order: number;

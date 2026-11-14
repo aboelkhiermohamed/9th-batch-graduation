@@ -76,19 +76,159 @@ export function cleanTextMeta(raw?: string | null): string {
     .trim();
 }
 
+// Extract items embedded in order notes (B64 or JSON)
+export function extractItemsFromNotes(notes?: string | null): any[] {
+  if (!notes) return [];
+
+  // 1. Try B64 notes
+  if (notes.includes('[ITEMS_META_B64:')) {
+    const b64Match = notes.match(/\[ITEMS_META_B64:([A-Za-z0-9+/=]+)\]/);
+    if (b64Match && b64Match[1]) {
+      try {
+        const jsonStr = Buffer.from(b64Match[1], 'base64').toString('utf8');
+        const parsed = JSON.parse(jsonStr);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+  }
+
+  // 2. Try raw JSON notes
+  if (notes.includes('[ITEMS_META:')) {
+    const startIdx = notes.indexOf('[ITEMS_META:');
+    if (startIdx !== -1) {
+      const rest = notes.substring(startIdx + 12).trim();
+      if (rest[0] === '[' || rest[0] === '{') {
+        let depth = 0;
+        let endIdx = -1;
+        for (let i = 0; i < rest.length; i++) {
+          if (rest[i] === '[' || rest[i] === '{') depth++;
+          else if (rest[i] === ']' || rest[i] === '}') {
+            depth--;
+            if (depth === 0) {
+              endIdx = i;
+              break;
+            }
+          }
+        }
+        if (endIdx !== -1) {
+          try {
+            const parsed = JSON.parse(rest.substring(0, endIdx + 1));
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          } catch (e) {}
+        }
+      }
+    }
+  }
+
+  return [];
+}
+
+// Parse multi-piece text/size breakdowns into separate garment pieces
+export interface ParsedPieceDetail {
+  pieceNum: number;
+  size?: string;
+  customText?: string;
+}
+
+export function parseItemPieces(sizeStr?: string | null, textStr?: string | null, quantity: number = 1): ParsedPieceDetail[] {
+  const isMultiSize = Boolean(sizeStr && (sizeStr.includes('القطعة') || sizeStr.includes('قطعة')));
+  const isMultiText = Boolean(textStr && (textStr.includes('القطعة') || textStr.includes('قطعة')));
+
+  if (!isMultiSize && !isMultiText) {
+    if (quantity > 1) {
+      const res: ParsedPieceDetail[] = [];
+      for (let i = 1; i <= quantity; i++) {
+        res.push({
+          pieceNum: i,
+          size: sizeStr || undefined,
+          customText: textStr || undefined
+        });
+      }
+      return res;
+    }
+    return [{
+      pieceNum: 1,
+      size: sizeStr || undefined,
+      customText: textStr || undefined
+    }];
+  }
+
+  const sizeMap: Record<number, string> = {};
+  if (isMultiSize && sizeStr) {
+    const parts = sizeStr.split('|');
+    parts.forEach(p => {
+      const match = p.match(/(?:القطعة|قطعة)\s*(\d+)[\s:]+(.*)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        sizeMap[num] = match[2].trim();
+      }
+    });
+  }
+
+  const textMap: Record<number, string> = {};
+  if (isMultiText && textStr) {
+    const parts = textStr.split('|');
+    parts.forEach(p => {
+      const match = p.match(/(?:القطعة|قطعة)\s*(\d+)[\s:]+(.*)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        textMap[num] = match[2].trim();
+      }
+    });
+  }
+
+  const maxPiece = Math.max(
+    quantity || 1,
+    ...Object.keys(sizeMap).map(Number),
+    ...Object.keys(textMap).map(Number),
+    1
+  );
+
+  const pieces: ParsedPieceDetail[] = [];
+  for (let i = 1; i <= maxPiece; i++) {
+    pieces.push({
+      pieceNum: i,
+      size: sizeMap[i] || (Object.keys(sizeMap).length === 0 ? sizeStr || undefined : undefined),
+      customText: textMap[i] || (Object.keys(textMap).length === 0 ? textStr || undefined : undefined)
+    });
+  }
+  return pieces;
+}
+
 // Format items into clean human-readable summary for printing & display
 export function formatOrderItemsSummary(items: any[]): { summary: string; parsedItems: DeliveryItemSummary[] } {
   if (!items || items.length === 0) {
     return { summary: 'بدون تفاصيل', parsedItems: [] };
   }
 
-  const parsedItems: DeliveryItemSummary[] = items.map(item => ({
-    product_title: cleanTextMeta(item.product_title) || 'منتج',
-    selected_size: item.selected_size ? cleanTextMeta(item.selected_size) : undefined,
-    quantity: Number(item.quantity || 1),
-    custom_text: item.custom_text ? cleanTextMeta(item.custom_text) : undefined,
-    customization_option: item.customization_option ? cleanTextMeta(item.customization_option) : undefined
-  }));
+  const parsedItems: DeliveryItemSummary[] = [];
+
+  items.forEach(item => {
+    const rawTitle = cleanTextMeta(item.product_title) || 'منتج';
+    const addons = item.customization_option || (item.selected_addons || []).map((a: any) => a.name).join(' | ') || '';
+    const cleanAddons = cleanTextMeta(addons);
+    const pieces = parseItemPieces(item.selected_size, item.custom_text, Number(item.quantity || 1));
+
+    if (pieces.length > 1) {
+      pieces.forEach(p => {
+        parsedItems.push({
+          product_title: `${rawTitle} (قطعة ${p.pieceNum})`,
+          selected_size: p.size ? cleanTextMeta(p.size) : (item.selected_size ? cleanTextMeta(item.selected_size) : undefined),
+          quantity: 1,
+          custom_text: p.customText ? cleanTextMeta(p.customText) : undefined,
+          customization_option: cleanAddons || undefined
+        });
+      });
+    } else {
+      parsedItems.push({
+        product_title: rawTitle,
+        selected_size: item.selected_size ? cleanTextMeta(item.selected_size) : undefined,
+        quantity: Number(item.quantity || 1),
+        custom_text: item.custom_text ? cleanTextMeta(item.custom_text) : undefined,
+        customization_option: cleanAddons || undefined
+      });
+    }
+  });
 
   const parts = parsedItems.map(item => {
     let text = `${item.product_title}`;
@@ -134,9 +274,10 @@ export async function searchOrderForZone(query: string): Promise<{
   const client = supabaseAdmin || supabase;
 
   // Search store_orders by ID, exact order_code, or prefixed GRAD-code
+  // NOTE: MUST SELECT notes to extract items when store_order_items is empty
   let q = client
     .from('store_orders')
-    .select('id, order_code, customer_name, customer_phone, status')
+    .select('id, order_code, customer_name, customer_phone, status, notes')
     .limit(1);
 
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
@@ -153,13 +294,23 @@ export async function searchOrderForZone(query: string): Promise<{
 
   const foundOrder = orders[0];
 
-  // Fetch only necessary item fields from store_order_items
-  const { data: items } = await client
+  // Fetch from store_order_items
+  const { data: dbItems } = await client
     .from('store_order_items')
     .select('product_title, selected_size, quantity, custom_text, customization_option')
     .eq('order_id', foundOrder.id);
 
-  const { summary, parsedItems } = formatOrderItemsSummary(items || []);
+  let rawItems = dbItems || [];
+
+  // If store_order_items is empty, decode items from notes
+  if (rawItems.length === 0 && foundOrder.notes) {
+    const extracted = extractItemsFromNotes(foundOrder.notes);
+    if (extracted && extracted.length > 0) {
+      rawItems = extracted;
+    }
+  }
+
+  const { summary, parsedItems } = formatOrderItemsSummary(rawItems);
 
   return {
     order_id: foundOrder.id,
@@ -274,6 +425,7 @@ export async function getDeliveryZoneById(zoneId: string): Promise<DeliveryZone 
               order_code,
               customer_name,
               customer_phone,
+              notes,
               store_order_items (
                 product_title,
                 selected_size,
@@ -289,8 +441,22 @@ export async function getDeliveryZoneById(zoneId: string): Promise<DeliveryZone 
 
         const formattedOrders: DeliveryZoneOrder[] = (zoneOrders || []).map((zo: any) => {
           const storeOrder = zo.store_orders || {};
-          const rawItems = storeOrder.store_order_items || [];
+          let rawItems = storeOrder.store_order_items || [];
+          if ((!rawItems || rawItems.length === 0) && storeOrder.notes) {
+            const extracted = extractItemsFromNotes(storeOrder.notes);
+            if (extracted && extracted.length > 0) rawItems = extracted;
+          }
           const { summary, parsedItems } = formatOrderItemsSummary(rawItems);
+
+          // Extract delivered item indices if stored in delivered_by
+          let delivered_items: number[] | undefined = undefined;
+          if (zo.delivered_by && zo.delivered_by.includes('[ITEMS:')) {
+            const match = zo.delivered_by.match(/\[ITEMS:([\d,]+)\]/);
+            if (match && match[1]) {
+              delivered_items = match[1].split(',').map(Number);
+            }
+          }
+          const cleanDeliveredBy = zo.delivered_by ? zo.delivered_by.replace(/\s*\[ITEMS:[\d,]+\]/, '').trim() : null;
 
           return {
             id: zo.id,
@@ -303,9 +469,10 @@ export async function getDeliveryZoneById(zoneId: string): Promise<DeliveryZone 
             items_summary: summary,
             items: parsedItems,
             delivery_time: zo.delivery_time || 'غير محدد',
-            delivery_status: (zo.delivery_status as 'pending' | 'delivered') || 'pending',
+            delivery_status: (zo.delivery_status as 'pending' | 'delivered' | 'partial') || 'pending',
+            delivered_items,
             delivered_at: zo.delivered_at,
-            delivered_by: zo.delivered_by,
+            delivered_by: cleanDeliveredBy,
             sort_order: zo.sort_order || 0,
             created_at: zo.created_at,
             updated_at: zo.updated_at
@@ -617,17 +784,27 @@ export async function updateDeliveryZone(
 }
 
 // -------------------------------------------------------------
-// 6. UPDATE ORDER DELIVERY STATUS (Mark as Delivered / Undo)
+// 6. UPDATE ORDER DELIVERY STATUS (Mark as Delivered / Partial / Undo)
 // -------------------------------------------------------------
 export async function updateOrderDeliveryStatus(
   zoneId: string,
   orderIdOrZoneOrderId: string,
-  status: 'delivered' | 'pending',
-  adminName: string
-): Promise<{ success: boolean; delivered_at?: string | null; delivered_by?: string | null }> {
+  status: 'delivered' | 'pending' | 'partial',
+  adminName: string,
+  deliveredItems?: number[]
+): Promise<{ success: boolean; delivered_at?: string | null; delivered_by?: string | null; delivered_items?: number[] }> {
   const now = new Date().toISOString();
-  const delivered_at = status === 'delivered' ? now : null;
-  const delivered_by = status === 'delivered' ? (adminName || 'Admin') : null;
+  const delivered_at = status !== 'pending' ? now : null;
+
+  let delivered_by: string | null = null;
+  if (status !== 'pending') {
+    const baseAdmin = adminName || 'Admin';
+    if (deliveredItems && deliveredItems.length > 0) {
+      delivered_by = `${baseAdmin} [ITEMS:${deliveredItems.join(',')}]`;
+    } else {
+      delivered_by = baseAdmin;
+    }
+  }
 
   const client = supabaseAdmin || supabase;
   const isAvailable = await checkSupabaseTablesAvailable();
@@ -655,7 +832,12 @@ export async function updateOrderDeliveryStatus(
           .eq('id', rowId);
 
         if (!updateErr) {
-          return { success: true, delivered_at, delivered_by };
+          return {
+            success: true,
+            delivered_at,
+            delivered_by: adminName || 'Admin',
+            delivered_items: deliveredItems
+          };
         }
       }
     } catch (err) {
@@ -680,7 +862,8 @@ export async function updateOrderDeliveryStatus(
 
   targetOrder.delivery_status = status;
   targetOrder.delivered_at = delivered_at;
-  targetOrder.delivered_by = delivered_by;
+  targetOrder.delivered_by = adminName || 'Admin';
+  targetOrder.delivered_items = deliveredItems;
   targetOrder.updated_at = now;
 
   zone.delivered_orders = zone.orders.filter(o => o.delivery_status === 'delivered').length;
@@ -688,7 +871,12 @@ export async function updateOrderDeliveryStatus(
   zone.updated_at = now;
 
   saveFallbackData(zones);
-  return { success: true, delivered_at, delivered_by };
+  return {
+    success: true,
+    delivered_at,
+    delivered_by: adminName || 'Admin',
+    delivered_items: deliveredItems
+  };
 }
 
 // -------------------------------------------------------------

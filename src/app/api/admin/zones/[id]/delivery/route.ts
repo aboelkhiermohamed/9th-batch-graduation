@@ -10,9 +10,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const { id: zoneId } = params;
     const body = await req.json();
-    const { orderId, status, adminName } = body;
+    const { orderId, status, adminName, deliveredItems } = body;
 
-    if (!orderId || !status || (status !== 'delivered' && status !== 'pending')) {
+    if (!orderId || !status || (status !== 'delivered' && status !== 'pending' && status !== 'partial')) {
       return NextResponse.json(
         { success: false, error: 'البيانات المطلوبة غير مكتملة (orderId, status)' },
         { status: 400 }
@@ -23,7 +23,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       zoneId,
       orderId,
       status,
-      adminName || 'Admin'
+      adminName || 'Admin',
+      Array.isArray(deliveredItems) ? deliveredItems : undefined
     );
 
     if (!result.success) {
@@ -37,7 +38,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       success: true,
       delivered_at: result.delivered_at,
       delivered_by: result.delivered_by,
-      message: status === 'delivered' ? 'تم تأكيد تسليم الطلب بنجاح' : 'تم التراجع عن تسليم الطلب'
+      delivered_items: result.delivered_items,
+      message: status === 'delivered' 
+        ? 'تم تأكيد تسليم جميع قطع الطلب بنجاح' 
+        : status === 'partial'
+        ? 'تم حفظ التسليم الجزئي للقطع المحددة بنجاح'
+        : 'تم التراجع عن تسليم الطلب'
     });
   } catch (err: any) {
     console.error('Error updating order delivery status:', err);
