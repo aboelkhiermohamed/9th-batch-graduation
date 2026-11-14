@@ -744,13 +744,13 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   const openItemDeliveryModal = (order: DeliveryZoneOrder) => {
     setItemDeliveryModalOrder(order);
     const parsedItems = parseOrderDetailsToItems(order.items_summary || order.order_details, order.items);
-    if (order.delivery_status === 'delivered') {
-      setSelectedItemIndices(parsedItems.map((_, i) => i));
-    } else if (order.delivery_status === 'partial' && order.delivered_items && order.delivered_items.length > 0) {
+    // User requested unselect by default:
+    // If order was already partially delivered with specific delivered_items recorded, preserve them;
+    // Otherwise start with an empty selection (unselected by default)
+    if (order.delivery_status === 'partial' && order.delivered_items && Array.isArray(order.delivered_items) && order.delivered_items.length > 0) {
       setSelectedItemIndices([...order.delivered_items]);
     } else {
-      // Default: select all items so a single tap confirms everything if ready, or uncheck specific ones
-      setSelectedItemIndices(parsedItems.map((_, i) => i));
+      setSelectedItemIndices([]);
     }
   };
 
@@ -3369,9 +3369,112 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
         const isAllSelected = totalItems > 0 && selectedCount === totalItems;
         const isNoneSelected = selectedCount === 0;
 
+        // Group items for high visual order & speed
+        const itemsWithIndex = parsedItems.map((item, index) => ({ item, index }));
+
+        const garmentItems = itemsWithIndex.filter(({ item }) => {
+          const isAddon = item.title.startsWith('ملحق:') || item.title.startsWith('إضافة:') || item.title.toLowerCase().includes('ملحق');
+          const isKids = item.title.includes('اطفال') || item.title.includes('أطفال');
+          return !isAddon && !isKids;
+        });
+
+        const kidsItems = itemsWithIndex.filter(({ item }) => {
+          return item.title.includes('اطفال') || item.title.includes('أطفال');
+        });
+
+        const addonItems = itemsWithIndex.filter(({ item }) => {
+          const isAddon = item.title.startsWith('ملحق:') || item.title.startsWith('إضافة:') || item.title.toLowerCase().includes('ملحق');
+          const isKids = item.title.includes('اطفال') || item.title.includes('أطفال');
+          return isAddon && !isKids;
+        });
+
+        // Any leftover goes with garments
+        const classifiedIndices = new Set([
+          ...garmentItems.map(x => x.index),
+          ...kidsItems.map(x => x.index),
+          ...addonItems.map(x => x.index)
+        ]);
+        const otherItems = itemsWithIndex.filter(x => !classifiedIndices.has(x.index));
+        const allGarments = [...garmentItems, ...otherItems];
+
+        // Item Card Renderer
+        const renderItemCard = ({ item, index }: { item: ParsedOrderItem; index: number }, isCompactAddon = false) => {
+          const isChecked = selectedItemIndices.includes(index);
+          const cleanTitle = item.title.replace(/^(?:ملحق|إضافة):\s*/i, '').trim();
+
+          return (
+            <div
+              key={index}
+              onClick={() => handleToggleItemIndex(index)}
+              className={`group select-none rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                isCompactAddon ? 'p-2.5 sm:p-3' : 'p-3'
+              } ${
+                isChecked
+                  ? 'bg-emerald-950/30 border-emerald-500/50 hover:bg-emerald-950/40 shadow-sm shadow-emerald-950/20'
+                  : 'bg-slate-800/40 border-slate-700/60 hover:bg-slate-800/70 hover:border-slate-600'
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {/* Checkbox */}
+                <div
+                  className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 transition-all ${
+                    isChecked
+                      ? 'bg-emerald-500 border-emerald-400 text-white shadow-sm shadow-emerald-500/30 scale-105'
+                      : 'border-slate-600 bg-slate-900/70 text-transparent group-hover:border-slate-400'
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                </div>
+
+                {/* Details */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs sm:text-sm font-bold truncate ${isChecked ? 'text-white' : 'text-slate-200'}`}>
+                      {cleanTitle}
+                    </span>
+                    {item.qty && item.qty > 1 && (
+                      <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono font-bold text-[10px]">
+                        ×{item.qty}
+                      </span>
+                    )}
+                  </div>
+                  {(item.size || item.customization) && (
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                      {item.size && (
+                        <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono font-bold text-[10px]" dir="ltr">
+                          مقاس: {item.size}
+                        </span>
+                      )}
+                      {item.customization && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-200 border border-amber-500/30 text-[10px] font-medium truncate max-w-[220px]" title={item.customization}>
+                          {item.customization}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Pill */}
+              <div className="shrink-0">
+                {isChecked ? (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold inline-flex items-center gap-1">
+                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    <span>مستلم</span>
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-medium">
+                    معلق
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        };
+
         return (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl space-y-4 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 max-w-xl w-full shadow-2xl space-y-3.5 animate-in zoom-in-95 max-h-[92vh] flex flex-col">
               {/* Modal Header */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-3">
@@ -3382,10 +3485,16 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                     <h3 className="text-sm sm:text-base font-bold text-white">
                       تحديد عناصر التسليم للطلب
                     </h3>
-                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5 flex-wrap">
                       <span className="font-mono font-bold text-amber-400">#{itemDeliveryModalOrder.order_code}</span>
                       <span>•</span>
                       <span className="font-semibold text-slate-200">{itemDeliveryModalOrder.customer_name}</span>
+                      {itemDeliveryModalOrder.customer_phone && (
+                        <>
+                          <span>•</span>
+                          <span className="text-slate-400 font-mono" dir="ltr">{itemDeliveryModalOrder.customer_phone}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3399,12 +3508,15 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 </button>
               </div>
 
-              {/* Quick Actions & Helper */}
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-slate-400 text-[11px] sm:text-xs">
-                  اختر القطع التي تم تسليمها للطالب الآن:
-                </span>
-                <div className="flex items-center gap-1.5 shrink-0">
+              {/* Quick Actions Bar */}
+              <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5 text-xs">
+                <div className="text-slate-400 text-xs flex items-center gap-1.5">
+                  <span>اختر القطع المسلّمة:</span>
+                  <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700 font-mono font-bold text-[11px]">
+                    {selectedCount} / {totalItems}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setSelectedItemIndices(parsedItems.map((_, i) => i))}
@@ -3419,126 +3531,112 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   >
                     إلغاء التحديد
                   </button>
+                  {allGarments.length > 0 && addonItems.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedItemIndices(allGarments.map(x => x.index))}
+                        className="px-2.5 py-1 rounded-lg bg-blue-950/40 hover:bg-blue-900/40 text-blue-300 border border-blue-500/30 font-bold text-[11px] transition"
+                        title="تحديد قطع الملابس فقط"
+                      >
+                        الملابس فقط
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedItemIndices(addonItems.map(x => x.index))}
+                        className="px-2.5 py-1 rounded-lg bg-purple-950/40 hover:bg-purple-900/40 text-purple-300 border border-purple-500/30 font-bold text-[11px] transition"
+                        title="تحديد الملحقات فقط"
+                      >
+                        الملحقات فقط
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* Addons & Kids helper note */}
-              <div className="p-2 rounded-xl bg-purple-950/20 border border-purple-500/20 text-[11px] text-purple-300 flex items-center gap-2">
-                <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                <span>تم إدراج الملحقات (Add-ons) وملابس الأطفال كعناصر مستقلة لتسليمها بشكل منفصل في مكانها المخصص.</span>
-              </div>
-
-              {/* Items Checklist (Scrollable) */}
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                {parsedItems.map((item, idx) => {
-                  const isChecked = selectedItemIndices.includes(idx);
-                  const isAddon = item.title.startsWith('ملحق:') || item.title.startsWith('إضافة:');
-                  const isKids = item.title.includes('اطفال') || item.title.includes('أطفال');
-
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => handleToggleItemIndex(idx)}
-                      className={`p-3 rounded-2xl border cursor-pointer transition flex items-center justify-between gap-3 ${
-                        isChecked
-                          ? 'bg-emerald-950/25 border-emerald-500/40 hover:bg-emerald-950/35'
-                          : isAddon
-                          ? 'bg-purple-950/15 border-purple-500/30 hover:bg-purple-950/25'
-                          : isKids
-                          ? 'bg-sky-950/15 border-sky-500/30 hover:bg-sky-950/25'
-                          : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800/70 opacity-75'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div
-                          className={`w-5 h-5 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 transition ${
-                            isChecked
-                              ? 'bg-emerald-600 border-emerald-500 text-white'
-                              : 'bg-slate-800 border-slate-600 text-transparent'
-                          }`}
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {isAddon ? (
-                              <span className="px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold inline-flex items-center gap-1">
-                                <Sparkles className="w-2.5 h-2.5 text-purple-400" />
-                                <span>ملحق / Add-on</span>
-                              </span>
-                            ) : isKids ? (
-                              <span className="px-1.5 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold inline-flex items-center gap-1">
-                                <span>👶</span>
-                                <span>أطفال</span>
-                              </span>
-                            ) : null}
-                            <div className="font-bold text-xs sm:text-sm text-white truncate">
-                              {isAddon ? item.title.replace(/^(?:ملحق|إضافة):\s*/i, '').trim() : item.title}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {item.size && (
-                              <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono font-bold text-[10px]" dir="ltr">
-                                مقاس: {item.size}
-                              </span>
-                            )}
-                            {item.qty && item.qty > 1 && (
-                              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-amber-300 border border-slate-700 font-mono font-bold text-[10px]">
-                                ×{item.qty}
-                              </span>
-                            )}
-                            {item.customization && (
-                              <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-200 border border-amber-500/30 text-[10px] font-medium">
-                                {item.customization}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 text-left">
-                        {isChecked ? (
-                          <span className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold inline-flex items-center gap-1">
-                            <Check className="w-3 h-3" />
-                            <span>مستلم</span>
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 text-[10px] font-medium inline-flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            <span>معلق</span>
-                          </span>
-                        )}
+              {/* Items Checklist Grouped (Scrollable) */}
+              <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 custom-scrollbar">
+                {/* 1. Main Garments */}
+                {allGarments.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-bold px-1 text-indigo-300">
+                      <div className="flex items-center gap-1.5">
+                        <Package className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>الملابس والقطع الرئيسية ({allGarments.length})</span>
                       </div>
                     </div>
-                  );
-                })}
+                    <div className="space-y-1.5">
+                      {allGarments.map(entry => renderItemCard(entry, false))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Kids Garments */}
+                {kidsItems.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-bold px-1 text-sky-300">
+                      <div className="flex items-center gap-1.5">
+                        <span>👶</span>
+                        <span>ملابس الأطفال ({kidsItems.length})</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      {kidsItems.map(entry => renderItemCard(entry, false))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Add-ons & Accessories (Grid) */}
+                {addonItems.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-bold px-1 text-purple-300">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                        <span>الملحقات والإضافات ({addonItems.length})</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {addonItems.map(entry => renderItemCard(entry, true))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Status Outcome Preview */}
-              <div className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-2 text-xs">
-                <span className="text-slate-400 font-medium">الحالة الناتجة:</span>
-                <div>
+              {/* Status Outcome & Progress Bar */}
+              <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-2">
+                <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+                  <span className="text-slate-400 font-medium">حالة الطلب بعد الحفظ:</span>
                   {isAllSelected ? (
-                    <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold inline-flex items-center gap-1">
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-[11px] inline-flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>تسليم كامل (جميع القطع مستلمة {selectedCount}/{totalItems})</span>
                     </span>
                   ) : isNoneSelected ? (
-                    <span className="px-2.5 py-1 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 font-bold inline-flex items-center gap-1">
+                    <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-bold text-[11px] inline-flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5" />
-                      <span>قيد التسليم (لم يستلم أي قطعة بعد)</span>
+                      <span>قيد التسليم (لم يستلم أي قطعة بعد 0/{totalItems})</span>
                     </span>
                   ) : (
-                    <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold inline-flex items-center gap-1">
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[11px] inline-flex items-center gap-1">
                       <Package className="w-3.5 h-3.5" />
                       <span>تسليم جزئي ({selectedCount} من {totalItems} قطع)</span>
                     </span>
                   )}
                 </div>
+
+                {/* Progress bar */}
+                <div className="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 rounded-full ${
+                      isAllSelected ? 'bg-emerald-500' : isNoneSelected ? 'bg-slate-700' : 'bg-amber-500'
+                    }`}
+                    style={{ width: `${totalItems > 0 ? (selectedCount / totalItems) * 100 : 0}%` }}
+                  />
+                </div>
               </div>
 
               {/* Modal Footer Actions */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setItemDeliveryModalOrder(null)}
@@ -3551,7 +3649,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   type="button"
                   onClick={handleSaveItemDelivery}
                   disabled={isSavingItemDelivery}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition flex items-center gap-2 shadow-lg shadow-emerald-950/40 disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs transition flex items-center gap-2 shadow-lg shadow-emerald-950/40 disabled:opacity-50"
                 >
                   {isSavingItemDelivery ? (
                     <>
@@ -3560,8 +3658,14 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                     </>
                   ) : (
                     <>
-                      <Check className="w-4 h-4" />
-                      <span>تأكيد وحفظ حالة التسليم</span>
+                      <Check className="w-4 h-4 stroke-[3]" />
+                      <span>
+                        {isAllSelected
+                          ? 'تأكيد التسليم الكامل'
+                          : isNoneSelected
+                          ? 'حفظ كمعلق (0 قطع)'
+                          : `تأكيد تسليم (${selectedCount}) قطع`}
+                      </span>
                     </>
                   )}
                 </button>
