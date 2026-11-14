@@ -3754,7 +3754,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 </div>
 
                 {recipientMode === 'proxy' && (
-                  <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                  <div className="pt-1 animate-in fade-in duration-200">
                     <input
                       type="text"
                       value={proxyRecipientName}
@@ -3763,23 +3763,6 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                       className="w-full bg-slate-900 border border-purple-500/40 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400 transition"
                       autoFocus
                     />
-
-                    {/* Quick suggestion tags */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] text-slate-500">صلة سريعة:</span>
-                      {['أخوه', 'أخته', 'والده', 'والدته', 'صديقه/زميله', 'صديقتها/زميلتها'].map(tag => (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => {
-                            setProxyRecipientName(prev => prev ? `${prev} (${tag})` : tag);
-                          }}
-                          className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-slate-400 hover:text-purple-300 text-[10px] font-medium transition"
-                        >
-                          +{tag}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 )}
               </div>
