@@ -6,7 +6,9 @@ export const dynamic = 'force-dynamic';
 // GET /api/admin/zones - Returns all delivery sheets (lightweight summary)
 export async function GET(req: NextRequest) {
   try {
-    const { zones, isUsingFallback } = await listDeliveryZones();
+    const { searchParams } = new URL(req.url);
+    const forceRefresh = searchParams.get('refresh') === 'true';
+    const { zones, isUsingFallback } = await listDeliveryZones(forceRefresh);
     return NextResponse.json({
       success: true,
       zones,

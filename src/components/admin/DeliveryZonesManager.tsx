@@ -454,10 +454,12 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   // -------------------------------------------------------------
   // FETCH ALL ZONES (Summary for Dashboard)
   // -------------------------------------------------------------
-  const fetchZonesList = async () => {
+  const fetchZonesList = async (force: boolean | unknown = false) => {
+    const shouldForce = force === true;
     try {
       setIsLoadingZones(true);
-      const res = await fetch('/api/admin/zones', { cache: 'no-store' });
+      const url = shouldForce ? '/api/admin/zones?refresh=true' : '/api/admin/zones';
+      const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) throw new Error('فشل جلب البيانات');
       const data = await res.json();
       if (data.success && Array.isArray(data.zones)) {
@@ -479,10 +481,12 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   // -------------------------------------------------------------
   // FETCH DELIVERY ANALYTICS & STATS
   // -------------------------------------------------------------
-  const fetchDeliveryStats = async () => {
+  const fetchDeliveryStats = async (force: boolean | unknown = false) => {
+    const shouldForce = force === true;
     try {
       setIsLoadingStats(true);
-      const res = await fetch('/api/admin/zones/stats', { cache: 'no-store' });
+      const url = shouldForce ? '/api/admin/zones/stats?refresh=true' : '/api/admin/zones/stats';
+      const res = await fetch(url, { cache: 'no-store' });
       const data = await res.json();
       if (data.success && data.stats) {
         setDeliveryStats(data.stats);
@@ -2498,7 +2502,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
                   <button
                     type="button"
-                    onClick={fetchZonesList}
+                    onClick={() => fetchZonesList(true)}
                     disabled={isLoadingZones}
                     className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition"
                     title="تحديث القائمة"
@@ -3331,7 +3335,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
                 <button
                   type="button"
-                  onClick={fetchZonesList}
+                  onClick={() => fetchZonesList(true)}
                   disabled={isLoadingZones}
                   className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition"
                   title="تحديث البيانات"
@@ -3758,7 +3762,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
-                  onClick={fetchDeliveryStats}
+                  onClick={() => fetchDeliveryStats(true)}
                   disabled={isLoadingStats}
                   className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 transition min-h-[38px]"
                   title="تحديث الأرقام"

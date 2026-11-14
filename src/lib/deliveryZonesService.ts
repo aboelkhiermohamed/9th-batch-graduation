@@ -485,9 +485,28 @@ export async function searchOrderForZone(query: string): Promise<SearchedZoneOrd
 }
 
 // -------------------------------------------------------------
+// IN-MEMORY EGRESS OPTIMIZATION CACHES
+// -------------------------------------------------------------
+let zonesListCache: { data: { zones: DeliveryZone[]; isUsingFallback: boolean }; timestamp: number } | null = null;
+const ZONES_LIST_CACHE_TTL = 20 * 1000; // 20 seconds cache to save Supabase Egress
+
+let deliveryStatsCache: { data: DeliveryStatsSummary; timestamp: number } | null = null;
+const STATS_CACHE_TTL = 30 * 1000; // 30 seconds cache to save Supabase Egress
+
+export function invalidateDeliveryCaches() {
+  zonesListCache = null;
+  deliveryStatsCache = null;
+}
+
+// -------------------------------------------------------------
 // 2. LIST DELIVERY ZONES (Lightweight summary for dashboard)
 // -------------------------------------------------------------
-export async function listDeliveryZones(): Promise<{ zones: DeliveryZone[]; isUsingFallback: boolean }> {
+export async function listDeliveryZones(forceRefresh = false): Promise<{ zones: DeliveryZone[]; isUsingFallback: boolean }> {
+  const now = Date.now();
+  if (!forceRefresh && zonesListCache && (now - zonesListCache.timestamp < ZONES_LIST_CACHE_TTL)) {
+    return zonesListCache.data;
+  }
+
   const isAvailable = await checkSupabaseTablesAvailable();
   const client = supabaseAdmin || supabase;
 
@@ -524,7 +543,9 @@ export async function listDeliveryZones(): Promise<{ zones: DeliveryZone[]; isUs
             pending_orders: total - delivered
           };
         });
-        return { zones: mapped, isUsingFallback: false };
+        const result = { zones: mapped, isUsingFallback: false };
+        zonesListCache = { data: result, timestamp: now };
+        return result;
       }
     } catch (err) {
       console.warn('Failed querying delivery_zones from Supabase, falling back to local storage:', err);
@@ -548,7 +569,9 @@ export async function listDeliveryZones(): Promise<{ zones: DeliveryZone[]; isUs
     };
   }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  return { zones: mapped, isUsingFallback: true };
+  const fallbackResult = { zones: mapped, isUsingFallback: true };
+  zonesListCache = { data: fallbackResult, timestamp: now };
+  return fallbackResult;
 }
 
 // -------------------------------------------------------------
@@ -778,6 +801,7 @@ export async function createDeliveryZone(data: {
         }
 
         const fullZone = await getDeliveryZoneById(zoneId);
+        invalidateDeliveryCaches();
         if (fullZone) return fullZone;
       }
     } catch (err) {
@@ -821,6 +845,7 @@ export async function createDeliveryZone(data: {
   zones.unshift(newZoneObj);
   saveFallbackData(zones);
 
+  invalidateDeliveryCaches();
   return newZoneObj;
 }
 
@@ -904,6 +929,7 @@ export async function updateDeliveryZone(
         }
       }
 
+      invalidateDeliveryCaches();
       return await getDeliveryZoneById(zoneId);
     } catch (err) {
       console.warn('Error updating zone in Supabase, using fallback:', err);
@@ -956,6 +982,7 @@ export async function updateDeliveryZone(
   }
 
   saveFallbackData(zones);
+  invalidateDeliveryCaches();
   return target;
 }
 
@@ -1041,6 +1068,7 @@ export async function updateOrderDeliveryStatus(
             .eq('id', rowId);
 
           if (!anyUpdateErr) {
+            invalidateDeliveryCaches();
             return {
               success: true,
               delivered_at,
@@ -1091,6 +1119,7 @@ export async function updateOrderDeliveryStatus(
   zone.updated_at = now;
 
   saveFallbackData(zones);
+  invalidateDeliveryCaches();
   return {
     success: true,
     delivered_at,
@@ -1112,7 +1141,10 @@ export async function deleteDeliveryZone(zoneId: string): Promise<boolean> {
       // Deleting the zone automatically cascades to delivery_zone_orders
       // Original store_orders are NOT touched!
       const { error } = await client.from('delivery_zones').delete().eq('id', zoneId);
-      if (!error) return true;
+      if (!error) {
+        invalidateDeliveryCaches();
+        return true;
+      }
     } catch (err) {
       console.warn('Error deleting zone from Supabase, removing from fallback:', err);
     }
@@ -1121,6 +1153,7 @@ export async function deleteDeliveryZone(zoneId: string): Promise<boolean> {
   const zones = getFallbackData();
   const filtered = zones.filter(z => z.id !== zoneId);
   saveFallbackData(filtered);
+  invalidateDeliveryCaches();
   return true;
 }
 
@@ -1187,7 +1220,12 @@ export interface DeliveryStatsSummary {
   }>;
 }
 
-export async function getDeliveryAnalyticsSummary(): Promise<DeliveryStatsSummary> {
+export async function getDeliveryAnalyticsSummary(forceRefresh = false): Promise<DeliveryStatsSummary> {
+  const now = Date.now();
+  if (!forceRefresh && deliveryStatsCache && (now - deliveryStatsCache.timestamp < STATS_CACHE_TTL)) {
+    return deliveryStatsCache.data;
+  }
+
   const isAvailable = await checkSupabaseTablesAvailable();
   const client = supabaseAdmin || supabase;
 
@@ -1245,7 +1283,6 @@ export async function getDeliveryAnalyticsSummary(): Promise<DeliveryStatsSummar
             order_code,
             customer_name,
             customer_phone,
-            notes,
             store_order_items (
               product_title,
               selected_size,
@@ -1259,11 +1296,7 @@ export async function getDeliveryAnalyticsSummary(): Promise<DeliveryStatsSummar
       if (!ordersErr && zoneOrdersData) {
         allOrders = zoneOrdersData.map((zo: any) => {
           const storeOrder = zo.store_orders || {};
-          let rawItems = storeOrder.store_order_items || [];
-          if ((!rawItems || rawItems.length === 0) && storeOrder.notes) {
-            const extracted = extractItemsFromNotes(storeOrder.notes);
-            if (extracted && extracted.length > 0) rawItems = extracted;
-          }
+          const rawItems = storeOrder.store_order_items || [];
           const { summary, parsedItems } = formatOrderItemsSummary(rawItems);
 
           let delivered_items: number[] | undefined = undefined;
@@ -1515,7 +1548,7 @@ export async function getDeliveryAnalyticsSummary(): Promise<DeliveryStatsSummar
   const deliveryRate = totalOrders > 0 ? Math.round((deliveredOrders / totalOrders) * 100) : 0;
   const piecesRate = totalPieces > 0 ? Math.round((deliveredPieces / totalPieces) * 100) : 0;
 
-  return {
+  const statsResult: DeliveryStatsSummary = {
     overview: {
       total_zones: allZones.length,
       total_orders: totalOrders,
@@ -1537,5 +1570,8 @@ export async function getDeliveryAnalyticsSummary(): Promise<DeliveryStatsSummar
     },
     recentDeliveries
   };
+
+  deliveryStatsCache = { data: statsResult, timestamp: now };
+  return statsResult;
 }
 

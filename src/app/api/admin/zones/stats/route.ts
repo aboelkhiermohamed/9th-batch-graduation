@@ -6,7 +6,9 @@ export const dynamic = 'force-dynamic';
 // GET /api/admin/zones/stats - Returns comprehensive delivery metrics, zone breakdown, and item counts
 export async function GET(req: NextRequest) {
   try {
-    const stats = await getDeliveryAnalyticsSummary();
+    const { searchParams } = new URL(req.url);
+    const forceRefresh = searchParams.get('refresh') === 'true';
+    const stats = await getDeliveryAnalyticsSummary(forceRefresh);
     return NextResponse.json({
       success: true,
       stats
