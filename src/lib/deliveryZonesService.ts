@@ -1124,3 +1124,418 @@ export async function deleteDeliveryZone(zoneId: string): Promise<boolean> {
   return true;
 }
 
+// -------------------------------------------------------------
+// 8. DELIVERY ANALYTICS & STATS SUMMARY
+// -------------------------------------------------------------
+export interface DeliveryStatsSummary {
+  overview: {
+    total_zones: number;
+    total_orders: number;
+    delivered_orders: number;
+    partial_orders: number;
+    pending_orders: number;
+    delivery_rate: number;
+    total_pieces: number;
+    delivered_pieces: number;
+    remaining_pieces: number;
+    pieces_rate: number;
+    self_deliveries: number;
+    proxy_deliveries: number;
+  };
+  zonesBreakdown: Array<{
+    id: string;
+    name: string;
+    created_by: string;
+    created_at: string;
+    total_orders: number;
+    delivered_orders: number;
+    partial_orders: number;
+    pending_orders: number;
+    progress_percent: number;
+    total_pieces: number;
+    delivered_pieces: number;
+    remaining_pieces: number;
+  }>;
+  itemsBreakdown: {
+    garments: Array<{
+      title: string;
+      total: number;
+      delivered: number;
+      pending: number;
+    }>;
+    addons: Array<{
+      title: string;
+      total: number;
+      delivered: number;
+      pending: number;
+    }>;
+  };
+  recentDeliveries: Array<{
+    id: string;
+    order_code: string;
+    customer_name: string;
+    customer_phone: string;
+    zone_id: string;
+    zone_name: string;
+    delivery_status: 'delivered' | 'partial' | 'pending';
+    delivered_at: string | null;
+    delivered_by: string | null;
+    recipient_name: string | null;
+    items_summary: string;
+    delivered_items_count: number;
+    total_items_count: number;
+  }>;
+}
+
+export async function getDeliveryAnalyticsSummary(): Promise<DeliveryStatsSummary> {
+  const isAvailable = await checkSupabaseTablesAvailable();
+  const client = supabaseAdmin || supabase;
+
+  let allZones: Array<{ id: string; name: string; created_by: string; created_at: string }> = [];
+  let allOrders: Array<{
+    id: string;
+    zone_id: string;
+    zone_name: string;
+    order_id: string;
+    order_code: string;
+    customer_name: string;
+    customer_phone: string;
+    delivery_status: 'pending' | 'delivered' | 'partial';
+    delivered_at: string | null;
+    delivered_by: string | null;
+    recipient_name?: string | null;
+    delivered_items?: number[];
+    items_summary?: string;
+    parsedItems: DeliveryItemSummary[];
+  }> = [];
+
+  if (isAvailable) {
+    try {
+      const { data: zonesData } = await client
+        .from('delivery_zones')
+        .select('id, name, created_by, created_at')
+        .order('created_at', { ascending: false });
+
+      if (zonesData) {
+        allZones = zonesData.map((z: any) => ({
+          id: z.id,
+          name: z.name,
+          created_by: z.created_by || 'Admin',
+          created_at: z.created_at
+        }));
+      }
+
+      const { data: zoneOrdersData, error: ordersErr } = await client
+        .from('delivery_zone_orders')
+        .select(`
+          id,
+          zone_id,
+          order_id,
+          delivery_time,
+          delivery_status,
+          delivered_at,
+          delivered_by,
+          created_at,
+          delivery_zones (
+            id,
+            name
+          ),
+          store_orders (
+            id,
+            order_code,
+            customer_name,
+            customer_phone,
+            notes,
+            store_order_items (
+              product_title,
+              selected_size,
+              quantity,
+              custom_text,
+              customization_option
+            )
+          )
+        `);
+
+      if (!ordersErr && zoneOrdersData) {
+        allOrders = zoneOrdersData.map((zo: any) => {
+          const storeOrder = zo.store_orders || {};
+          let rawItems = storeOrder.store_order_items || [];
+          if ((!rawItems || rawItems.length === 0) && storeOrder.notes) {
+            const extracted = extractItemsFromNotes(storeOrder.notes);
+            if (extracted && extracted.length > 0) rawItems = extracted;
+          }
+          const { summary, parsedItems } = formatOrderItemsSummary(rawItems);
+
+          let delivered_items: number[] | undefined = undefined;
+          let recipient_name: string | undefined = undefined;
+          if (zo.delivered_by) {
+            if (zo.delivered_by.includes('[ITEMS:')) {
+              const match = zo.delivered_by.match(/\[ITEMS:([\d,]+)\]/);
+              if (match && match[1]) {
+                delivered_items = match[1].split(',').map(Number);
+              }
+            }
+            if (zo.delivered_by.includes('[RECIPIENT:')) {
+              const rMatch = zo.delivered_by.match(/\[RECIPIENT:(.*?)\]/);
+              if (rMatch && rMatch[1]) {
+                recipient_name = rMatch[1].trim();
+              }
+            }
+          }
+          const cleanDeliveredBy = zo.delivered_by
+            ? zo.delivered_by
+                .replace(/\s*\[ITEMS:[\d,]+\]/, '')
+                .replace(/\s*\[RECIPIENT:.*?\]/, '')
+                .trim()
+            : null;
+
+          return {
+            id: zo.id,
+            zone_id: zo.zone_id,
+            zone_name: zo.delivery_zones?.name || 'زون تسليم',
+            order_id: zo.order_id,
+            order_code: storeOrder.order_code || 'ORD',
+            customer_name: storeOrder.customer_name || 'بدون اسم',
+            customer_phone: storeOrder.customer_phone || '',
+            delivery_status: (zo.delivery_status || 'pending') as 'pending' | 'delivered' | 'partial',
+            delivered_at: zo.delivered_at || null,
+            delivered_by: cleanDeliveredBy,
+            recipient_name: recipient_name || null,
+            delivered_items,
+            items_summary: summary,
+            parsedItems
+          };
+        });
+      }
+    } catch (err) {
+      console.warn('Error fetching stats from Supabase, using fallback:', err);
+    }
+  }
+
+  // Fallback path if no orders loaded from Supabase
+  if (allOrders.length === 0) {
+    const fallbackZones = getFallbackData();
+    allZones = fallbackZones.map(z => ({
+      id: z.id,
+      name: z.name,
+      created_by: z.created_by,
+      created_at: z.created_at
+    }));
+    fallbackZones.forEach(z => {
+      (z.orders || []).forEach(o => {
+        allOrders.push({
+          id: o.id,
+          zone_id: z.id,
+          zone_name: z.name,
+          order_id: o.order_id,
+          order_code: o.order_code,
+          customer_name: o.customer_name,
+          customer_phone: o.customer_phone,
+          delivery_status: o.delivery_status,
+          delivered_at: o.delivered_at || null,
+          delivered_by: o.delivered_by || null,
+          recipient_name: o.recipient_name || null,
+          delivered_items: o.delivered_items,
+          items_summary: o.items_summary || o.order_details,
+          parsedItems: o.items || []
+        });
+      });
+    });
+  }
+
+  // Calculate Overview KPIs
+  const totalOrders = allOrders.length;
+  let deliveredOrders = 0;
+  let partialOrders = 0;
+  let pendingOrders = 0;
+  let totalPieces = 0;
+  let deliveredPieces = 0;
+  let selfDeliveries = 0;
+  let proxyDeliveries = 0;
+
+  // Track garments & addons
+  const garmentsMap = new Map<string, { total: number; delivered: number }>();
+  const addonsMap = new Map<string, { total: number; delivered: number }>();
+
+  // Zone map
+  const zoneStatsMap = new Map<string, {
+    total_orders: number;
+    delivered_orders: number;
+    partial_orders: number;
+    pending_orders: number;
+    total_pieces: number;
+    delivered_pieces: number;
+  }>();
+
+  allZones.forEach(z => {
+    zoneStatsMap.set(z.id, {
+      total_orders: 0,
+      delivered_orders: 0,
+      partial_orders: 0,
+      pending_orders: 0,
+      total_pieces: 0,
+      delivered_pieces: 0
+    });
+  });
+
+  allOrders.forEach(ord => {
+    // Delivery status
+    if (ord.delivery_status === 'delivered') deliveredOrders++;
+    else if (ord.delivery_status === 'partial') partialOrders++;
+    else pendingOrders++;
+
+    // Recipient type
+    if (ord.delivery_status === 'delivered' || ord.delivery_status === 'partial') {
+      if (ord.recipient_name && ord.recipient_name.trim()) {
+        proxyDeliveries++;
+      } else {
+        selfDeliveries++;
+      }
+    }
+
+    // Pieces calculation
+    const items = ord.parsedItems && ord.parsedItems.length > 0 ? ord.parsedItems : [{ product_title: 'منتج غير محدد', quantity: 1 }];
+    const orderPiecesCount = items.length;
+    let orderDeliveredPieces = 0;
+
+    items.forEach((item, idx) => {
+      totalPieces++;
+      let isDelivered = false;
+      if (ord.delivery_status === 'delivered') {
+        isDelivered = true;
+      } else if (ord.delivery_status === 'partial' && ord.delivered_items && ord.delivered_items.includes(idx)) {
+        isDelivered = true;
+      }
+
+      if (isDelivered) {
+        deliveredPieces++;
+        orderDeliveredPieces++;
+      }
+
+      // Group product titles cleanly
+      let title = item.product_title || 'منتج';
+      const normalizedTitle = title.replace(/\s*\(\s*قطعة\s*\d+\s*\)/g, '').trim();
+
+      const isAddon = normalizedTitle.startsWith('ملحق:') ||
+        ['Sunglasses', 'Notebook', 'Stickers', 'Bag', 'Cap', 'Signature Card'].some(w => normalizedTitle.toLowerCase().includes(w.toLowerCase()));
+
+      const targetMap = isAddon ? addonsMap : garmentsMap;
+      const cleanTitleKey = normalizedTitle.replace(/^ملحق:\s*/, '').trim();
+
+      const cur = targetMap.get(cleanTitleKey) || { total: 0, delivered: 0 };
+      cur.total += 1;
+      if (isDelivered) cur.delivered += 1;
+      targetMap.set(cleanTitleKey, cur);
+    });
+
+    // Update zone stats
+    const zStat = zoneStatsMap.get(ord.zone_id);
+    if (zStat) {
+      zStat.total_orders++;
+      if (ord.delivery_status === 'delivered') zStat.delivered_orders++;
+      else if (ord.delivery_status === 'partial') zStat.partial_orders++;
+      else zStat.pending_orders++;
+      zStat.total_pieces += orderPiecesCount;
+      zStat.delivered_pieces += orderDeliveredPieces;
+    }
+  });
+
+  const zonesBreakdown = allZones.map(z => {
+    const s = zoneStatsMap.get(z.id) || {
+      total_orders: 0,
+      delivered_orders: 0,
+      partial_orders: 0,
+      pending_orders: 0,
+      total_pieces: 0,
+      delivered_pieces: 0
+    };
+    return {
+      id: z.id,
+      name: z.name,
+      created_by: z.created_by,
+      created_at: z.created_at,
+      total_orders: s.total_orders,
+      delivered_orders: s.delivered_orders,
+      partial_orders: s.partial_orders,
+      pending_orders: s.pending_orders,
+      progress_percent: s.total_orders > 0 ? Math.round((s.delivered_orders / s.total_orders) * 100) : 0,
+      total_pieces: s.total_pieces,
+      delivered_pieces: s.delivered_pieces,
+      remaining_pieces: s.total_pieces - s.delivered_pieces
+    };
+  });
+
+  const garmentsList = Array.from(garmentsMap.entries()).map(([title, s]) => ({
+    title,
+    total: s.total,
+    delivered: s.delivered,
+    pending: s.total - s.delivered
+  })).sort((a, b) => b.total - a.total);
+
+  const addonsList = Array.from(addonsMap.entries()).map(([title, s]) => ({
+    title,
+    total: s.total,
+    delivered: s.delivered,
+    pending: s.total - s.delivered
+  })).sort((a, b) => b.total - a.total);
+
+  // Recent deliveries log (delivered or partial), sorted by delivered_at or created_at desc
+  const recentDeliveries = allOrders
+    .filter(o => o.delivery_status !== 'pending')
+    .sort((a, b) => {
+      const timeA = a.delivered_at ? new Date(a.delivered_at).getTime() : 0;
+      const timeB = b.delivered_at ? new Date(b.delivered_at).getTime() : 0;
+      return timeB - timeA;
+    })
+    .slice(0, 30)
+    .map(o => {
+      const items = o.parsedItems || [];
+      const totalCount = items.length || 1;
+      let deliveredCount = 0;
+      if (o.delivery_status === 'delivered') deliveredCount = totalCount;
+      else if (o.delivery_status === 'partial') deliveredCount = o.delivered_items?.length || 0;
+
+      return {
+        id: o.id,
+        order_code: o.order_code,
+        customer_name: o.customer_name,
+        customer_phone: o.customer_phone,
+        zone_id: o.zone_id,
+        zone_name: o.zone_name,
+        delivery_status: o.delivery_status,
+        delivered_at: o.delivered_at,
+        delivered_by: o.delivered_by,
+        recipient_name: o.recipient_name || null,
+        items_summary: o.items_summary || '',
+        delivered_items_count: deliveredCount,
+        total_items_count: totalCount
+      };
+    });
+
+  const deliveryRate = totalOrders > 0 ? Math.round((deliveredOrders / totalOrders) * 100) : 0;
+  const piecesRate = totalPieces > 0 ? Math.round((deliveredPieces / totalPieces) * 100) : 0;
+
+  return {
+    overview: {
+      total_zones: allZones.length,
+      total_orders: totalOrders,
+      delivered_orders: deliveredOrders,
+      partial_orders: partialOrders,
+      pending_orders: pendingOrders,
+      delivery_rate: deliveryRate,
+      total_pieces: totalPieces,
+      delivered_pieces: deliveredPieces,
+      remaining_pieces: totalPieces - deliveredPieces,
+      pieces_rate: piecesRate,
+      self_deliveries: selfDeliveries,
+      proxy_deliveries: proxyDeliveries
+    },
+    zonesBreakdown,
+    itemsBreakdown: {
+      garments: garmentsList,
+      addons: addonsList
+    },
+    recentDeliveries
+  };
+}
+

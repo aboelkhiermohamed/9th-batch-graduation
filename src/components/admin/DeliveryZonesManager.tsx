@@ -30,9 +30,15 @@ import {
   Sparkles,
   SlidersHorizontal,
   ExternalLink,
-  LayoutGrid
+  LayoutGrid,
+  BarChart3,
+  TrendingUp,
+  UserCheck,
+  Download,
+  Award
 } from 'lucide-react';
 import { DeliveryZone, DeliveryZoneOrder, DeliveryItemSummary } from '@/types';
+import { DeliveryStatsSummary } from '@/lib/deliveryZonesService';
 
 interface DeliveryZonesManagerProps {
   currentAdmin: { id: string; username: string; display_name: string; role: string } | null;
@@ -297,12 +303,18 @@ function OrderItemsList({
 
 export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesManagerProps) {
   // Navigation: Sub-sections
-  const [subTab, setSubTab] = useState<'create' | 'delivery' | 'edit'>('delivery');
+  const [subTab, setSubTab] = useState<'create' | 'delivery' | 'edit' | 'stats'>('delivery');
 
   // Shared Data States
   const [zones, setZones] = useState<DeliveryZone[]>([]);
   const [isLoadingZones, setIsLoadingZones] = useState(false);
   const [isUsingFallback, setIsUsingFallback] = useState(false);
+
+  // Delivery Analytics & Stats States
+  const [deliveryStats, setDeliveryStats] = useState<DeliveryStatsSummary | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [statsZoneFilter, setStatsZoneFilter] = useState<string>('all');
+  const [statsLogSearch, setStatsLogSearch] = useState<string>('');
 
   // Notifications
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -463,6 +475,253 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   useEffect(() => {
     fetchZonesList();
   }, []);
+
+  // -------------------------------------------------------------
+  // FETCH DELIVERY ANALYTICS & STATS
+  // -------------------------------------------------------------
+  const fetchDeliveryStats = async () => {
+    try {
+      setIsLoadingStats(true);
+      const res = await fetch('/api/admin/zones/stats', { cache: 'no-store' });
+      const data = await res.json();
+      if (data.success && data.stats) {
+        setDeliveryStats(data.stats);
+      }
+    } catch (err: any) {
+      console.error('Error fetching delivery stats:', err);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
+  useEffect(() => {
+    if (subTab === 'stats') {
+      fetchDeliveryStats();
+    }
+  }, [subTab]);
+
+  const handlePrintStatsReport = () => {
+    if (!deliveryStats) return;
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      alert('يرجى السماح بالنوافذ المنبثقة (Popups) في متصفحك لطباعة تقرير الإحصائيات.');
+      return;
+    }
+
+    const ov = deliveryStats.overview;
+    const printDate = new Date().toLocaleDateString('ar-EG', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const printTime = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
+    const zonesRowsHtml = deliveryStats.zonesBreakdown.map((z, idx) => `
+      <tr>
+        <td style="text-align: center; font-weight: bold; padding: 6px;">${idx + 1}</td>
+        <td style="font-weight: 700; padding: 6px;">${z.name}</td>
+        <td style="text-align: center; padding: 6px;">${z.created_by}</td>
+        <td style="text-align: center; font-weight: bold; padding: 6px;">${z.total_orders}</td>
+        <td style="text-align: center; color: #059669; font-weight: bold; padding: 6px;">${z.delivered_orders}</td>
+        <td style="text-align: center; color: #d97706; font-weight: bold; padding: 6px;">${z.partial_orders}</td>
+        <td style="text-align: center; color: #dc2626; font-weight: bold; padding: 6px;">${z.pending_orders}</td>
+        <td style="text-align: center; font-weight: bold; padding: 6px;">${z.delivered_pieces} / ${z.total_pieces}</td>
+        <td style="text-align: center; font-weight: 900; color: #4f46e5; padding: 6px;">${z.progress_percent}%</td>
+      </tr>
+    `).join('');
+
+    const garmentsRowsHtml = deliveryStats.itemsBreakdown.garments.map(g => `
+      <tr>
+        <td style="font-weight: 700; padding: 6px;">${g.title}</td>
+        <td style="text-align: center; font-weight: bold; padding: 6px;">${g.total}</td>
+        <td style="text-align: center; color: #059669; font-weight: bold; padding: 6px;">${g.delivered}</td>
+        <td style="text-align: center; color: #dc2626; font-weight: bold; padding: 6px;">${g.pending}</td>
+        <td style="text-align: center; font-weight: 900; color: #4f46e5; padding: 6px;">${g.total > 0 ? Math.round((g.delivered / g.total) * 100) : 0}%</td>
+      </tr>
+    `).join('');
+
+    const addonsRowsHtml = deliveryStats.itemsBreakdown.addons.map(a => `
+      <tr>
+        <td style="font-weight: 700; padding: 6px;">${a.title}</td>
+        <td style="text-align: center; font-weight: bold; padding: 6px;">${a.total}</td>
+        <td style="text-align: center; color: #059669; font-weight: bold; padding: 6px;">${a.delivered}</td>
+        <td style="text-align: center; color: #dc2626; font-weight: bold; padding: 6px;">${a.pending}</td>
+        <td style="text-align: center; font-weight: 900; color: #4f46e5; padding: 6px;">${a.total > 0 ? Math.round((a.delivered / a.total) * 100) : 0}%</td>
+      </tr>
+    `).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="utf-8">
+        <title>تقرير إحصائيات تسليم الدفعة الرسمي</title>
+        <style>
+          @page { size: A4 portrait; margin: 12mm 10mm; }
+          * { box-sizing: border-box; }
+          body { font-family: 'Cairo', system-ui, sans-serif; margin: 0; padding: 15px; color: #0f172a; font-size: 11px; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 15px; }
+          .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; }
+          .kpi-card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; text-align: center; background: #f8fafc; }
+          .kpi-num { font-size: 20px; font-weight: 900; margin-top: 4px; font-family: monospace; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px; }
+          th { background: #0f172a; color: white; padding: 6px; font-weight: bold; text-align: center; }
+          td { border-bottom: 1px solid #e2e8f0; }
+          .sec-title { font-size: 13px; font-weight: 800; margin: 12px 0 6px 0; color: #1e293b; border-right: 4px solid #4f46e5; padding-right: 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1 style="margin: 0; font-size: 18px; font-weight: 900;">The Medix - Graduation Store</h1>
+            <p style="margin: 2px 0 0 0; color: #475569; font-size: 12px; font-weight: bold;">تقرير إحصائيات ومتابعة تسليم الدفعة الشامل</p>
+          </div>
+          <div style="text-align: left; font-size: 11px; color: #475569;">
+            <div>التاريخ: <strong>${printDate}</strong></div>
+            <div>الوقت: <strong>${printTime}</strong></div>
+            <div>المشرف: <strong>${currentAdmin?.display_name || 'Admin'}</strong></div>
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div style="color: #64748b; font-size: 10px; font-weight: bold;">إجمالي طلاب الدفعة</div>
+            <div class="kpi-num" style="color: #0f172a;">${ov.total_orders}</div>
+          </div>
+          <div class="kpi-card" style="background: #ecfdf5; border-color: #a7f3d0;">
+            <div style="color: #047857; font-size: 10px; font-weight: bold;">تم التسليم (${ov.delivery_rate}%)</div>
+            <div class="kpi-num" style="color: #047857;">${ov.delivered_orders}</div>
+          </div>
+          <div class="kpi-card" style="background: #fffbeb; border-color: #fde68a;">
+            <div style="color: #b45309; font-size: 10px; font-weight: bold;">تسليم جزئي</div>
+            <div class="kpi-num" style="color: #b45309;">${ov.partial_orders}</div>
+          </div>
+          <div class="kpi-card" style="background: #fef2f2; border-color: #fecaca;">
+            <div style="color: #b91c1c; font-size: 10px; font-weight: bold;">قيد التسليم (متبقي)</div>
+            <div class="kpi-num" style="color: #b91c1c;">${ov.pending_orders}</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+          <div style="flex: 1; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; background: #f8fafc;">
+            <strong style="color: #334155;">حصر القطع والمستلزمات:</strong>
+            <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+              <span>إجمالي القطع: <strong>${ov.total_pieces}</strong></span>
+              <span>المسلم: <strong style="color: #059669;">${ov.delivered_pieces}</strong></span>
+              <span>المتبقي: <strong style="color: #dc2626;">${ov.remaining_pieces}</strong></span>
+              <span>الإنجاز: <strong style="color: #4f46e5;">${ov.pieces_rate}%</strong></span>
+            </div>
+          </div>
+          <div style="flex: 1; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; background: #f8fafc;">
+            <strong style="color: #334155;">نوع الاستلام وتوثيق النيابة:</strong>
+            <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+              <span>الطالب شخصياً: <strong style="color: #047857;">${ov.self_deliveries}</strong></span>
+              <span>🤝 بالنيابة عن الطالب: <strong style="color: #7c3aed;">${ov.proxy_deliveries}</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec-title">1. مقارنة محطات وزونات التسليم</div>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>اسم الزون / المحطة</th>
+              <th>المشرف</th>
+              <th>إجمالي الطلبات</th>
+              <th>تم التسليم</th>
+              <th>تسليم جزئي</th>
+              <th>قيد التسليم</th>
+              <th>القطع (مستلم/إجمالي)</th>
+              <th>نسبة الإنجاز</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${zonesRowsHtml}
+          </tbody>
+        </table>
+
+        <div style="display: flex; gap: 15px;">
+          <div style="flex: 1;">
+            <div class="sec-title">2. حصر تسليم الملابس والجاكيتات</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>المنتج</th>
+                  <th>المطلوب</th>
+                  <th>المستلم</th>
+                  <th>المتبقي</th>
+                  <th>الإنجاز</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${garmentsRowsHtml}
+              </tbody>
+            </table>
+          </div>
+          <div style="flex: 1;">
+            <div class="sec-title">3. حصر تسليم الملحقات والإضافات (Add-ons)</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>الملحق</th>
+                  <th>المطلوب</th>
+                  <th>المستلم</th>
+                  <th>المتبقي</th>
+                  <th>الإنجاز</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${addonsRowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="margin-top: 25px; border-top: 1px solid #cbd5e1; padding-top: 10px; display: flex; justify-content: space-between; font-size: 10px; color: #64748b;">
+          <div>نظام زونات التسليم الذكي &bull; The Medix Graduation Store</div>
+          <div>توقيع المشرف العام: _________________________</div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 350);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWin.document.open();
+    printWin.document.write(htmlContent);
+    printWin.document.close();
+  };
+
+  const handleExportStatsCsv = () => {
+    if (!deliveryStats) return;
+    const headers = ['كود الطلب', 'اسم الطالب', 'الهاتف', 'اسم الزون', 'حالة التسليم', 'المستلم الفعلي', 'المشرف المسلم', 'وقت التسليم', 'تفاصيل'];
+    const rows = deliveryStats.recentDeliveries.map(r => [
+      `"${r.order_code}"`,
+      `"${r.customer_name}"`,
+      `"${r.customer_phone}"`,
+      `"${r.zone_name}"`,
+      `"${r.delivery_status === 'delivered' ? 'مستلم بالكامل' : r.delivery_status === 'partial' ? 'تسليم جزئي' : 'قيد التسليم'}"`,
+      `"${r.recipient_name ? `بالنيابة: ${r.recipient_name}` : 'الطالب نفسه'}"`,
+      `"${r.delivered_by || '-'}"`,
+      `"${r.delivered_at ? new Date(r.delivered_at).toLocaleString('ar-EG') : '-'}"`,
+      `"${r.items_summary.replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `تقرير_تسليم_الدفعة_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    showToast('تم تصدير ملف CSV بنجاح', 'success');
+  };
 
   // -------------------------------------------------------------
   // 1. CREATE ZONES LOGIC
@@ -1631,6 +1890,18 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
           >
             <SlidersHorizontal className={`w-4 h-4 ${subTab === 'edit' ? 'text-amber-300' : 'text-slate-400'}`} />
             <span>3. إدارة وتعديل الكشوفات <span className="hidden md:inline">(Zones Edit)</span></span>
+          </button>
+
+          <button
+            onClick={() => setSubTab('stats')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl font-bold text-xs transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
+              subTab === 'stats'
+                ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-500/50'
+                : 'bg-slate-950/60 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-slate-800'
+            }`}
+          >
+            <BarChart3 className={`w-4 h-4 ${subTab === 'stats' ? 'text-amber-300' : 'text-slate-400'}`} />
+            <span>4. إحصائيات وتقارير التسليم <span className="hidden md:inline">(Analytics & Stats)</span></span>
           </button>
         </div>
       </div>
@@ -3459,6 +3730,701 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ============================================================= */}
+      {/* 4. SUB-SECTION FOUR: DELIVERY ANALYTICS & STATS DASHBOARD     */}
+      {/* ============================================================= */}
+      {subTab === 'stats' && (
+        <div className="space-y-6">
+          {/* Main Analytics Header Card */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div>
+                <h2 className="text-base sm:text-xl font-black text-white flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-indigo-400" />
+                  <span>إحصائيات وتقارير محطات التسليم الحية</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
+                    Live Analytics
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  متابعة حية وشاملة لمعدلات تسليم أوردرات الدفعة، أداء المحطات، حصر الملابس والملحقات، وسجل الاستلام الميداني.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={fetchDeliveryStats}
+                  disabled={isLoadingStats}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 transition min-h-[38px]"
+                  title="تحديث الأرقام"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoadingStats ? 'animate-spin text-indigo-400' : ''}`} />
+                  <span>تحديث البيانات</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrintStatsReport}
+                  disabled={!deliveryStats}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-lg shadow-indigo-600/20 min-h-[38px]"
+                  title="طباعة التقرير الشامل"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>طباعة التقرير الشامل</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportStatsCsv}
+                  disabled={!deliveryStats}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1.5 transition min-h-[38px]"
+                  title="تصدير كـ CSV"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">تصدير CSV</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Optional Zone Filter Bar */}
+            {deliveryStats && deliveryStats.zonesBreakdown.length > 1 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
+                <span className="text-slate-500 whitespace-nowrap font-bold">تصفية حسب الزون:</span>
+                <button
+                  type="button"
+                  onClick={() => setStatsZoneFilter('all')}
+                  className={`px-3 py-1 rounded-lg font-bold transition whitespace-nowrap ${
+                    statsZoneFilter === 'all'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  جميع الزونات ({deliveryStats.overview.total_orders})
+                </button>
+                {deliveryStats.zonesBreakdown.map(z => (
+                  <button
+                    key={z.id}
+                    type="button"
+                    onClick={() => setStatsZoneFilter(z.id)}
+                    className={`px-3 py-1 rounded-lg font-bold transition whitespace-nowrap flex items-center gap-1.5 ${
+                      statsZoneFilter === z.id
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>{z.name}</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/30 font-mono">
+                      {z.delivered_orders}/{z.total_orders}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {isLoadingStats && !deliveryStats ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-16 text-center text-slate-400 space-y-3">
+              <RefreshCw className="w-8 h-8 mx-auto animate-spin text-indigo-400" />
+              <p className="text-xs font-bold text-slate-300">جارٍ تجميع وحساب إحصائيات التسليم لجميع الزونات...</p>
+            </div>
+          ) : !deliveryStats || deliveryStats.overview.total_orders === 0 ? (
+            <div className="bg-slate-900 border border-dashed border-slate-800 rounded-3xl p-16 text-center text-slate-400 space-y-3">
+              <BarChart3 className="w-12 h-12 mx-auto text-slate-600" />
+              <h3 className="text-base font-bold text-white">لا توجد بيانات تسليم بعد</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                قم بإنشاء كشوفات للزونات وتوزيع الطلبات عليها لبدء رصد إحصائيات ونسب التسليم الحية هنا.
+              </p>
+              <button
+                type="button"
+                onClick={() => setSubTab('create')}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs inline-flex items-center gap-1.5 transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span>إنشاء أول كشف زون</span>
+              </button>
+            </div>
+          ) : (() => {
+            const ov = deliveryStats.overview;
+            const currentFilterZone = statsZoneFilter !== 'all'
+              ? deliveryStats.zonesBreakdown.find(z => z.id === statsZoneFilter)
+              : null;
+
+            // Display metrics (either for filtered zone or whole overview)
+            const displayTotalOrders = currentFilterZone ? currentFilterZone.total_orders : ov.total_orders;
+            const displayDeliveredOrders = currentFilterZone ? currentFilterZone.delivered_orders : ov.delivered_orders;
+            const displayPartialOrders = currentFilterZone ? currentFilterZone.partial_orders : ov.partial_orders;
+            const displayPendingOrders = currentFilterZone ? currentFilterZone.pending_orders : ov.pending_orders;
+            const displayDeliveryRate = currentFilterZone ? currentFilterZone.progress_percent : ov.delivery_rate;
+
+            const displayTotalPieces = currentFilterZone ? currentFilterZone.total_pieces : ov.total_pieces;
+            const displayDeliveredPieces = currentFilterZone ? currentFilterZone.delivered_pieces : ov.delivered_pieces;
+            const displayRemainingPieces = currentFilterZone ? currentFilterZone.remaining_pieces : ov.remaining_pieces;
+            const displayPiecesRate = displayTotalPieces > 0 ? Math.round((displayDeliveredPieces / displayTotalPieces) * 100) : 0;
+
+            return (
+              <div className="space-y-6">
+                {/* 1. TOP 4 EXECUTIVE KPI CARDS */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {/* Card 1: Total Orders */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-indigo-500 to-indigo-600" />
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] sm:text-xs font-bold text-slate-400">إجمالي طلاب الدفعة</span>
+                      <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                        <User className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-2xl sm:text-3xl font-black text-white">{displayTotalOrders}</span>
+                      <span className="text-[10px] text-slate-500 font-bold">طالب</span>
+                    </div>
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 mt-2 font-medium">
+                      {currentFilterZone ? `في ${currentFilterZone.name}` : `موزعين على ${ov.total_zones} محطات زون`}
+                    </p>
+                  </div>
+
+                  {/* Card 2: Fully Delivered */}
+                  <div className="bg-slate-900 border border-emerald-500/20 rounded-3xl p-4 sm:p-5 shadow-lg relative overflow-hidden group bg-gradient-to-b from-emerald-950/10 to-slate-900">
+                    <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400" />
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] sm:text-xs font-bold text-emerald-400">تم التسليم بالكامل</span>
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-2xl sm:text-3xl font-black text-emerald-400">{displayDeliveredOrders}</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-bold">
+                        {displayDeliveryRate}%
+                      </span>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, Math.max(0, displayDeliveryRate))}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Card 3: Partial Deliveries */}
+                  <div className="bg-slate-900 border border-amber-500/20 rounded-3xl p-4 sm:p-5 shadow-lg relative overflow-hidden group bg-gradient-to-b from-amber-950/10 to-slate-900">
+                    <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-amber-500 to-orange-400" />
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] sm:text-xs font-bold text-amber-400">تسليم جزئي</span>
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-2xl sm:text-3xl font-black text-amber-400">{displayPartialOrders}</span>
+                      <span className="text-[10px] text-slate-500 font-bold">طالب</span>
+                    </div>
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 mt-2 font-medium">
+                      استلموا بعض القطع وباقي لهم مستلزمات
+                    </p>
+                  </div>
+
+                  {/* Card 4: Pending Deliveries */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-rose-500 to-amber-500" />
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] sm:text-xs font-bold text-slate-400">قيد التسليم (متبقي)</span>
+                      <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                        <AlertCircle className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-2xl sm:text-3xl font-black text-white">{displayPendingOrders}</span>
+                      <span className="text-[10px] text-slate-500 font-bold">طالب</span>
+                    </div>
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 mt-2 font-medium">
+                      بانتظار حضورهم لمحطة التسليم
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. PIECES & RECIPIENT TYPE SUMMARY CARDS */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Card A: Total Pieces Tracker */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                          <Package className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-white">حصر إجمالي القطع والمستلزمات</h3>
+                          <p className="text-[11px] text-slate-400">الملابس الرئيسية + ملابس الأطفال + الملحقات</p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-xl text-xs font-mono font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        {displayPiecesRate}% تم تسليمه
+                      </span>
+                    </div>
+
+                    {/* Visual Progress Bar */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-mono font-bold">
+                        <span className="text-emerald-400">{displayDeliveredPieces} قطعة مستلمة</span>
+                        <span className="text-slate-400">{displayTotalPieces} إجمالي القطع</span>
+                      </div>
+                      <div className="w-full bg-slate-950 rounded-full h-3 p-0.5 border border-slate-800 overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-indigo-500 via-teal-400 to-emerald-400 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, Math.max(0, displayPiecesRate))}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Stat Badges */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800 text-center">
+                      <div className="bg-slate-950/60 rounded-xl p-2 border border-slate-800">
+                        <span className="block text-[10px] text-slate-400 font-bold">إجمالي القطع</span>
+                        <span className="font-mono font-black text-sm text-white">{displayTotalPieces}</span>
+                      </div>
+                      <div className="bg-emerald-950/20 rounded-xl p-2 border border-emerald-500/20">
+                        <span className="block text-[10px] text-emerald-400 font-bold">تم تسليمها</span>
+                        <span className="font-mono font-black text-sm text-emerald-400">{displayDeliveredPieces}</span>
+                      </div>
+                      <div className="bg-rose-950/20 rounded-xl p-2 border border-rose-500/20">
+                        <span className="block text-[10px] text-rose-400 font-bold">متبقية بالمحطة</span>
+                        <span className="font-mono font-black text-sm text-rose-400">{displayRemainingPieces}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card B: Recipient Type Breakdown (Self vs Proxy) */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-lg space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                          <UserCheck className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-white">جهة الاستلام وتوثيق النيابة</h3>
+                          <p className="text-[11px] text-slate-400">توثيق تسليم الطالب شخصياً أو شخص بالنيابة عنه</p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-xl text-xs font-mono font-black bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                        {ov.self_deliveries + ov.proxy_deliveries} عملية تسليم
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div className="bg-slate-950/80 rounded-2xl p-3.5 border border-emerald-500/20 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0 text-base">
+                          🎓
+                        </div>
+                        <div>
+                          <span className="block text-[11px] text-slate-400 font-bold">الطالب نفسه</span>
+                          <span className="font-mono font-black text-xl text-emerald-400">{ov.self_deliveries}</span>
+                          <span className="text-[10px] text-slate-500 block">
+                            {ov.self_deliveries + ov.proxy_deliveries > 0
+                              ? Math.round((ov.self_deliveries / (ov.self_deliveries + ov.proxy_deliveries)) * 100)
+                              : 0}% من المسلمين
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-950/80 rounded-2xl p-3.5 border border-purple-500/20 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 flex-shrink-0 text-base">
+                          🤝
+                        </div>
+                        <div>
+                          <span className="block text-[11px] text-purple-300 font-bold">استلام بالنيابة</span>
+                          <span className="font-mono font-black text-xl text-purple-300">{ov.proxy_deliveries}</span>
+                          <span className="text-[10px] text-slate-500 block">
+                            {ov.self_deliveries + ov.proxy_deliveries > 0
+                              ? Math.round((ov.proxy_deliveries / (ov.self_deliveries + ov.proxy_deliveries)) * 100)
+                              : 0}% من المسلمين
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 bg-slate-950/40 rounded-xl p-2.5 border border-slate-800/80">
+                      💡 يتم توثيق اسم وصلة قرابة المستلم الفعلي بالاسم ورقم الهاتف فورياً لحماية حقوق الطلاب.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. ZONE-BY-ZONE PERFORMANCE BREAKDOWN */}
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div>
+                      <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                        <SlidersHorizontal className="w-4 h-4 text-indigo-400" />
+                        <span>مقارنة أداء محطات وكشوفات الزونات</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        متابعة نسبة إنجاز كل زون والوصول المباشر لمحطة التسليم الخاصة به
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-slate-800 text-slate-300">
+                      {deliveryStats.zonesBreakdown.length} زونات
+                    </span>
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden lg:block overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400 font-bold">
+                          <th className="py-2.5 px-3 text-right">اسم الزون</th>
+                          <th className="py-2.5 px-3 text-center">المشرف</th>
+                          <th className="py-2.5 px-3 text-center">إجمالي الطلبات</th>
+                          <th className="py-2.5 px-3 text-center">تم التسليم</th>
+                          <th className="py-2.5 px-3 text-center">تسليم جزئي</th>
+                          <th className="py-2.5 px-3 text-center">قيد التسليم</th>
+                          <th className="py-2.5 px-3 text-center">القطع (مستلم/إجمالي)</th>
+                          <th className="py-2.5 px-3 text-center">نسبة الإنجاز</th>
+                          <th className="py-2.5 px-3 text-center">إجراء</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {deliveryStats.zonesBreakdown.map(z => (
+                          <tr key={z.id} className="hover:bg-slate-800/30 transition">
+                            <td className="py-3 px-3">
+                              <span className="font-bold text-white block">{z.name}</span>
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                أنشئ: {new Date(z.created_at).toLocaleDateString('ar-EG')}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-center text-slate-300 font-medium">
+                              {z.created_by}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono font-bold text-white">
+                              {z.total_orders}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono font-bold text-emerald-400">
+                              {z.delivered_orders}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono font-bold text-amber-400">
+                              {z.partial_orders}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono font-bold text-slate-400">
+                              {z.pending_orders}
+                            </td>
+                            <td className="py-3 px-3 text-center font-mono font-medium text-slate-300" dir="ltr">
+                              {z.delivered_pieces} / {z.total_pieces}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <div className="w-20 bg-slate-800 rounded-full h-2 overflow-hidden">
+                                  <div
+                                    className="bg-emerald-500 h-full transition-all"
+                                    style={{ width: `${z.progress_percent}%` }}
+                                  />
+                                </div>
+                                <span className="font-mono font-black text-xs text-emerald-400 min-w-[32px]">
+                                  {z.progress_percent}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSubTab('delivery');
+                                  openDeliverySheet(z.id);
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 font-bold text-[11px] inline-flex items-center gap-1 transition"
+                              >
+                                <span>محطة التسليم</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile & Tablet Card View */}
+                  <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {deliveryStats.zonesBreakdown.map(z => (
+                      <div key={z.id} className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-white text-sm">{z.name}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            {z.progress_percent}% مكتمل
+                          </span>
+                        </div>
+
+                        {/* Mini Progress */}
+                        <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-emerald-500 h-full transition-all"
+                            style={{ width: `${z.progress_percent}%` }}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-1 text-center pt-1 border-t border-slate-800 text-xs">
+                          <div>
+                            <span className="block text-[10px] text-slate-500">الطلبات</span>
+                            <span className="font-mono font-black text-white">{z.total_orders}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-emerald-400">مستلم</span>
+                            <span className="font-mono font-black text-emerald-400">{z.delivered_orders}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-amber-400">جزئي</span>
+                            <span className="font-mono font-black text-amber-400">{z.partial_orders}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[10px] text-slate-400">متبقي</span>
+                            <span className="font-mono font-black text-slate-400">{z.pending_orders}</span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                          <span className="text-[11px] text-slate-400">
+                            القطع: <strong className="text-white font-mono">{z.delivered_pieces}/{z.total_pieces}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubTab('delivery');
+                              openDeliverySheet(z.id);
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs inline-flex items-center gap-1 transition"
+                          >
+                            <span>فتح التسليم</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. PRODUCT & INVENTORY DELIVERY BREAKDOWN */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Box 1: Garments & Kids Apparel */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                      <div>
+                        <h3 className="text-sm font-black text-white flex items-center gap-2">
+                          <Package className="w-4 h-4 text-indigo-400" />
+                          <span>الملابس الرئيسية وأطفال (Garments)</span>
+                        </h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          حصر الجاكيتات، روب التخرج، وملابس الأطفال المسلمة والمتبقية
+                        </p>
+                      </div>
+                    </div>
+
+                    {deliveryStats.itemsBreakdown.garments.length === 0 ? (
+                      <p className="text-xs text-slate-500 text-center py-6">لا توجد بيانات ملابس في الكشوفات الحالية</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {deliveryStats.itemsBreakdown.garments.map(g => {
+                          const rate = g.total > 0 ? Math.round((g.delivered / g.total) * 100) : 0;
+                          return (
+                            <div key={g.title} className="bg-slate-950/60 rounded-2xl p-3 border border-slate-800/80 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-white text-xs sm:text-sm">{g.title}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs font-bold text-emerald-400">
+                                    {g.delivered} / {g.total}
+                                  </span>
+                                  <span className="px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold">
+                                    {rate}%
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
+                                <div
+                                  className="bg-gradient-to-r from-indigo-500 to-emerald-400 h-full transition-all"
+                                  style={{ width: `${rate}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                                <span>تم تسليمه: <strong className="text-emerald-400">{g.delivered}</strong></span>
+                                <span>متبقي بالمحطة: <strong className="text-rose-400">{g.pending}</strong></span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Box 2: Add-ons & Accessories */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                      <div>
+                        <h3 className="text-sm font-black text-white flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-purple-400" />
+                          <span>الملحقات والإضافات (Add-ons)</span>
+                        </h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          حصر تسليم النظارات، النوت بوك، الستيكرز، الشنط، وبطاقات التوقيع
+                        </p>
+                      </div>
+                    </div>
+
+                    {deliveryStats.itemsBreakdown.addons.length === 0 ? (
+                      <p className="text-xs text-slate-500 text-center py-6">لا توجد ملحقات مضافة في الكشوفات الحالية</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {deliveryStats.itemsBreakdown.addons.map(a => {
+                          const rate = a.total > 0 ? Math.round((a.delivered / a.total) * 100) : 0;
+                          return (
+                            <div key={a.title} className="bg-slate-950/60 rounded-2xl p-3 border border-purple-500/20 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-purple-400" />
+                                  <span className="font-bold text-white text-xs sm:text-sm">{a.title}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs font-bold text-purple-300">
+                                    {a.delivered} / {a.total}
+                                  </span>
+                                  <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 font-mono text-[10px] font-bold">
+                                    {rate}%
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden">
+                                <div
+                                  className="bg-gradient-to-r from-purple-500 to-indigo-400 h-full transition-all"
+                                  style={{ width: `${rate}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                                <span>تم تسليمه: <strong className="text-emerald-400">{a.delivered}</strong></span>
+                                <span>متبقي بالمحطة: <strong className="text-rose-400">{a.pending}</strong></span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 5. LIVE RECENT DELIVERY AUDIT FEED */}
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                    <div>
+                      <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-emerald-400" />
+                        <span>سجل عمليات التسليم اللحظي (Live Activity Feed)</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        آخر العمليات المسجلة ميدانياً مع توثيق المشرف والمستلم الفعلي
+                      </p>
+                    </div>
+
+                    {/* Filter Search Input */}
+                    <div className="relative min-w-[240px]">
+                      <Search className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={statsLogSearch}
+                        onChange={e => setStatsLogSearch(e.target.value)}
+                        placeholder="ابحث بالطالب أو الكود أو المستلم..."
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pr-9 pl-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Filtered Log List */}
+                  {(() => {
+                    const filteredLogs = deliveryStats.recentDeliveries.filter(r => {
+                      if (!statsLogSearch.trim()) return true;
+                      const q = statsLogSearch.trim().toLowerCase();
+                      return (
+                        r.order_code.toLowerCase().includes(q) ||
+                        r.customer_name.toLowerCase().includes(q) ||
+                        r.zone_name.toLowerCase().includes(q) ||
+                        (r.recipient_name && r.recipient_name.toLowerCase().includes(q)) ||
+                        (r.delivered_by && r.delivered_by.toLowerCase().includes(q))
+                      );
+                    });
+
+                    if (filteredLogs.length === 0) {
+                      return (
+                        <p className="text-xs text-slate-500 text-center py-8">
+                          {statsLogSearch ? 'لا توجد نتائج تطابق بحثك في سجل التسليم' : 'لم يتم تسجيل أي عمليات تسليم حتى الآن'}
+                        </p>
+                      );
+                    }
+
+                    return (
+                      <div className="divide-y divide-slate-800/60 max-h-[480px] overflow-y-auto pr-1">
+                        {filteredLogs.map(log => {
+                          const isFull = log.delivery_status === 'delivered';
+                          const timeStr = log.delivered_at
+                            ? new Date(log.delivered_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+                            : 'الآن';
+
+                          return (
+                            <div key={log.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-800/20 px-2 rounded-xl transition">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-mono font-black text-amber-300 text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20" dir="ltr">
+                                    #{log.order_code.replace(/^#/, '')}
+                                  </span>
+                                  <span className="font-bold text-white text-xs sm:text-sm">{log.customer_name}</span>
+                                  <span className="text-[11px] text-slate-400">({log.zone_name})</span>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-xs flex-wrap">
+                                  {/* Recipient Badge */}
+                                  {log.recipient_name ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+                                      <span>🤝 بالنيابة:</span>
+                                      <strong>{log.recipient_name}</strong>
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                                      🎓 الطالب نفسه
+                                    </span>
+                                  )}
+
+                                  {log.delivered_by && (
+                                    <span className="text-[11px] text-slate-500">
+                                      المشرف: <strong className="text-slate-300">{log.delivered_by}</strong>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-center flex-shrink-0">
+                                <div className="text-left font-mono text-[11px] text-slate-500">
+                                  {timeStr}
+                                </div>
+                                {isFull ? (
+                                  <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                                    <Check className="w-3 h-3 stroke-[3]" />
+                                    <span>تسليم كامل</span>
+                                  </span>
+                                ) : (
+                                  <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    <span>تسليم جزئي ({log.delivered_items_count}/{log.total_items_count})</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
