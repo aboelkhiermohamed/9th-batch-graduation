@@ -182,74 +182,72 @@ function OrderItemsList({
     return <span className="text-slate-500 text-xs">بدون تفاصيل</span>;
   }
 
+  // Separate garments and add-ons while preserving original index for delivery tracking!
+  const garmentsWithIndex: Array<{ item: ParsedOrderItem; idx: number }> = [];
+  const addonsWithIndex: Array<{ item: ParsedOrderItem; idx: number }> = [];
+
+  parsed.forEach((item, idx) => {
+    if (item.title.startsWith('ملحق:') || item.title.startsWith('إضافة:')) {
+      addonsWithIndex.push({ item, idx });
+    } else {
+      garmentsWithIndex.push({ item, idx });
+    }
+  });
+
   return (
-    <div className="flex flex-col gap-1.5 py-0.5">
-      {parsed.map((item, idx) => {
+    <div className="space-y-1.5 py-0.5 text-xs">
+      {/* 1. Garments & Kids Items (Compact clean rows) */}
+      {garmentsWithIndex.map(({ item, idx }) => {
         const isItemDelivered = orderStatus === 'delivered' || (orderStatus === 'partial' && (deliveredIndices?.includes(idx) ?? false));
-        const isOrderPartial = orderStatus === 'partial';
-        const isAddon = item.title.startsWith('ملحق:') || item.title.startsWith('إضافة:');
         const isKids = item.title.includes('اطفال') || item.title.includes('أطفال');
 
         return (
           <div
             key={idx}
-            className={`flex items-center gap-1.5 flex-wrap px-2.5 py-1.5 rounded-xl text-xs transition border ${
+            className={`flex items-center gap-1.5 flex-wrap px-2.5 py-1 rounded-lg border transition ${
               isItemDelivered
-                ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-100'
-                : isOrderPartial
-                ? 'bg-amber-950/20 border-amber-500/30 text-slate-300'
-                : isAddon
-                ? 'bg-purple-950/25 border-purple-500/30 text-slate-200'
+                ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
                 : isKids
-                ? 'bg-sky-950/25 border-sky-500/30 text-slate-200'
-                : 'bg-slate-950/80 border-slate-800/90 hover:border-slate-700 text-white'
+                ? 'bg-sky-950/20 border-sky-500/30 text-slate-200'
+                : 'bg-slate-900/80 border-slate-800 text-slate-200'
             }`}
           >
-            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-              isItemDelivered ? 'bg-emerald-400 shadow-sm shadow-emerald-400' : 'bg-slate-500'
-            }`} />
-            
-            {/* Visual Tag for Add-on or Kids item */}
-            {isAddon ? (
-              <span className="px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold inline-flex items-center gap-1">
-                <Sparkles className="w-2.5 h-2.5 text-purple-400" />
-                <span>ملحق / Add-on</span>
+            {isKids && (
+              <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[10px] font-bold">
+                👶 أطفال
               </span>
-            ) : isKids ? (
-              <span className="px-1.5 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold inline-flex items-center gap-1">
-                <span>👶</span>
-                <span>أطفال</span>
-              </span>
-            ) : null}
+            )}
 
-            <span className="font-bold tracking-wide">{item.title}</span>
+            <span className="font-bold text-[11px] sm:text-xs text-white">
+              {item.title}
+            </span>
 
             {item.size && (
-              <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono font-bold text-[10px]" dir="ltr">
+              <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono text-[10px] font-bold" dir="ltr">
                 مقاس: {item.size}
               </span>
             )}
 
             {item.qty && item.qty > 1 && (
-              <span className="px-2 py-0.5 rounded-lg bg-slate-800 text-amber-300 border border-slate-700 font-mono font-bold text-[10px]">
+              <span className="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-slate-700 font-mono text-[10px] font-bold">
                 ×{item.qty}
               </span>
             )}
 
             {item.customization && (
-              <span className="px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-200 border border-amber-500/30 text-[10px] font-medium">
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] max-w-[220px] truncate" title={item.customization}>
                 {item.customization}
               </span>
             )}
 
-            {/* Individual Item Delivery Badge */}
+            {/* Status indicator */}
             {isItemDelivered ? (
-              <span className="mr-auto px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-bold flex items-center gap-0.5">
+              <span className="mr-auto px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-bold flex items-center gap-0.5 shrink-0">
                 <Check className="w-2.5 h-2.5" />
                 <span>مستلم</span>
               </span>
-            ) : isOrderPartial ? (
-              <span className="mr-auto px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold flex items-center gap-0.5">
+            ) : orderStatus === 'partial' ? (
+              <span className="mr-auto px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] font-bold flex items-center gap-0.5 shrink-0">
                 <Clock className="w-2.5 h-2.5" />
                 <span>معلق</span>
               </span>
@@ -257,6 +255,41 @@ function OrderItemsList({
           </div>
         );
       })}
+
+      {/* 2. Add-ons (Single Compact Inline Flow of Chips!) */}
+      {addonsWithIndex.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+          <span className="text-[10px] font-bold text-purple-400 flex items-center gap-1 shrink-0">
+            <Sparkles className="w-3 h-3 text-purple-400" />
+            <span>الملحقات:</span>
+          </span>
+
+          {addonsWithIndex.map(({ item, idx }) => {
+            const isItemDelivered = orderStatus === 'delivered' || (orderStatus === 'partial' && (deliveredIndices?.includes(idx) ?? false));
+            const cleanTitle = item.title.replace(/^(?:ملحق|إضافة):\s*/i, '').trim();
+
+            return (
+              <span
+                key={idx}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border transition ${
+                  isItemDelivered
+                    ? 'bg-emerald-950/30 text-emerald-300 border-emerald-500/40 font-bold'
+                    : orderStatus === 'partial'
+                    ? 'bg-amber-950/25 text-amber-300 border-amber-500/30 font-bold'
+                    : 'bg-purple-950/20 text-purple-300 border-purple-500/30'
+                }`}
+              >
+                <span>{cleanTitle}</span>
+                {isItemDelivered ? (
+                  <Check className="w-2.5 h-2.5 text-emerald-400" />
+                ) : orderStatus === 'partial' ? (
+                  <Clock className="w-2.5 h-2.5 text-amber-400" />
+                ) : null}
+              </span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -364,7 +397,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   const [openedZone, setOpenedZone] = useState<DeliveryZone | null>(null);
   const [isLoadingOpenedZone, setIsLoadingOpenedZone] = useState(false);
   const [deliveryCodeSearch, setDeliveryCodeSearch] = useState('');
-  const [deliverySearchFeedback, setDeliverySearchFeedback] = useState<{ type: 'found' | 'not_found'; message: string } | null>(null);
+  const [deliverySearchFeedback, setDeliverySearchFeedback] = useState<{ type: 'found' | 'not_found' | 'external'; message: string; externalOrder?: any } | null>(null);
   const [highlightedOrderId, setHighlightedOrderId] = useState<string | null>(null);
   const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'pending' | 'partial' | 'delivered'>('all');
   const [statusUpdatingOrderId, setStatusUpdatingOrderId] = useState<string | null>(null);
@@ -585,7 +618,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
     }
   };
 
-  const handleDeliverySearchByCode = (e?: React.FormEvent) => {
+  const handleDeliverySearchByCode = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!openedZone || !openedZone.orders) return;
 
@@ -632,12 +665,24 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       }, 100);
     } else {
       setHighlightedOrderId(null);
+      // Auto search database globally in background
+      try {
+        const res = await fetch(`/api/admin/zones/search-order?query=${encodeURIComponent(q)}`, { cache: 'no-store' });
+        const data = await res.json();
+        if (data.success && data.order) {
+          setDeliverySearchFeedback({
+            type: 'external',
+            message: `هذا الطلب مسجل في كشف آخر: [${data.order.zone_name || 'كشف تسليم'}]`,
+            externalOrder: data.order
+          });
+          return;
+        }
+      } catch (err) {}
+
       setDeliverySearchFeedback({
         type: 'not_found',
-        message: `⚠️ غير موجود في هذا الكشف. اضغط "بحث شامل" بالأعلى للبحث في كافة الزونات والطلبات.`
+        message: `⚠️ الطلب "${deliveryCodeSearch}" غير موجود في هذا الكشف ولا في أي كشف آخر.`
       });
-      // Pre-fill global search input for convenience
-      setGlobalSearchInput(deliveryCodeSearch.trim());
     }
   };
 
@@ -1931,242 +1976,239 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       {/* ============================================================= */}
       {subTab === 'delivery' && (
         <div className="space-y-6">
-          {/* ============================================================= */}
-          {/* UNIFIED GLOBAL SEARCH: ADD-ONS, KIDS & ALL ZONES             */}
-          {/* ============================================================= */}
-          <div className="bg-gradient-to-br from-slate-900/95 via-indigo-950/20 to-slate-900/95 border border-indigo-500/30 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-                  <Search className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2 flex-wrap">
-                    <span>البحث الشامل في جميع الزونات والطلبات</span>
-                    <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono flex items-center gap-1">
-                      <Sparkles className="w-2.5 h-2.5 text-purple-400" />
-                      <span>💎 Add-ons & أطفال</span>
-                    </span>
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    مخصص لتسليم الملحقات (Add-ons) وملابس الأطفال أو تسليم طلبات أي كشف فوراً من مكان واحد وبأقل استهلاك للسيرفر.
-                  </p>
-                </div>
-              </div>
-
-              {globalSearchResult && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGlobalSearchResult(null);
-                    setGlobalSearchFeedback(null);
-                    setGlobalSearchInput('');
-                  }}
-                  className="self-end sm:self-auto text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition flex items-center gap-1"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  <span>مسح النتيجة</span>
-                </button>
-              )}
-            </div>
-
-            {/* Search Input Form */}
-            <form onSubmit={handleGlobalDeliverySearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={globalSearchInput}
-                  onChange={e => setGlobalSearchInput(e.target.value)}
-                  placeholder="أدخل كود الطلب (مثلاً 13357 أو GRAD-13357) أو رقم الهاتف أو اسم الطالب..."
-                  className="w-full bg-slate-950/80 border border-slate-800 focus:border-indigo-500 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none transition shadow-inner font-mono"
-                  dir="auto"
-                />
-                {globalSearchInput && (
-                  <button
-                    type="button"
-                    onClick={() => setGlobalSearchInput('')}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={isGlobalSearching}
-                className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition min-h-[44px]"
-              >
-                {isGlobalSearching ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>جارٍ البحث...</span>
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4" />
-                    <span>بحث شامل</span>
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Search Feedback Message */}
-            {globalSearchFeedback && (
-              <div
-                className={`p-2.5 rounded-xl text-xs flex items-center gap-2 animate-in fade-in ${
-                  globalSearchFeedback.type === 'found'
-                    ? 'bg-emerald-950/40 border border-emerald-500/30 text-emerald-300'
-                    : globalSearchFeedback.type === 'not_found'
-                    ? 'bg-rose-950/40 border border-rose-500/30 text-rose-300'
-                    : 'bg-indigo-950/40 border border-indigo-500/30 text-indigo-300'
-                }`}
-              >
-                {globalSearchFeedback.type === 'found' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                ) : globalSearchFeedback.type === 'not_found' ? (
-                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                ) : (
-                  <Clock className="w-4 h-4 text-indigo-400 shrink-0" />
-                )}
-                <span>{globalSearchFeedback.message}</span>
-              </div>
-            )}
-
-            {/* Global Search Result Card */}
-            {globalSearchResult && (
-              <div className="bg-slate-950/90 border border-indigo-500/40 rounded-2xl p-4 space-y-3.5 shadow-xl animate-in zoom-in-95">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <span className="font-mono font-black text-amber-300 text-sm sm:text-base bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-xl">
-                      #{globalSearchResult.order_code?.replace(/^#/, '')}
-                    </span>
-                    <span className="font-bold text-white text-sm sm:text-base">
-                      {globalSearchResult.customer_name}
-                    </span>
-                    {globalSearchResult.customer_phone && (
-                      <a
-                        href={`tel:${globalSearchResult.customer_phone}`}
-                        className="font-mono text-slate-300 text-xs flex items-center gap-1 bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
-                        dir="ltr"
-                      >
-                        <Phone className="w-3 h-3 text-emerald-400" />
-                        <span>{globalSearchResult.customer_phone}</span>
-                      </a>
-                    )}
+          {/* VIEW A: LIST OF ALL SHEETS & GLOBAL SEARCH (Only when NO sheet is opened) */}
+          {!openedZoneId && (
+            <div className="space-y-6">
+              {/* ============================================================= */}
+              {/* UNIFIED GLOBAL SEARCH: ADD-ONS, KIDS & ALL ZONES             */}
+              {/* ============================================================= */}
+              <div className="bg-gradient-to-br from-slate-900/95 via-indigo-950/20 to-slate-900/95 border border-indigo-500/30 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                      <Search className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2 flex-wrap">
+                        <span>البحث الشامل في جميع الزونات والطلبات</span>
+                        <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono flex items-center gap-1">
+                          <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                          <span>💎 Add-ons & أطفال</span>
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        مخصص لتسليم الملحقات (Add-ons) وملابس الأطفال أو تسليم طلبات أي كشف فوراً من مكان واحد وبأقل استهلاك للسيرفر.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Zone Badge */}
-                    <span className="px-2.5 py-1 rounded-xl bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-xs font-bold flex items-center gap-1">
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>{globalSearchResult.zone_name || 'غير مضاف لكشف'}</span>
-                    </span>
-
-                    {/* Delivery Status Badge */}
-                    {globalSearchResult.delivery_status === 'delivered' ? (
-                      <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>تم التسليم بالكامل</span>
-                      </span>
-                    ) : globalSearchResult.delivery_status === 'partial' ? (
-                      <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1">
-                        <Package className="w-3.5 h-3.5" />
-                        <span>تسليم جزئي</span>
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>قيد التسليم (معلق)</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Items Breakdown */}
-                <div>
-                  <div className="text-[11px] text-slate-400 font-bold mb-1.5 flex items-center justify-between">
-                    <span>محتويات وأصناف الطلب:</span>
-                    <span className="text-slate-500">
-                      {globalSearchResult.delivery_time ? `موعد التسليم: ${globalSearchResult.delivery_time}` : ''}
-                    </span>
-                  </div>
-                  <OrderItemsList
-                    text={globalSearchResult.items_summary}
-                    items={globalSearchResult.items}
-                    deliveredIndices={globalSearchResult.delivered_items}
-                    orderStatus={globalSearchResult.delivery_status}
-                  />
-                </div>
-
-                {/* Card Actions */}
-                <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                  <div className="text-[11px] text-slate-400">
-                    {globalSearchResult.delivered_at && (
-                      <span>آخر تسليم: {new Date(globalSearchResult.delivered_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })} ({globalSearchResult.delivered_by || 'Admin'})</span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
+                  {globalSearchResult && (
                     <button
                       type="button"
                       onClick={() => {
-                        const targetOrder: DeliveryZoneOrder = {
-                          id: globalSearchResult.zone_order_id || globalSearchResult.order_id,
-                          zone_id: globalSearchResult.zone_id || 'general',
-                          zone_name: globalSearchResult.zone_name,
-                          order_id: globalSearchResult.order_id,
-                          order_code: globalSearchResult.order_code,
-                          customer_name: globalSearchResult.customer_name,
-                          customer_phone: globalSearchResult.customer_phone,
-                          order_details: globalSearchResult.items_summary,
-                          items_summary: globalSearchResult.items_summary,
-                          items: globalSearchResult.items,
-                          delivery_time: globalSearchResult.delivery_time || 'غير محدد',
-                          delivery_status: globalSearchResult.delivery_status || 'pending',
-                          delivered_items: globalSearchResult.delivered_items || [],
-                          delivered_at: globalSearchResult.delivered_at,
-                          delivered_by: globalSearchResult.delivered_by,
-                          sort_order: 1,
-                          created_at: new Date().toISOString(),
-                          updated_at: new Date().toISOString()
-                        };
-                        openItemDeliveryModal(targetOrder);
+                        setGlobalSearchResult(null);
+                        setGlobalSearchFeedback(null);
+                        setGlobalSearchInput('');
                       }}
-                      className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition"
+                      className="self-end sm:self-auto text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition flex items-center gap-1"
                     >
-                      <Check className="w-4 h-4" />
-                      <span>تسليم / تحديد القطع والملحقات المستلمة</span>
+                      <X className="w-3.5 h-3.5" />
+                      <span>مسح النتيجة</span>
                     </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          {/* VIEW A: LIST OF ALL SHEETS */}
-          {!openedZoneId && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-black text-white flex items-center gap-2">
-                    <Package className="w-5 h-5 text-indigo-400" />
-                    <span>كشوفات التسليم المتاحة لجميع المشرفين</span>
-                  </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    اختر كشف الزون الخاص بك لبدء تسليم أوردرات الطلاب ومتابعة نسبة الإنجاز لحظياً.
-                  </p>
+                  )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={fetchZonesList}
-                  disabled={isLoadingZones}
-                  className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition"
-                  title="تحديث القائمة"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isLoadingZones ? 'animate-spin' : ''}`} />
-                </button>
+                {/* Search Input Form */}
+                <form onSubmit={handleGlobalDeliverySearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={globalSearchInput}
+                      onChange={e => setGlobalSearchInput(e.target.value)}
+                      placeholder="أدخل كود الطلب (مثلاً 13357 أو GRAD-13357) أو رقم الهاتف أو اسم الطالب..."
+                      className="w-full bg-slate-950/80 border border-slate-800 focus:border-indigo-500 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none transition shadow-inner font-mono"
+                      dir="auto"
+                    />
+                    {globalSearchInput && (
+                      <button
+                        type="button"
+                        onClick={() => setGlobalSearchInput('')}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isGlobalSearching}
+                    className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition min-h-[44px]"
+                  >
+                    {isGlobalSearching ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>جارٍ البحث...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-4 h-4" />
+                        <span>بحث شامل</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                {/* Search Feedback Message */}
+                {globalSearchFeedback && (
+                  <div
+                    className={`p-2.5 rounded-xl text-xs flex items-center gap-2 animate-in fade-in ${
+                      globalSearchFeedback.type === 'found'
+                        ? 'bg-emerald-950/40 border border-emerald-500/30 text-emerald-300'
+                        : globalSearchFeedback.type === 'not_found'
+                        ? 'bg-rose-950/40 border border-rose-500/30 text-rose-300'
+                        : 'bg-indigo-950/40 border border-indigo-500/30 text-indigo-300'
+                    }`}
+                  >
+                    {globalSearchFeedback.type === 'found' ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    ) : globalSearchFeedback.type === 'not_found' ? (
+                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    ) : (
+                      <Clock className="w-4 h-4 text-indigo-400 shrink-0" />
+                    )}
+                    <span>{globalSearchFeedback.message}</span>
+                  </div>
+                )}
+
+                {/* Global Search Result Card */}
+                {globalSearchResult && (
+                  <div className="bg-slate-950/90 border border-indigo-500/40 rounded-2xl p-4 space-y-3 shadow-xl animate-in zoom-in-95">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="font-mono font-black text-amber-300 text-sm bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-lg">
+                          #{globalSearchResult.order_code?.replace(/^#/, '')}
+                        </span>
+                        <span className="font-bold text-white text-sm">
+                          {globalSearchResult.customer_name}
+                        </span>
+                        {globalSearchResult.customer_phone && (
+                          <a
+                            href={`tel:${globalSearchResult.customer_phone}`}
+                            className="font-mono text-slate-300 text-xs flex items-center gap-1 bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
+                            dir="ltr"
+                          >
+                            <Phone className="w-3 h-3 text-emerald-400" />
+                            <span>{globalSearchResult.customer_phone}</span>
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Zone Badge */}
+                        <span className="px-2 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-xs font-bold flex items-center gap-1">
+                          <Layers className="w-3.5 h-3.5" />
+                          <span>{globalSearchResult.zone_name || 'غير مضاف لكشف'}</span>
+                        </span>
+
+                        {/* Delivery Status Badge */}
+                        {globalSearchResult.delivery_status === 'delivered' ? (
+                          <span className="px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>تم التسليم</span>
+                          </span>
+                        ) : globalSearchResult.delivery_status === 'partial' ? (
+                          <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1">
+                            <Package className="w-3.5 h-3.5" />
+                            <span>تسليم جزئي</span>
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>قيد التسليم</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Items Breakdown */}
+                    <div>
+                      <OrderItemsList
+                        text={globalSearchResult.items_summary}
+                        items={globalSearchResult.items}
+                        deliveredIndices={globalSearchResult.delivered_items}
+                        orderStatus={globalSearchResult.delivery_status}
+                      />
+                    </div>
+
+                    {/* Card Actions */}
+                    <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                      <div className="text-[11px] text-slate-400">
+                        {globalSearchResult.delivered_at && (
+                          <span>آخر تسليم: {new Date(globalSearchResult.delivered_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })} ({globalSearchResult.delivered_by || 'Admin'})</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const targetOrder: DeliveryZoneOrder = {
+                              id: globalSearchResult.zone_order_id || globalSearchResult.order_id,
+                              zone_id: globalSearchResult.zone_id || 'general',
+                              zone_name: globalSearchResult.zone_name,
+                              order_id: globalSearchResult.order_id,
+                              order_code: globalSearchResult.order_code,
+                              customer_name: globalSearchResult.customer_name,
+                              customer_phone: globalSearchResult.customer_phone,
+                              order_details: globalSearchResult.items_summary,
+                              items_summary: globalSearchResult.items_summary,
+                              items: globalSearchResult.items,
+                              delivery_time: globalSearchResult.delivery_time || 'غير محدد',
+                              delivery_status: globalSearchResult.delivery_status || 'pending',
+                              delivered_items: globalSearchResult.delivered_items || [],
+                              delivered_at: globalSearchResult.delivered_at,
+                              delivered_by: globalSearchResult.delivered_by,
+                              sort_order: 1,
+                              created_at: new Date().toISOString(),
+                              updated_at: new Date().toISOString()
+                            };
+                            openItemDeliveryModal(targetOrder);
+                          }}
+                          className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/30 transition"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>تسليم / تحديد القطع</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* LIST OF ALL SHEETS */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-black text-white flex items-center gap-2">
+                      <Package className="w-5 h-5 text-indigo-400" />
+                      <span>كشوفات التسليم المتاحة لجميع المشرفين</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      اختر كشف الزون الخاص بك لبدء تسليم أوردرات الطلاب ومتابعة نسبة الإنجاز لحظياً.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={fetchZonesList}
+                    disabled={isLoadingZones}
+                    className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition"
+                    title="تحديث القائمة"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isLoadingZones ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
 
               {isLoadingZones && zones.length === 0 ? (
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center text-slate-400">
@@ -2259,6 +2301,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 </div>
               )}
             </div>
+          </div>
           )}
 
           {/* VIEW B: INSIDE THE OPENED DELIVERY SHEET */}
@@ -2313,27 +2356,40 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                   </div>
                 </div>
 
-                {/* Progress KPIs */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 pt-3 border-t border-slate-800">
-                  <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-2.5 sm:p-3 text-center">
-                    <span className="block text-[10px] sm:text-[11px] text-slate-400 font-bold">إجمالي الطلبات</span>
-                    <span className="font-mono font-black text-base sm:text-lg text-white">{openedZone.total_orders || 0}</span>
+                {/* Sleek Horizontal Progress KPIs */}
+                <div className="flex items-center justify-between gap-3 flex-wrap pt-3 border-t border-slate-800 text-xs">
+                  <div className="flex items-center gap-4 sm:gap-6 flex-wrap font-bold">
+                    <div className="flex items-center gap-1.5 text-slate-300">
+                      <span className="text-slate-500">إجمالي الطلبات:</span>
+                      <span className="font-mono text-white font-black text-sm">{openedZone.total_orders || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-emerald-400">
+                      <span>تم التسليم:</span>
+                      <span className="font-mono font-black text-sm">{openedZone.delivered_orders || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-amber-400">
+                      <span>قيد التسليم:</span>
+                      <span className="font-mono font-black text-sm">{openedZone.pending_orders || 0}</span>
+                    </div>
                   </div>
-                  <div className="bg-slate-950/80 border border-emerald-900/40 rounded-2xl p-2.5 sm:p-3 text-center">
-                    <span className="block text-[10px] sm:text-[11px] text-emerald-400 font-bold">تم التسليم ✅</span>
-                    <span className="font-mono font-black text-base sm:text-lg text-emerald-400">{openedZone.delivered_orders || 0}</span>
-                  </div>
-                  <div className="bg-slate-950/80 border border-amber-900/40 rounded-2xl p-2.5 sm:p-3 text-center">
-                    <span className="block text-[10px] sm:text-[11px] text-amber-400 font-bold">قيد التسليم ⏳</span>
-                    <span className="font-mono font-black text-base sm:text-lg text-amber-400">{openedZone.pending_orders || 0}</span>
-                  </div>
-                  <div className="bg-slate-950/80 border border-indigo-900/40 rounded-2xl p-2.5 sm:p-3 text-center">
-                    <span className="block text-[10px] sm:text-[11px] text-indigo-400 font-bold">نسبة الإنجاز</span>
-                    <span className="font-mono font-black text-base sm:text-lg text-indigo-300">
+
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-slate-400 text-[11px] font-bold">الإنجاز:</span>
+                    <span className="font-mono font-black text-indigo-300 text-xs">
                       {openedZone.total_orders && openedZone.total_orders > 0
                         ? Math.round(((openedZone.delivered_orders || 0) / openedZone.total_orders) * 100)
                         : 0}%
                     </span>
+                    <div className="w-24 sm:w-32 h-2 rounded-full bg-slate-800 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${openedZone.total_orders && openedZone.total_orders > 0
+                            ? Math.round(((openedZone.delivered_orders || 0) / openedZone.total_orders) * 100)
+                            : 0}%`
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2376,18 +2432,65 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 {/* Search Feedback Message */}
                 {deliverySearchFeedback && (
                   <div
-                    className={`p-3.5 rounded-2xl border text-xs font-bold flex items-center gap-2.5 animate-in fade-in ${
+                    className={`p-3 rounded-2xl border text-xs font-bold animate-in fade-in ${
                       deliverySearchFeedback.type === 'found'
-                        ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40'
-                        : 'bg-rose-950/40 text-rose-300 border-rose-500/40'
+                        ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40 flex items-center gap-2.5'
+                        : deliverySearchFeedback.type === 'external'
+                        ? 'bg-indigo-950/60 text-white border-indigo-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg'
+                        : 'bg-rose-950/40 text-rose-300 border-rose-500/40 flex items-center gap-2.5'
                     }`}
                   >
-                    {deliverySearchFeedback.type === 'found' ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    ) : (
-                      <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                    <div className="flex items-center gap-2.5">
+                      {deliverySearchFeedback.type === 'found' ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      ) : deliverySearchFeedback.type === 'external' ? (
+                        <Layers className="w-4 h-4 text-indigo-400 flex-shrink-0" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                      )}
+                      <span>
+                        {deliverySearchFeedback.message}
+                        {deliverySearchFeedback.externalOrder && (
+                          <span className="mr-1.5 font-bold text-amber-300">
+                            - الطالب: {deliverySearchFeedback.externalOrder.customer_name} (#{deliverySearchFeedback.externalOrder.order_code})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+
+                    {deliverySearchFeedback.type === 'external' && deliverySearchFeedback.externalOrder && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const ord = deliverySearchFeedback.externalOrder;
+                          const targetOrder: DeliveryZoneOrder = {
+                            id: ord.zone_order_id || ord.order_id,
+                            zone_id: ord.zone_id || 'general',
+                            zone_name: ord.zone_name,
+                            order_id: ord.order_id,
+                            order_code: ord.order_code,
+                            customer_name: ord.customer_name,
+                            customer_phone: ord.customer_phone,
+                            order_details: ord.items_summary,
+                            items_summary: ord.items_summary,
+                            items: ord.items,
+                            delivery_time: ord.delivery_time || 'غير محدد',
+                            delivery_status: ord.delivery_status || 'pending',
+                            delivered_items: ord.delivered_items || [],
+                            delivered_at: ord.delivered_at,
+                            delivered_by: ord.delivered_by,
+                            sort_order: 1,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                          };
+                          openItemDeliveryModal(targetOrder);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition shrink-0 shadow-md shadow-emerald-600/30"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>تسليم القطع والملحقات الآن</span>
+                      </button>
                     )}
-                    <span>{deliverySearchFeedback.message}</span>
                   </div>
                 )}
 
@@ -3370,7 +3473,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                               </span>
                             ) : null}
                             <div className="font-bold text-xs sm:text-sm text-white truncate">
-                              {item.title}
+                              {isAddon ? item.title.replace(/^(?:ملحق|إضافة):\s*/i, '').trim() : item.title}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 flex-wrap">
