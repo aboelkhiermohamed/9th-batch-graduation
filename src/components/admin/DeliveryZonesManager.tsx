@@ -49,6 +49,48 @@ export function cleanDisplayOrderDetails(text?: string | null): string {
     .trim() || 'بدون تفاصيل';
 }
 
+// Clean Add-on text helper
+export function cleanAddonNameInUI(raw: string): string {
+  if (!raw) return '';
+  return raw
+    .replace(/^تخصيص:\s*/i, '')
+    .replace(/^إضافة:\s*/i, '')
+    .replace(/^ملحق:\s*/i, '')
+    .replace(/\s*\(\s*\+?\s*\d+[\s\S]*?\)/gi, '')
+    .replace(/\s*\+\s*\d+\s*(ج\.م|EGP|\$)?/gi, '')
+    .replace(/[\(\)]/g, '')
+    .replace(/\[.*?\]/g, '')
+    .trim();
+}
+
+// Split text by top-level " + " outside parentheses
+export function splitTopLevelPlus(text: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let parenDepth = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '(') {
+      parenDepth++;
+      current += char;
+    } else if (char === ')') {
+      if (parenDepth > 0) parenDepth--;
+      current += char;
+    } else if (char === '+' && parenDepth === 0) {
+      const trimmed = current.trim();
+      if (trimmed) parts.push(trimmed);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  const lastTrimmed = current.trim();
+  if (lastTrimmed) parts.push(lastTrimmed);
+  return parts;
+}
+
 export interface ParsedOrderItem {
   title: string;
   size?: string;
@@ -58,23 +100,33 @@ export interface ParsedOrderItem {
 
 export function parseOrderDetailsToItems(text?: string | null, rawItems?: DeliveryItemSummary[]): ParsedOrderItem[] {
   if (rawItems && rawItems.length > 0) {
-    return rawItems.map(item => ({
-      title: cleanDisplayOrderDetails(item.product_title) || 'منتج',
-      size: item.selected_size ? cleanDisplayOrderDetails(item.selected_size) : undefined,
-      qty: item.quantity > 1 ? item.quantity : undefined,
-      customization: (item.custom_text || item.customization_option)
-        ? cleanDisplayOrderDetails(item.custom_text ? `تطريز: ${item.custom_text}` : item.customization_option)
-        : undefined
-    }));
+    const results: ParsedOrderItem[] = [];
+    rawItems.forEach(item => {
+      const cleanTitle = cleanDisplayOrderDetails(item.product_title) || 'منتج';
+      results.push({
+        title: cleanTitle,
+        size: item.selected_size ? cleanDisplayOrderDetails(item.selected_size) : undefined,
+        qty: item.quantity > 1 ? item.quantity : undefined,
+        customization: (item.custom_text || item.customization_option)
+          ? cleanDisplayOrderDetails(item.custom_text ? `تطريز: ${item.custom_text}` : item.customization_option)
+          : undefined
+      });
+    });
+    return results;
   }
 
   if (!text) return [];
 
-  const rawParts = text.split(/\s*\+\s*/);
-  return rawParts.map(part => {
+  const rawParts = splitTopLevelPlus(text);
+  const items: ParsedOrderItem[] = [];
+
+  rawParts.forEach(part => {
     const clean = cleanDisplayOrderDetails(part);
     const match = clean.match(/^(.*?)(?:\s*\((.*?)\))?$/);
-    if (!match) return { title: clean };
+    if (!match) {
+      items.push({ title: clean });
+      return;
+    }
 
     const title = match[1].trim() || 'منتج';
     const extraStr = match[2] || '';
@@ -83,21 +135,34 @@ export function parseOrderDetailsToItems(text?: string | null, rawItems?: Delive
     let size: string | undefined = undefined;
     let qty: number | undefined = undefined;
     let customization: string | undefined = undefined;
+    const extractedAddons: string[] = [];
 
     extraParts.forEach(p => {
       if (p.startsWith('مقاس:')) {
         size = p.replace('مقاس:', '').trim();
       } else if (p.startsWith('كمية:')) {
         qty = parseInt(p.replace('كمية:', '').trim(), 10) || undefined;
-      } else if (p.startsWith('تطريز:') || p.startsWith('تخصيص:')) {
+      } else if (p.startsWith('تطريز:')) {
         customization = p;
+      } else if (p.startsWith('تخصيص:') || p.includes('Card') || p.includes('Notebook') || p.includes('Cap') || p.includes('Sunglasses') || p.includes('+')) {
+        const cleanName = cleanAddonNameInUI(p);
+        if (cleanName && !extractedAddons.includes(cleanName)) {
+          extractedAddons.push(cleanName);
+        }
       } else if (p) {
         customization = customization ? `${customization} | ${p}` : p;
       }
     });
 
-    return { title, size, qty, customization };
+    items.push({ title, size, qty, customization });
+
+    // Each extracted Add-on becomes its own individual checklist item!
+    extractedAddons.forEach(addon => {
+      items.push({ title: `ملحق: ${addon}` });
+    });
   });
+
+  return items;
 }
 
 function OrderItemsList({
@@ -122,6 +187,8 @@ function OrderItemsList({
       {parsed.map((item, idx) => {
         const isItemDelivered = orderStatus === 'delivered' || (orderStatus === 'partial' && (deliveredIndices?.includes(idx) ?? false));
         const isOrderPartial = orderStatus === 'partial';
+        const isAddon = item.title.startsWith('ملحق:') || item.title.startsWith('إضافة:');
+        const isKids = item.title.includes('اطفال') || item.title.includes('أطفال');
 
         return (
           <div
@@ -131,6 +198,10 @@ function OrderItemsList({
                 ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-100'
                 : isOrderPartial
                 ? 'bg-amber-950/20 border-amber-500/30 text-slate-300'
+                : isAddon
+                ? 'bg-purple-950/25 border-purple-500/30 text-slate-200'
+                : isKids
+                ? 'bg-sky-950/25 border-sky-500/30 text-slate-200'
                 : 'bg-slate-950/80 border-slate-800/90 hover:border-slate-700 text-white'
             }`}
           >
@@ -138,6 +209,19 @@ function OrderItemsList({
               isItemDelivered ? 'bg-emerald-400 shadow-sm shadow-emerald-400' : 'bg-slate-500'
             }`} />
             
+            {/* Visual Tag for Add-on or Kids item */}
+            {isAddon ? (
+              <span className="px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold inline-flex items-center gap-1">
+                <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                <span>ملحق / Add-on</span>
+              </span>
+            ) : isKids ? (
+              <span className="px-1.5 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold inline-flex items-center gap-1">
+                <span>👶</span>
+                <span>أطفال</span>
+              </span>
+            ) : null}
+
             <span className="font-bold tracking-wide">{item.title}</span>
 
             {item.size && (
@@ -288,6 +372,12 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   const [itemDeliveryModalOrder, setItemDeliveryModalOrder] = useState<DeliveryZoneOrder | null>(null);
   const [selectedItemIndices, setSelectedItemIndices] = useState<number[]>([]);
   const [isSavingItemDelivery, setIsSavingItemDelivery] = useState(false);
+
+  // Global Unified Search State (for Add-ons, Kids & All Zones)
+  const [globalSearchInput, setGlobalSearchInput] = useState('');
+  const [isGlobalSearching, setIsGlobalSearching] = useState(false);
+  const [globalSearchResult, setGlobalSearchResult] = useState<any | null>(null);
+  const [globalSearchFeedback, setGlobalSearchFeedback] = useState<{ type: 'found' | 'not_found' | 'info'; message: string } | null>(null);
 
   // Ref for table rows / mobile cards scrolling
   const orderRowRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -544,8 +634,64 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       setHighlightedOrderId(null);
       setDeliverySearchFeedback({
         type: 'not_found',
-        message: `⚠️ الطلب أو العميل "${deliveryCodeSearch}" غير موجود في هذا الزون! تأكد من رقم الزون أو راجع شيت المشاكل.`
+        message: `⚠️ غير موجود في هذا الكشف. اضغط "بحث شامل" بالأعلى للبحث في كافة الزونات والطلبات.`
       });
+      // Pre-fill global search input for convenience
+      setGlobalSearchInput(deliveryCodeSearch.trim());
+    }
+  };
+
+  // Global Unified Search: Search ANY order across all zones directly from DB (bandwidth-optimized)
+  const handleGlobalDeliverySearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const q = globalSearchInput.trim().replace(/^#/, '');
+    if (!q) {
+      setGlobalSearchFeedback({ type: 'info', message: 'يرجى إدخال كود الطلب أو رقم الهاتف أو اسم الطالب' });
+      setGlobalSearchResult(null);
+      return;
+    }
+
+    try {
+      setIsGlobalSearching(true);
+      setGlobalSearchFeedback(null);
+      setGlobalSearchResult(null);
+
+      const res = await fetch(`/api/admin/zones/search-order?query=${encodeURIComponent(q)}`, { cache: 'no-store' });
+      const data = await res.json();
+
+      if (!res.ok || !data.success || !data.order) {
+        setGlobalSearchFeedback({
+          type: 'not_found',
+          message: data.error || `⚠️ لم يتم العثور على أي طلب يطابق "${q}"`
+        });
+        return;
+      }
+
+      setGlobalSearchResult(data.order);
+      setGlobalSearchFeedback({
+        type: 'found',
+        message: `تم العثور على طلب: ${data.order.customer_name} (${data.order.order_code})`
+      });
+
+      // If this order exists in currently opened zone, also highlight it!
+      if (openedZone && openedZone.orders) {
+        const inZone = openedZone.orders.find(o => o.order_id === data.order.order_id || o.order_code === data.order.order_code);
+        if (inZone) {
+          setHighlightedOrderId(inZone.order_id);
+          const el = orderRowRefs.current[inZone.order_id];
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Error in global delivery search:', err);
+      setGlobalSearchFeedback({
+        type: 'not_found',
+        message: 'تعذر البحث حالياً، يرجى المحاولة ثانية'
+      });
+    } finally {
+      setIsGlobalSearching(false);
     }
   };
 
@@ -576,9 +722,10 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
   // Save item-by-item delivery
   const handleSaveItemDelivery = async () => {
-    if (!itemDeliveryModalOrder || !openedZoneId || !openedZone) return;
+    if (!itemDeliveryModalOrder) return;
 
     const order = itemDeliveryModalOrder;
+    const targetZoneId = order.zone_id || openedZoneId || 'general';
     const parsedItems = parseOrderDetailsToItems(order.items_summary || order.order_details, order.items);
     const totalItems = parsedItems.length;
     const selectedCount = selectedItemIndices.length;
@@ -599,32 +746,48 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       const now = new Date().toISOString();
       const adminName = currentAdmin?.display_name || 'Admin';
 
-      // Optimistic update
-      setOpenedZone(prev => {
-        if (!prev || !prev.orders) return prev;
-        const updatedOrders = prev.orders.map(o => {
-          if (o.order_id === order.order_id) {
-            return {
-              ...o,
-              delivery_status: newStatus,
-              delivered_items: newStatus === 'partial' ? selectedItemIndices : (newStatus === 'delivered' ? parsedItems.map((_, i) => i) : []),
-              delivered_at: newStatus !== 'pending' ? now : null,
-              delivered_by: newStatus !== 'pending' ? adminName : null
-            };
-          }
-          return o;
+      // 1. Optimistic update for openedZone (if active)
+      if (openedZone && openedZone.orders) {
+        setOpenedZone(prev => {
+          if (!prev || !prev.orders) return prev;
+          const updatedOrders = prev.orders.map(o => {
+            if (o.order_id === order.order_id) {
+              return {
+                ...o,
+                delivery_status: newStatus,
+                delivered_items: newStatus === 'partial' ? selectedItemIndices : (newStatus === 'delivered' ? parsedItems.map((_, i) => i) : []),
+                delivered_at: newStatus !== 'pending' ? now : null,
+                delivered_by: newStatus !== 'pending' ? adminName : null
+              };
+            }
+            return o;
+          });
+
+          const deliveredCount = updatedOrders.filter(o => o.delivery_status === 'delivered').length;
+          return {
+            ...prev,
+            orders: updatedOrders,
+            delivered_orders: deliveredCount,
+            pending_orders: (prev.total_orders || updatedOrders.length) - deliveredCount
+          };
         });
+      }
 
-        const deliveredCount = updatedOrders.filter(o => o.delivery_status === 'delivered').length;
-        return {
-          ...prev,
-          orders: updatedOrders,
-          delivered_orders: deliveredCount,
-          pending_orders: (prev.total_orders || updatedOrders.length) - deliveredCount
-        };
-      });
+      // 2. Optimistic update for globalSearchResult (if active)
+      if (globalSearchResult && (globalSearchResult.order_id === order.order_id || globalSearchResult.order_code === order.order_code)) {
+        setGlobalSearchResult((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            delivery_status: newStatus,
+            delivered_items: newStatus === 'partial' ? selectedItemIndices : (newStatus === 'delivered' ? parsedItems.map((_, i) => i) : []),
+            delivered_at: newStatus !== 'pending' ? now : null,
+            delivered_by: newStatus !== 'pending' ? adminName : null
+          };
+        });
+      }
 
-      const res = await fetch(`/api/admin/zones/${openedZoneId}/delivery`, {
+      const res = await fetch(`/api/admin/zones/${targetZoneId}/delivery`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -652,7 +815,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
     } catch (err: any) {
       console.error('Error saving item delivery:', err);
       showToast('تعذر حفظ عناصر التسليم، يرجى المحاولة ثانية', 'error');
-      openDeliverySheet(openedZoneId);
+      if (openedZoneId) openDeliverySheet(openedZoneId);
     } finally {
       setIsSavingItemDelivery(false);
       setStatusUpdatingOrderId(null);
@@ -661,8 +824,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
   // Mark an order as delivered
   const handleMarkAsDelivered = async (order: DeliveryZoneOrder, forceAll: boolean = false) => {
-    if (!openedZoneId || !openedZone) return;
-
+    const targetZoneId = order.zone_id || openedZoneId || 'general';
     const parsedItems = parseOrderDetailsToItems(order.items_summary || order.order_details, order.items);
     if (parsedItems.length > 1 && !forceAll) {
       openItemDeliveryModal(order);
@@ -676,32 +838,47 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       const now = new Date().toISOString();
       const adminName = currentAdmin?.display_name || 'Admin';
 
-      setOpenedZone(prev => {
-        if (!prev || !prev.orders) return prev;
-        const updatedOrders = prev.orders.map(o => {
-          if (o.order_id === order.order_id) {
-            return {
-              ...o,
-              delivery_status: 'delivered' as const,
-              delivered_items: parsedItems.map((_, i) => i),
-              delivered_at: now,
-              delivered_by: adminName
-            };
-          }
-          return o;
-        });
+      if (openedZone && openedZone.orders) {
+        setOpenedZone(prev => {
+          if (!prev || !prev.orders) return prev;
+          const updatedOrders = prev.orders.map(o => {
+            if (o.order_id === order.order_id) {
+              return {
+                ...o,
+                delivery_status: 'delivered' as const,
+                delivered_items: parsedItems.map((_, i) => i),
+                delivered_at: now,
+                delivered_by: adminName
+              };
+            }
+            return o;
+          });
 
-        const deliveredCount = updatedOrders.filter(o => o.delivery_status === 'delivered').length;
-        return {
-          ...prev,
-          orders: updatedOrders,
-          delivered_orders: deliveredCount,
-          pending_orders: (prev.total_orders || updatedOrders.length) - deliveredCount
-        };
-      });
+          const deliveredCount = updatedOrders.filter(o => o.delivery_status === 'delivered').length;
+          return {
+            ...prev,
+            orders: updatedOrders,
+            delivered_orders: deliveredCount,
+            pending_orders: (prev.total_orders || updatedOrders.length) - deliveredCount
+          };
+        });
+      }
+
+      if (globalSearchResult && (globalSearchResult.order_id === order.order_id || globalSearchResult.order_code === order.order_code)) {
+        setGlobalSearchResult((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            delivery_status: 'delivered',
+            delivered_items: parsedItems.map((_, i) => i),
+            delivered_at: now,
+            delivered_by: adminName
+          };
+        });
+      }
 
       // Send PATCH to API
-      const res = await fetch(`/api/admin/zones/${openedZoneId}/delivery`, {
+      const res = await fetch(`/api/admin/zones/${targetZoneId}/delivery`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -721,7 +898,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
       // Update in background list as well
       setZones(prev => prev.map(z => {
-        if (z.id === openedZoneId) {
+        if (z.id === targetZoneId) {
           const total = z.total_orders || 0;
           const delivered = (z.delivered_orders || 0) + 1;
           return { ...z, delivered_orders: delivered, pending_orders: Math.max(0, total - delivered) };
@@ -731,8 +908,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
     } catch (err: any) {
       console.error('Error marking as delivered:', err);
       showToast('تعذر حفظ حالة التسليم، يرجى المحاولة ثانية', 'error');
-      // Rollback: reload zone
-      openDeliverySheet(openedZoneId);
+      if (openedZoneId) openDeliverySheet(openedZoneId);
     } finally {
       setStatusUpdatingOrderId(null);
     }
@@ -1755,6 +1931,218 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       {/* ============================================================= */}
       {subTab === 'delivery' && (
         <div className="space-y-6">
+          {/* ============================================================= */}
+          {/* UNIFIED GLOBAL SEARCH: ADD-ONS, KIDS & ALL ZONES             */}
+          {/* ============================================================= */}
+          <div className="bg-gradient-to-br from-slate-900/95 via-indigo-950/20 to-slate-900/95 border border-indigo-500/30 rounded-3xl p-4 sm:p-5 shadow-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                  <Search className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2 flex-wrap">
+                    <span>البحث الشامل في جميع الزونات والطلبات</span>
+                    <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-mono flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                      <span>💎 Add-ons & أطفال</span>
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    مخصص لتسليم الملحقات (Add-ons) وملابس الأطفال أو تسليم طلبات أي كشف فوراً من مكان واحد وبأقل استهلاك للسيرفر.
+                  </p>
+                </div>
+              </div>
+
+              {globalSearchResult && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGlobalSearchResult(null);
+                    setGlobalSearchFeedback(null);
+                    setGlobalSearchInput('');
+                  }}
+                  className="self-end sm:self-auto text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition flex items-center gap-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>مسح النتيجة</span>
+                </button>
+              )}
+            </div>
+
+            {/* Search Input Form */}
+            <form onSubmit={handleGlobalDeliverySearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={globalSearchInput}
+                  onChange={e => setGlobalSearchInput(e.target.value)}
+                  placeholder="أدخل كود الطلب (مثلاً 13357 أو GRAD-13357) أو رقم الهاتف أو اسم الطالب..."
+                  className="w-full bg-slate-950/80 border border-slate-800 focus:border-indigo-500 rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder:text-slate-500 focus:outline-none transition shadow-inner font-mono"
+                  dir="auto"
+                />
+                {globalSearchInput && (
+                  <button
+                    type="button"
+                    onClick={() => setGlobalSearchInput('')}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isGlobalSearching}
+                className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition min-h-[44px]"
+              >
+                {isGlobalSearching ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>جارٍ البحث...</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" />
+                    <span>بحث شامل</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Search Feedback Message */}
+            {globalSearchFeedback && (
+              <div
+                className={`p-2.5 rounded-xl text-xs flex items-center gap-2 animate-in fade-in ${
+                  globalSearchFeedback.type === 'found'
+                    ? 'bg-emerald-950/40 border border-emerald-500/30 text-emerald-300'
+                    : globalSearchFeedback.type === 'not_found'
+                    ? 'bg-rose-950/40 border border-rose-500/30 text-rose-300'
+                    : 'bg-indigo-950/40 border border-indigo-500/30 text-indigo-300'
+                }`}
+              >
+                {globalSearchFeedback.type === 'found' ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : globalSearchFeedback.type === 'not_found' ? (
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                ) : (
+                  <Clock className="w-4 h-4 text-indigo-400 shrink-0" />
+                )}
+                <span>{globalSearchFeedback.message}</span>
+              </div>
+            )}
+
+            {/* Global Search Result Card */}
+            {globalSearchResult && (
+              <div className="bg-slate-950/90 border border-indigo-500/40 rounded-2xl p-4 space-y-3.5 shadow-xl animate-in zoom-in-95">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="font-mono font-black text-amber-300 text-sm sm:text-base bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-xl">
+                      #{globalSearchResult.order_code?.replace(/^#/, '')}
+                    </span>
+                    <span className="font-bold text-white text-sm sm:text-base">
+                      {globalSearchResult.customer_name}
+                    </span>
+                    {globalSearchResult.customer_phone && (
+                      <a
+                        href={`tel:${globalSearchResult.customer_phone}`}
+                        className="font-mono text-slate-300 text-xs flex items-center gap-1 bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
+                        dir="ltr"
+                      >
+                        <Phone className="w-3 h-3 text-emerald-400" />
+                        <span>{globalSearchResult.customer_phone}</span>
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Zone Badge */}
+                    <span className="px-2.5 py-1 rounded-xl bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-xs font-bold flex items-center gap-1">
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>{globalSearchResult.zone_name || 'غير مضاف لكشف'}</span>
+                    </span>
+
+                    {/* Delivery Status Badge */}
+                    {globalSearchResult.delivery_status === 'delivered' ? (
+                      <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>تم التسليم بالكامل</span>
+                      </span>
+                    ) : globalSearchResult.delivery_status === 'partial' ? (
+                      <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1">
+                        <Package className="w-3.5 h-3.5" />
+                        <span>تسليم جزئي</span>
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>قيد التسليم (معلق)</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Items Breakdown */}
+                <div>
+                  <div className="text-[11px] text-slate-400 font-bold mb-1.5 flex items-center justify-between">
+                    <span>محتويات وأصناف الطلب:</span>
+                    <span className="text-slate-500">
+                      {globalSearchResult.delivery_time ? `موعد التسليم: ${globalSearchResult.delivery_time}` : ''}
+                    </span>
+                  </div>
+                  <OrderItemsList
+                    text={globalSearchResult.items_summary}
+                    items={globalSearchResult.items}
+                    deliveredIndices={globalSearchResult.delivered_items}
+                    orderStatus={globalSearchResult.delivery_status}
+                  />
+                </div>
+
+                {/* Card Actions */}
+                <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                  <div className="text-[11px] text-slate-400">
+                    {globalSearchResult.delivered_at && (
+                      <span>آخر تسليم: {new Date(globalSearchResult.delivered_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })} ({globalSearchResult.delivered_by || 'Admin'})</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetOrder: DeliveryZoneOrder = {
+                          id: globalSearchResult.zone_order_id || globalSearchResult.order_id,
+                          zone_id: globalSearchResult.zone_id || 'general',
+                          zone_name: globalSearchResult.zone_name,
+                          order_id: globalSearchResult.order_id,
+                          order_code: globalSearchResult.order_code,
+                          customer_name: globalSearchResult.customer_name,
+                          customer_phone: globalSearchResult.customer_phone,
+                          order_details: globalSearchResult.items_summary,
+                          items_summary: globalSearchResult.items_summary,
+                          items: globalSearchResult.items,
+                          delivery_time: globalSearchResult.delivery_time || 'غير محدد',
+                          delivery_status: globalSearchResult.delivery_status || 'pending',
+                          delivered_items: globalSearchResult.delivered_items || [],
+                          delivered_at: globalSearchResult.delivered_at,
+                          delivered_by: globalSearchResult.delivered_by,
+                          sort_order: 1,
+                          created_at: new Date().toISOString(),
+                          updated_at: new Date().toISOString()
+                        };
+                        openItemDeliveryModal(targetOrder);
+                      }}
+                      className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 transition"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>تسليم / تحديد القطع والملحقات المستلمة</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           {/* VIEW A: LIST OF ALL SHEETS */}
           {!openedZoneId && (
             <div className="space-y-4">
@@ -2931,10 +3319,19 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 </div>
               </div>
 
+              {/* Addons & Kids helper note */}
+              <div className="p-2 rounded-xl bg-purple-950/20 border border-purple-500/20 text-[11px] text-purple-300 flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span>تم إدراج الملحقات (Add-ons) وملابس الأطفال كعناصر مستقلة لتسليمها بشكل منفصل في مكانها المخصص.</span>
+              </div>
+
               {/* Items Checklist (Scrollable) */}
               <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                 {parsedItems.map((item, idx) => {
                   const isChecked = selectedItemIndices.includes(idx);
+                  const isAddon = item.title.startsWith('ملحق:') || item.title.startsWith('إضافة:');
+                  const isKids = item.title.includes('اطفال') || item.title.includes('أطفال');
+
                   return (
                     <div
                       key={idx}
@@ -2942,6 +3339,10 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                       className={`p-3 rounded-2xl border cursor-pointer transition flex items-center justify-between gap-3 ${
                         isChecked
                           ? 'bg-emerald-950/25 border-emerald-500/40 hover:bg-emerald-950/35'
+                          : isAddon
+                          ? 'bg-purple-950/15 border-purple-500/30 hover:bg-purple-950/25'
+                          : isKids
+                          ? 'bg-sky-950/15 border-sky-500/30 hover:bg-sky-950/25'
                           : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800/70 opacity-75'
                       }`}
                     >
@@ -2956,8 +3357,21 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           <Check className="w-3.5 h-3.5" />
                         </div>
                         <div className="space-y-1 min-w-0">
-                          <div className="font-bold text-xs sm:text-sm text-white truncate">
-                            {item.title}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {isAddon ? (
+                              <span className="px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold inline-flex items-center gap-1">
+                                <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                                <span>ملحق / Add-on</span>
+                              </span>
+                            ) : isKids ? (
+                              <span className="px-1.5 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold inline-flex items-center gap-1">
+                                <span>👶</span>
+                                <span>أطفال</span>
+                              </span>
+                            ) : null}
+                            <div className="font-bold text-xs sm:text-sm text-white truncate">
+                              {item.title}
+                            </div>
                           </div>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {item.size && (

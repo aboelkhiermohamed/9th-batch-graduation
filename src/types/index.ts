@@ -194,6 +194,7 @@ export type DeliveryItemSummary = {
 export interface DeliveryZoneOrder {
   id: string;
   zone_id: string;
+  zone_name?: string;
   order_id: string;
   order_code: string;
   customer_name: string;

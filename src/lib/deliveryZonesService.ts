@@ -195,6 +195,63 @@ export function parseItemPieces(sizeStr?: string | null, textStr?: string | null
   return pieces;
 }
 
+export function cleanAddonName(raw: string): string {
+  if (!raw) return '';
+  return raw
+    .replace(/^تخصيص:\s*/i, '')
+    .replace(/^إضافة:\s*/i, '')
+    .replace(/^ملحق:\s*/i, '')
+    .replace(/\s*\(\s*\+?\s*\d+[\s\S]*?\)/gi, '')
+    .replace(/\s*\+\s*\d+\s*(ج\.م|EGP|\$)?/gi, '')
+    .replace(/[\(\)]/g, '')
+    .replace(/\[.*?\]/g, '')
+    .trim();
+}
+
+export function extractAddonNames(item: any): string[] {
+  const addons: string[] = [];
+
+  // 1. From item.selected_addons
+  if (Array.isArray(item.selected_addons) && item.selected_addons.length > 0) {
+    item.selected_addons.forEach((a: any) => {
+      const name = typeof a === 'string' ? a : (a?.name || a?.title);
+      if (name && typeof name === 'string') {
+        const clean = cleanAddonName(name);
+        if (clean && !addons.includes(clean)) addons.push(clean);
+      }
+    });
+  }
+
+  // 2. From item.product_title if [الإضافات:...]
+  const rawTitle = item.product_title || '';
+  if (rawTitle.includes('[الإضافات:')) {
+    const match = rawTitle.match(/\[الإضافات:\s*(.*?)\]/);
+    if (match && match[1]) {
+      const parts = match[1].split(/[,،\n|]/).map((p: string) => p.trim()).filter(Boolean);
+      parts.forEach((p: string) => {
+        const clean = cleanAddonName(p);
+        if (clean && !addons.includes(clean)) addons.push(clean);
+      });
+    }
+  }
+
+  // 3. From item.customization_option
+  const optStr = item.customization_option || item.customizationOption || '';
+  if (optStr) {
+    const cleanOpt = optStr.replace(/\[ATTENDEES:[\s\S]*?\]/gi, '').trim();
+    if (cleanOpt) {
+      const parts = cleanOpt.split(/[,،\n|]/).map((p: string) => p.trim()).filter(Boolean);
+      parts.forEach((p: string) => {
+        if (p.startsWith('تطريز:') || p.startsWith('مقاس:') || p.startsWith('القطعة')) return;
+        const clean = cleanAddonName(p);
+        if (clean && !addons.includes(clean)) addons.push(clean);
+      });
+    }
+  }
+
+  return addons;
+}
+
 // Format items into clean human-readable summary for printing & display
 export function formatOrderItemsSummary(items: any[]): { summary: string; parsedItems: DeliveryItemSummary[] } {
   if (!items || items.length === 0) {
@@ -205,9 +262,8 @@ export function formatOrderItemsSummary(items: any[]): { summary: string; parsed
 
   items.forEach(item => {
     const rawTitle = cleanTextMeta(item.product_title) || 'منتج';
-    const addons = item.customization_option || (item.selected_addons || []).map((a: any) => a.name).join(' | ') || '';
-    const cleanAddons = cleanTextMeta(addons);
     const pieces = parseItemPieces(item.selected_size, item.custom_text, Number(item.quantity || 1));
+    const addonNames = extractAddonNames(item);
 
     if (pieces.length > 1) {
       pieces.forEach(p => {
@@ -215,8 +271,7 @@ export function formatOrderItemsSummary(items: any[]): { summary: string; parsed
           product_title: `${rawTitle} (قطعة ${p.pieceNum})`,
           selected_size: p.size ? cleanTextMeta(p.size) : (item.selected_size ? cleanTextMeta(item.selected_size) : undefined),
           quantity: 1,
-          custom_text: p.customText ? cleanTextMeta(p.customText) : undefined,
-          customization_option: cleanAddons || undefined
+          custom_text: p.customText ? cleanTextMeta(p.customText) : undefined
         });
       });
     } else {
@@ -224,10 +279,17 @@ export function formatOrderItemsSummary(items: any[]): { summary: string; parsed
         product_title: rawTitle,
         selected_size: item.selected_size ? cleanTextMeta(item.selected_size) : undefined,
         quantity: Number(item.quantity || 1),
-        custom_text: item.custom_text ? cleanTextMeta(item.custom_text) : undefined,
-        customization_option: cleanAddons || undefined
+        custom_text: item.custom_text ? cleanTextMeta(item.custom_text) : undefined
       });
     }
+
+    // Push each Add-on as its own individual checklist item!
+    addonNames.forEach(addonName => {
+      parsedItems.push({
+        product_title: `ملحق: ${addonName}`,
+        quantity: 1
+      });
+    });
   });
 
   const parts = parsedItems.map(item => {
@@ -241,8 +303,6 @@ export function formatOrderItemsSummary(items: any[]): { summary: string; parsed
     }
     if (item.custom_text && item.custom_text.trim()) {
       extras.push(`تطريز: ${item.custom_text.trim()}`);
-    } else if (item.customization_option && item.customization_option.trim()) {
-      extras.push(`تخصيص: ${item.customization_option.trim()}`);
     }
     if (extras.length > 0) {
       text += ` (${extras.join(' | ')})`;
@@ -256,10 +316,7 @@ export function formatOrderItemsSummary(items: any[]): { summary: string; parsed
   };
 }
 
-// -------------------------------------------------------------
-// 1. ORDER SEARCH (Lean query, directly on DB, bandwidth optimized)
-// -------------------------------------------------------------
-export async function searchOrderForZone(query: string): Promise<{
+export interface SearchedZoneOrderResult {
   order_id: string;
   order_code: string;
   customer_name: string;
@@ -267,7 +324,20 @@ export async function searchOrderForZone(query: string): Promise<{
   items_summary: string;
   items: DeliveryItemSummary[];
   status: string;
-} | null> {
+  zone_id?: string | null;
+  zone_name?: string | null;
+  zone_order_id?: string | null;
+  delivery_status: 'pending' | 'delivered' | 'partial';
+  delivered_items?: number[];
+  delivered_at?: string | null;
+  delivered_by?: string | null;
+  delivery_time?: string | null;
+}
+
+// -------------------------------------------------------------
+// 1. ORDER SEARCH (Lean query, directly on DB, bandwidth optimized)
+// -------------------------------------------------------------
+export async function searchOrderForZone(query: string): Promise<SearchedZoneOrderResult | null> {
   const clean = query.trim().replace(/^#/, '');
   if (!clean) return null;
 
@@ -312,6 +382,73 @@ export async function searchOrderForZone(query: string): Promise<{
 
   const { summary, parsedItems } = formatOrderItemsSummary(rawItems);
 
+  // Check if assigned to any delivery zone
+  let zoneInfo: {
+    zone_id: string | null;
+    zone_name: string | null;
+    zone_order_id: string | null;
+    delivery_status: 'pending' | 'delivered' | 'partial';
+    delivered_items?: number[];
+    delivered_at?: string | null;
+    delivered_by?: string | null;
+    delivery_time?: string | null;
+  } = {
+    zone_id: null,
+    zone_name: null,
+    zone_order_id: null,
+    delivery_status: 'pending',
+    delivered_items: []
+  };
+
+  try {
+    const { data: zoData } = await client
+      .from('delivery_zone_orders')
+      .select('id, zone_id, delivery_status, delivered_at, delivered_by, delivery_time, delivery_zones(id, name)')
+      .eq('order_id', foundOrder.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (zoData) {
+      let delivered_items: number[] | undefined = undefined;
+      if (zoData.delivered_by && zoData.delivered_by.includes('[ITEMS:')) {
+        const match = zoData.delivered_by.match(/\[ITEMS:([\d,]+)\]/);
+        if (match && match[1]) {
+          delivered_items = match[1].split(',').map(Number);
+        }
+      }
+      const cleanDeliveredBy = zoData.delivered_by ? zoData.delivered_by.replace(/\s*\[ITEMS:[\d,]+\]/, '').trim() : null;
+
+      zoneInfo = {
+        zone_id: zoData.zone_id,
+        zone_name: (zoData.delivery_zones as any)?.name || 'كشف تسليم',
+        zone_order_id: zoData.id,
+        delivery_status: (zoData.delivery_status as any) || 'pending',
+        delivered_items,
+        delivered_at: zoData.delivered_at,
+        delivered_by: cleanDeliveredBy,
+        delivery_time: zoData.delivery_time
+      };
+    }
+  } catch (err) {
+    const fallbackZones = getFallbackData();
+    for (const z of fallbackZones) {
+      const o = z.orders?.find(item => item.order_id === foundOrder.id);
+      if (o) {
+        zoneInfo = {
+          zone_id: z.id,
+          zone_name: z.name,
+          zone_order_id: o.id,
+          delivery_status: o.delivery_status || 'pending',
+          delivered_items: o.delivered_items,
+          delivered_at: o.delivered_at,
+          delivered_by: o.delivered_by,
+          delivery_time: o.delivery_time
+        };
+        break;
+      }
+    }
+  }
+
   return {
     order_id: foundOrder.id,
     order_code: foundOrder.order_code,
@@ -319,7 +456,15 @@ export async function searchOrderForZone(query: string): Promise<{
     customer_phone: foundOrder.customer_phone,
     items_summary: summary,
     items: parsedItems,
-    status: foundOrder.status
+    status: foundOrder.status,
+    zone_id: zoneInfo.zone_id,
+    zone_name: zoneInfo.zone_name,
+    zone_order_id: zoneInfo.zone_order_id,
+    delivery_status: zoneInfo.delivery_status,
+    delivered_items: zoneInfo.delivered_items,
+    delivered_at: zoneInfo.delivered_at,
+    delivered_by: zoneInfo.delivered_by,
+    delivery_time: zoneInfo.delivery_time
   };
 }
 
@@ -839,6 +984,35 @@ export async function updateOrderDeliveryStatus(
             delivered_items: deliveredItems
           };
         }
+      } else {
+        // Fallback: Check if the order exists in ANY other zone by order_id
+        const { data: anyRows } = await client
+          .from('delivery_zone_orders')
+          .select('id, zone_id')
+          .or(`id.eq.${orderIdOrZoneOrderId},order_id.eq.${orderIdOrZoneOrderId}`)
+          .limit(1);
+
+        if (anyRows && anyRows.length > 0) {
+          const rowId = anyRows[0].id;
+          const { error: anyUpdateErr } = await client
+            .from('delivery_zone_orders')
+            .update({
+              delivery_status: status,
+              delivered_at,
+              delivered_by,
+              updated_at: now
+            })
+            .eq('id', rowId);
+
+          if (!anyUpdateErr) {
+            return {
+              success: true,
+              delivered_at,
+              delivered_by: adminName || 'Admin',
+              delivered_items: deliveredItems
+            };
+          }
+        }
       }
     } catch (err) {
       console.warn('Error updating delivery status in Supabase, updating fallback:', err);
@@ -847,16 +1021,23 @@ export async function updateOrderDeliveryStatus(
 
   // Fallback path
   const zones = getFallbackData();
-  const zone = zones.find(z => z.id === zoneId);
-  if (!zone || !zone.orders) {
-    return { success: false };
-  }
-
-  const targetOrder = zone.orders.find(
+  let zone = zones.find(z => z.id === zoneId);
+  let targetOrder = zone?.orders?.find(
     o => o.id === orderIdOrZoneOrderId || o.order_id === orderIdOrZoneOrderId
   );
 
   if (!targetOrder) {
+    for (const z of zones) {
+      const found = z.orders?.find(o => o.id === orderIdOrZoneOrderId || o.order_id === orderIdOrZoneOrderId);
+      if (found) {
+        zone = z;
+        targetOrder = found;
+        break;
+      }
+    }
+  }
+
+  if (!zone || !targetOrder) {
     return { success: false };
   }
 
@@ -866,8 +1047,9 @@ export async function updateOrderDeliveryStatus(
   targetOrder.delivered_items = deliveredItems;
   targetOrder.updated_at = now;
 
-  zone.delivered_orders = zone.orders.filter(o => o.delivery_status === 'delivered').length;
-  zone.pending_orders = (zone.total_orders || zone.orders.length) - zone.delivered_orders;
+  const zoneOrders = zone.orders || [];
+  zone.delivered_orders = zoneOrders.filter(o => o.delivery_status === 'delivered').length;
+  zone.pending_orders = (zone.total_orders || zoneOrders.length) - zone.delivered_orders;
   zone.updated_at = now;
 
   saveFallbackData(zones);
