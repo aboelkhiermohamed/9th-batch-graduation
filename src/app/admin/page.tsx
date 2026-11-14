@@ -364,6 +364,7 @@ export default function AdminDashboardPage() {
   const [pdfShowEmbroiderySection, setPdfShowEmbroiderySection] = useState(true);
   const [pdfShowTickets, setPdfShowTickets] = useState(false);
   const [exportSortBy, setExportSortBy] = useState<'default' | 'size' | 'product_size'>('size');
+  const [exportFilterScope, setExportFilterScope] = useState<'all' | 'embroidery' | 'plain'>('all');
 
   // Backup & Restore State
   const [isRestoringBackup, setIsRestoringBackup] = useState(false);
@@ -2317,7 +2318,8 @@ export default function AdminDashboardPage() {
     return embRows;
   };
 
-  const exportEmbroideryExcel = () => {
+  const exportEmbroideryExcel = (forcedScope?: 'all' | 'embroidery' | 'plain') => {
+    const scope = forcedScope || exportFilterScope;
     interface ExportRowItem {
       orderCode: string;
       customerName: string;
@@ -2329,13 +2331,21 @@ export default function AdminDashboardPage() {
       addons: string;
     }
 
+    const cleanTitle = (raw: string) => (raw || '')
+      .replace(/\[IMG:.*?\]/g, '')
+      .replace(/\s*\.?\s*\[الإضافات:.*?\]/gi, '')
+      .replace(/\s*\.?\s*\[التطريز:.*?\]/gi, '')
+      .replace(/\s*\.?\s*\[Addons:.*?\]/gi, '')
+      .trim();
+
     const collectedItems: ExportRowItem[] = [];
 
-    orders.forEach(order => {
+    // Using reportOrders and getReportEffectiveItems ensures 100% exact match with the PDF manufacturing report!
+    reportOrders.forEach(order => {
       const isConfirmed = order.status === 'auto_verified' || order.status === 'manual_verified' || order.status === 'ready_for_pickup' || order.status === 'delivered';
       if (!isConfirmed) return;
 
-      const items = getOrderEffectiveItems(order);
+      const items = getReportEffectiveItems(order);
       items.forEach(item => {
         const addons = item.customization_option || (item.selected_addons || []).map((a: any) => a.name).join(' | ') || '';
         const pieces = parseItemPieces(item.selected_size, item.custom_text, item.quantity);
@@ -2343,39 +2353,55 @@ export default function AdminDashboardPage() {
 
         if (isMulti) {
           pieces.forEach(p => {
-            if (p.customText || p.size || addons) {
-              collectedItems.push({
-                orderCode: order.order_code || '',
-                customerName: order.customer_name || '',
-                customerPhone: order.customer_phone || '',
-                productTitle: `${item.product_title || ''} (قطعة ${p.pieceNum})`,
-                size: p.size || item.selected_size || 'Free Size',
-                quantity: '1',
-                customText: p.customText || '—',
-                addons: addons || '—'
-              });
-            }
-          });
-        } else {
-          const text = (item.custom_text || '').trim();
-          if (text || addons) {
+            const hasCustomText = Boolean(p.customText && p.customText.trim());
+            const hasAddons = Boolean(addons && addons.trim());
+            const isEmbroidered = hasCustomText || hasAddons;
+
+            if (scope === 'embroidery' && !isEmbroidered) return;
+            if (scope === 'plain' && isEmbroidered) return;
+
             collectedItems.push({
               orderCode: order.order_code || '',
               customerName: order.customer_name || '',
               customerPhone: order.customer_phone || '',
-              productTitle: item.product_title || '',
-              size: item.selected_size || 'Free Size',
-              quantity: String(item.quantity || 1),
-              customText: text || '—',
-              addons: addons || '—'
+              productTitle: `${cleanTitle(item.product_title)} (قطعة ${p.pieceNum})`,
+              size: p.size || item.selected_size || 'Free Size',
+              quantity: '1',
+              customText: hasCustomText ? p.customText! : '— (سادة بدون تطريز)',
+              addons: hasAddons ? addons : '—'
             });
-          }
+          });
+        } else {
+          const text = (item.custom_text || '').trim();
+          const hasCustomText = Boolean(text);
+          const hasAddons = Boolean(addons && addons.trim());
+          const isEmbroidered = hasCustomText || hasAddons;
+
+          if (scope === 'embroidery' && !isEmbroidered) return;
+          if (scope === 'plain' && isEmbroidered) return;
+
+          collectedItems.push({
+            orderCode: order.order_code || '',
+            customerName: order.customer_name || '',
+            customerPhone: order.customer_phone || '',
+            productTitle: cleanTitle(item.product_title),
+            size: item.selected_size || 'Free Size',
+            quantity: String(item.quantity || 1),
+            customText: hasCustomText ? text : '— (سادة بدون تطريز)',
+            addons: hasAddons ? addons : '—'
+          });
         }
       });
     });
 
     if (collectedItems.length === 0) {
-      alert('لا توجد طلبات مؤكدة تحتوي على نصوص تطريز حالياً');
+      alert(
+        scope === 'plain'
+          ? 'لا توجد طلبات سادة بدون تطريز حالياً'
+          : scope === 'embroidery'
+          ? 'لا توجد طلبات تحتوي على نصوص تطريز حالياً'
+          : 'لا توجد طلبات مؤكدة للتصنيع حالياً'
+      );
       return;
     }
 
@@ -2395,7 +2421,7 @@ export default function AdminDashboardPage() {
     }
 
     const rows: string[][] = [
-      ['مسلسل', 'كود الطلب', 'اسم العميل', 'رقم الموبايل', 'اسم المنتج', 'المقاس', 'العدد', 'نص التطريز / الطباعة المطلوبة', 'الإضافات الاختيارية (Add-ons)']
+      ['مسلسل', 'كود الطلب', 'اسم العميل', 'رقم الموبايل', 'اسم المنتج المطلوب تصنيعه', 'المقاس', 'العدد', 'نص التطريز / الطباعة المطلوبة', 'الإضافات الاختيارية (Add-ons)']
     ];
 
     collectedItems.forEach((item, index) => {
@@ -2412,13 +2438,19 @@ export default function AdminDashboardPage() {
       ]);
     });
 
-    const csvContent = '\uFEFF' + rows.map(r => r.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csvContent = '\uFEFF' + rows.map(r => r.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     const sortSuffix = exportSortBy === 'size' ? '_مرتب_حسب_المقاسات' : exportSortBy === 'product_size' ? '_مرتب_حسب_المنتجات_والمقاسات' : '';
-    link.setAttribute('download', `شيت_التطريز_والطباعة_المصنع${sortSuffix}_${new Date().toISOString().slice(0, 10)}.csv`);
+    const scopePrefix = scope === 'all' 
+      ? 'شيت_المصنع_الشامل_لجميع_القطع' 
+      : scope === 'plain' 
+      ? 'شيت_القطع_السادة_المصنع' 
+      : 'شيت_التطريز_والطباعة_المصنع';
+
+    link.setAttribute('download', `${scopePrefix}${sortSuffix}_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -4509,6 +4541,18 @@ export default function AdminDashboardPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 rounded-2xl px-3 py-1.5 shadow-sm">
+                  <span className="text-[11px] font-bold text-slate-300">محتوى الشيت:</span>
+                  <select
+                    value={exportFilterScope}
+                    onChange={(e) => setExportFilterScope(e.target.value as any)}
+                    className="bg-transparent text-emerald-400 font-extrabold text-xs focus:outline-none cursor-pointer pr-1"
+                  >
+                    <option value="all" className="bg-slate-900 text-slate-100">جميع القطع (سادة + تطريز) 100% مطابق للـ PDF</option>
+                    <option value="embroidery" className="bg-slate-900 text-slate-100">قطع التطريز والطباعة فقط</option>
+                    <option value="plain" className="bg-slate-900 text-slate-100">القطع السادة فقط (بدون تطريز)</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 rounded-2xl px-3 py-1.5 shadow-sm">
                   <span className="text-[11px] font-bold text-slate-300">ترتيب الشيت:</span>
                   <select
                     value={exportSortBy}
@@ -4522,7 +4566,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={exportEmbroideryExcel}
+                  onClick={() => exportEmbroideryExcel()}
                   className="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition"
                 >
                   <Download className="w-4 h-4" />
@@ -6397,7 +6441,17 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-300 rounded-xl px-2.5 py-1.5">
-                    <span className="text-xs font-bold text-slate-700">الترتيب:</span>
+                    <span className="text-xs font-bold text-slate-700">المحتوى:</span>
+                    <select
+                      value={exportFilterScope}
+                      onChange={(e) => setExportFilterScope(e.target.value as any)}
+                      className="bg-transparent text-emerald-800 font-extrabold text-xs focus:outline-none cursor-pointer"
+                    >
+                      <option value="all">جميع القطع (سادة + تطريز) - 100% مطابق للـ PDF</option>
+                      <option value="embroidery">قطع التطريز والطباعة فقط</option>
+                      <option value="plain">القطع السادة فقط (بدون تطريز)</option>
+                    </select>
+                    <span className="text-xs font-bold text-slate-700 mr-2">الترتيب:</span>
                     <select
                       value={exportSortBy}
                       onChange={(e) => setExportSortBy(e.target.value as any)}
@@ -6409,11 +6463,11 @@ export default function AdminDashboardPage() {
                     </select>
                   </div>
                   <button
-                    onClick={exportEmbroideryExcel}
+                    onClick={() => exportEmbroideryExcel()}
                     className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg transition"
                   >
                     <Download className="w-4 h-4" />
-                    <span>تصدير شيت التطريز (CSV/Excel) 📥</span>
+                    <span>تصدير إكسيل (CSV) 📥</span>
                   </button>
                   <button
                     onClick={() => printStandalonePdfReport()}
@@ -6433,7 +6487,17 @@ export default function AdminDashboardPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
                   <p className="text-xs font-extrabold text-slate-800">⚙️ تخصيص ومفتاح التحكم بالأعمدة والترتيب قبل التصدير والطباعة:</p>
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                    <span>نظام الترتيب:</span>
+                    <span>محتوى الشيت:</span>
+                    <select
+                      value={exportFilterScope}
+                      onChange={(e) => setExportFilterScope(e.target.value as any)}
+                      className="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-900 focus:outline-none"
+                    >
+                      <option value="all">جميع القطع للتصنيع (شامل السادة) - مطابق للـ PDF</option>
+                      <option value="embroidery">قطع التطريز والطباعة فقط</option>
+                      <option value="plain">القطع السادة فقط (بدون تطريز)</option>
+                    </select>
+                    <span className="mr-2">نظام الترتيب:</span>
                     <select
                       value={exportSortBy}
                       onChange={(e) => setExportSortBy(e.target.value as any)}
