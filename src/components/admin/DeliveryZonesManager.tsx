@@ -406,6 +406,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   const [itemDeliveryModalOrder, setItemDeliveryModalOrder] = useState<DeliveryZoneOrder | null>(null);
   const [selectedItemIndices, setSelectedItemIndices] = useState<number[]>([]);
   const [isSavingItemDelivery, setIsSavingItemDelivery] = useState(false);
+  const [recipientMode, setRecipientMode] = useState<'student' | 'proxy'>('student');
+  const [proxyRecipientName, setProxyRecipientName] = useState('');
   const [viewPreference, setViewPreference] = useState<'auto' | 'cards' | 'table'>('auto');
 
   // Global Unified Search State (for Add-ons, Kids & All Zones)
@@ -743,7 +745,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   };
 
   // Open item-by-item delivery selection modal
-  const openItemDeliveryModal = (order: DeliveryZoneOrder) => {
+  const openItemDeliveryModal = (order: DeliveryZoneOrder, defaultToProxy: boolean = false) => {
     setItemDeliveryModalOrder(order);
     const parsedItems = parseOrderDetailsToItems(order.items_summary || order.order_details, order.items);
     // User requested unselect by default:
@@ -753,6 +755,17 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       setSelectedItemIndices([...order.delivered_items]);
     } else {
       setSelectedItemIndices([]);
+    }
+
+    if (order.recipient_name) {
+      setRecipientMode('proxy');
+      setProxyRecipientName(order.recipient_name);
+    } else if (defaultToProxy) {
+      setRecipientMode('proxy');
+      setProxyRecipientName('');
+    } else {
+      setRecipientMode('student');
+      setProxyRecipientName('');
     }
   };
 
@@ -786,6 +799,10 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       newStatus = 'pending';
     }
 
+    const finalRecipient = recipientMode === 'proxy' && proxyRecipientName.trim()
+      ? proxyRecipientName.trim()
+      : null;
+
     try {
       setIsSavingItemDelivery(true);
       setStatusUpdatingOrderId(order.order_id);
@@ -804,7 +821,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                 delivery_status: newStatus,
                 delivered_items: newStatus === 'partial' ? selectedItemIndices : (newStatus === 'delivered' ? parsedItems.map((_, i) => i) : []),
                 delivered_at: newStatus !== 'pending' ? now : null,
-                delivered_by: newStatus !== 'pending' ? adminName : null
+                delivered_by: newStatus !== 'pending' ? adminName : null,
+                recipient_name: newStatus !== 'pending' ? finalRecipient : null
               };
             }
             return o;
@@ -829,7 +847,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
             delivery_status: newStatus,
             delivered_items: newStatus === 'partial' ? selectedItemIndices : (newStatus === 'delivered' ? parsedItems.map((_, i) => i) : []),
             delivered_at: newStatus !== 'pending' ? now : null,
-            delivered_by: newStatus !== 'pending' ? adminName : null
+            delivered_by: newStatus !== 'pending' ? adminName : null,
+            recipient_name: newStatus !== 'pending' ? finalRecipient : null
           };
         });
       }
@@ -841,7 +860,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
           orderId: order.order_id,
           status: newStatus,
           adminName,
-          deliveredItems: selectedItemIndices
+          deliveredItems: selectedItemIndices,
+          recipientName: finalRecipient
         })
       });
 
@@ -2145,9 +2165,14 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
                     {/* Card Actions */}
                     <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-[11px] text-slate-400 flex items-center gap-2 flex-wrap">
                         {globalSearchResult.delivered_at && (
                           <span>آخر تسليم: {new Date(globalSearchResult.delivered_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })} ({globalSearchResult.delivered_by || 'Admin'})</span>
+                        )}
+                        {globalSearchResult.recipient_name && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            🤝 المستلم: {globalSearchResult.recipient_name}
+                          </span>
                         )}
                       </div>
 
@@ -2171,6 +2196,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                               delivered_items: globalSearchResult.delivered_items || [],
                               delivered_at: globalSearchResult.delivered_at,
                               delivered_by: globalSearchResult.delivered_by,
+                              recipient_name: globalSearchResult.recipient_name,
                               sort_order: 1,
                               created_at: new Date().toISOString(),
                               updated_at: new Date().toISOString()
@@ -2481,6 +2507,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                             delivered_items: ord.delivered_items || [],
                             delivered_at: ord.delivered_at,
                             delivered_by: ord.delivered_by,
+                            recipient_name: ord.recipient_name,
                             sort_order: 1,
                             created_at: new Date().toISOString(),
                             updated_at: new Date().toISOString()
@@ -2675,6 +2702,11 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                                         بواسطة: {ord.delivered_by}
                                       </span>
                                     )}
+                                    {ord.recipient_name && (
+                                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1 mt-0.5" title={`المستلم بالنيابة: ${ord.recipient_name}`}>
+                                        <span>🤝 المستلم: {ord.recipient_name}</span>
+                                      </span>
+                                    )}
                                   </div>
                                 ) : isPartial ? (
                                   <div className="inline-flex flex-col items-center">
@@ -2685,6 +2717,11 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                                     {ord.delivered_by && (
                                       <span className="text-[9px] text-slate-400 mt-0.5">
                                         بواسطة: {ord.delivered_by}
+                                      </span>
+                                    )}
+                                    {ord.recipient_name && (
+                                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1 mt-0.5" title={`المستلم بالنيابة: ${ord.recipient_name}`}>
+                                        <span>🤝 المستلم: {ord.recipient_name}</span>
                                       </span>
                                     )}
                                   </div>
@@ -2756,21 +2793,32 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                                         <span>اختيار القطع ({totalItemsCount})</span>
                                       </button>
                                     ) : (
-                                      <button
-                                        type="button"
-                                        disabled={isUpdating}
-                                        onClick={() => handleMarkAsDelivered(ord, true)}
-                                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition"
-                                      >
-                                        {isUpdating ? (
-                                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                        ) : (
-                                          <>
-                                            <Check className="w-3.5 h-3.5" />
-                                            <span>تسليم الطلب</span>
-                                          </>
-                                        )}
-                                      </button>
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button
+                                          type="button"
+                                          disabled={isUpdating}
+                                          onClick={() => handleMarkAsDelivered(ord, true)}
+                                          className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition"
+                                        >
+                                          {isUpdating ? (
+                                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                          ) : (
+                                            <>
+                                              <Check className="w-3.5 h-3.5" />
+                                              <span>تسليم للطالب</span>
+                                            </>
+                                          )}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={isUpdating}
+                                          onClick={() => openItemDeliveryModal(ord, true)}
+                                          className="p-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/40 border border-purple-500/30 text-purple-300 transition"
+                                          title="استلام بالنيابة (شخص آخر)"
+                                        >
+                                          <span>🤝</span>
+                                        </button>
+                                      </div>
                                     )}
                                   </div>
                                 )}
@@ -2879,15 +2927,22 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           </div>
 
                           {/* Delivery Time & Admin Meta */}
-                          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60">
+                          <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800/60 flex-wrap gap-1">
                             <span className="text-[11px] text-slate-400">
                               موعد التسليم: <strong className="text-indigo-300 font-mono">{ord.delivery_time}</strong>
                             </span>
-                            {ord.delivered_by && (
-                              <span className="text-[10px] text-slate-400">
-                                بواسطة: <span className="text-slate-200 font-bold">{ord.delivered_by}</span>
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {ord.delivered_by && (
+                                <span className="text-[10px] text-slate-400">
+                                  بواسطة: <span className="text-slate-200 font-bold">{ord.delivered_by}</span>
+                                </span>
+                              )}
+                              {ord.recipient_name && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                  🤝 المستلم: {ord.recipient_name}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           {/* Action Button: Touch-optimized */}
@@ -2947,21 +3002,32 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                                 <span>اختيار القطع المسلمة ({totalItemsCount} قطع)</span>
                               </button>
                             ) : (
-                              <button
-                                type="button"
-                                disabled={isUpdating}
-                                onClick={() => handleMarkAsDelivered(ord, true)}
-                                className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition active:scale-[0.98] min-h-[48px]"
-                              >
-                                {isUpdating ? (
-                                  <RefreshCw className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <>
-                                    <Check className="w-5 h-5" />
-                                    <span>تسليم الطلب للطالب الآن</span>
-                                  </>
-                                )}
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  disabled={isUpdating}
+                                  onClick={() => handleMarkAsDelivered(ord, true)}
+                                  className="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition active:scale-[0.98] min-h-[48px]"
+                                >
+                                  {isUpdating ? (
+                                    <RefreshCw className="w-5 h-5 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Check className="w-5 h-5" />
+                                      <span>تسليم للطالب الآن</span>
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isUpdating}
+                                  onClick={() => openItemDeliveryModal(ord, true)}
+                                  className="py-3.5 px-3 sm:px-4 rounded-2xl bg-purple-950/40 hover:bg-purple-900/40 border border-purple-500/30 text-purple-200 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-[0.98] min-h-[48px]"
+                                  title="استلام بالنيابة (شخص آخر)"
+                                >
+                                  <span>🤝 بالنيابة</span>
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -3637,6 +3703,82 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {addonItems.map(entry => renderItemCard(entry, true))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Recipient Identity Section (الطالب نفسه أو شخص آخر بالنيابة) */}
+              <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-300 font-bold flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>جهة الاستلام (المستلم الفعلي):</span>
+                  </span>
+                  {recipientMode === 'proxy' && proxyRecipientName.trim() && (
+                    <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold">
+                      تسليم بالنيابة 🤝
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecipientMode('student');
+                      setProxyRecipientName('');
+                    }}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
+                      recipientMode === 'student'
+                        ? 'bg-indigo-600/30 text-indigo-200 border-indigo-500/50 shadow-sm'
+                        : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span>🎓 الطالب نفسه</span>
+                    {recipientMode === 'student' && <Check className="w-3.5 h-3.5 text-indigo-400" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRecipientMode('proxy')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
+                      recipientMode === 'proxy'
+                        ? 'bg-purple-600/30 text-purple-200 border-purple-500/50 shadow-sm'
+                        : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <span>🤝 شخص آخر (بالنيابة)</span>
+                    {recipientMode === 'proxy' && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                  </button>
+                </div>
+
+                {recipientMode === 'proxy' && (
+                  <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                    <input
+                      type="text"
+                      value={proxyRecipientName}
+                      onChange={e => setProxyRecipientName(e.target.value)}
+                      placeholder="اكتب اسم المستلم وصلة القرابة أو رقم تليفونه (مثال: محمد أخوه، سارة زميلتها)..."
+                      className="w-full bg-slate-900 border border-purple-500/40 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400 transition"
+                      autoFocus
+                    />
+
+                    {/* Quick suggestion tags */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-slate-500">صلة سريعة:</span>
+                      {['أخوه', 'أخته', 'والده', 'والدته', 'صديقه/زميله', 'صديقتها/زميلتها'].map(tag => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            setProxyRecipientName(prev => prev ? `${prev} (${tag})` : tag);
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-slate-400 hover:text-purple-300 text-[10px] font-medium transition"
+                        >
+                          +{tag}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}

@@ -207,6 +207,7 @@ export interface DeliveryZoneOrder {
   delivered_items?: number[];
   delivered_at?: string | null;
   delivered_by?: string | null;
+  recipient_name?: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

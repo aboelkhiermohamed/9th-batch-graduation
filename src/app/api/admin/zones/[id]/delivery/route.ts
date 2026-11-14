@@ -10,7 +10,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const { id: zoneId } = params;
     const body = await req.json();
-    const { orderId, status, adminName, deliveredItems } = body;
+    const { orderId, status, adminName, deliveredItems, recipientName } = body;
 
     if (!orderId || !status || (status !== 'delivered' && status !== 'pending' && status !== 'partial')) {
       return NextResponse.json(
@@ -24,7 +24,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       orderId,
       status,
       adminName || 'Admin',
-      Array.isArray(deliveredItems) ? deliveredItems : undefined
+      Array.isArray(deliveredItems) ? deliveredItems : undefined,
+      typeof recipientName === 'string' ? recipientName : undefined
     );
 
     if (!result.success) {
@@ -39,6 +40,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       delivered_at: result.delivered_at,
       delivered_by: result.delivered_by,
       delivered_items: result.delivered_items,
+      recipient_name: result.recipient_name,
       message: status === 'delivered' 
         ? 'تم تأكيد تسليم جميع قطع الطلب بنجاح' 
         : status === 'partial'

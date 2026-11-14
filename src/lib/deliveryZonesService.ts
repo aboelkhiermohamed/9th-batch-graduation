@@ -389,6 +389,7 @@ export async function searchOrderForZone(query: string): Promise<SearchedZoneOrd
     zone_order_id: string | null;
     delivery_status: 'pending' | 'delivered' | 'partial';
     delivered_items?: number[];
+    recipient_name?: string | null;
     delivered_at?: string | null;
     delivered_by?: string | null;
     delivery_time?: string | null;
@@ -410,13 +411,27 @@ export async function searchOrderForZone(query: string): Promise<SearchedZoneOrd
 
     if (zoData) {
       let delivered_items: number[] | undefined = undefined;
-      if (zoData.delivered_by && zoData.delivered_by.includes('[ITEMS:')) {
-        const match = zoData.delivered_by.match(/\[ITEMS:([\d,]+)\]/);
-        if (match && match[1]) {
-          delivered_items = match[1].split(',').map(Number);
+      let recipient_name: string | undefined = undefined;
+      if (zoData.delivered_by) {
+        if (zoData.delivered_by.includes('[ITEMS:')) {
+          const match = zoData.delivered_by.match(/\[ITEMS:([\d,]+)\]/);
+          if (match && match[1]) {
+            delivered_items = match[1].split(',').map(Number);
+          }
+        }
+        if (zoData.delivered_by.includes('[RECIPIENT:')) {
+          const rMatch = zoData.delivered_by.match(/\[RECIPIENT:(.*?)\]/);
+          if (rMatch && rMatch[1]) {
+            recipient_name = rMatch[1].trim();
+          }
         }
       }
-      const cleanDeliveredBy = zoData.delivered_by ? zoData.delivered_by.replace(/\s*\[ITEMS:[\d,]+\]/, '').trim() : null;
+      const cleanDeliveredBy = zoData.delivered_by
+        ? zoData.delivered_by
+            .replace(/\s*\[ITEMS:[\d,]+\]/, '')
+            .replace(/\s*\[RECIPIENT:.*?\]/, '')
+            .trim()
+        : null;
 
       zoneInfo = {
         zone_id: zoData.zone_id,
@@ -424,6 +439,7 @@ export async function searchOrderForZone(query: string): Promise<SearchedZoneOrd
         zone_order_id: zoData.id,
         delivery_status: (zoData.delivery_status as any) || 'pending',
         delivered_items,
+        recipient_name,
         delivered_at: zoData.delivered_at,
         delivered_by: cleanDeliveredBy,
         delivery_time: zoData.delivery_time
@@ -593,15 +609,29 @@ export async function getDeliveryZoneById(zoneId: string): Promise<DeliveryZone 
           }
           const { summary, parsedItems } = formatOrderItemsSummary(rawItems);
 
-          // Extract delivered item indices if stored in delivered_by
+          // Extract delivered item indices and proxy recipient if stored in delivered_by
           let delivered_items: number[] | undefined = undefined;
-          if (zo.delivered_by && zo.delivered_by.includes('[ITEMS:')) {
-            const match = zo.delivered_by.match(/\[ITEMS:([\d,]+)\]/);
-            if (match && match[1]) {
-              delivered_items = match[1].split(',').map(Number);
+          let recipient_name: string | undefined = undefined;
+          if (zo.delivered_by) {
+            if (zo.delivered_by.includes('[ITEMS:')) {
+              const match = zo.delivered_by.match(/\[ITEMS:([\d,]+)\]/);
+              if (match && match[1]) {
+                delivered_items = match[1].split(',').map(Number);
+              }
+            }
+            if (zo.delivered_by.includes('[RECIPIENT:')) {
+              const rMatch = zo.delivered_by.match(/\[RECIPIENT:(.*?)\]/);
+              if (rMatch && rMatch[1]) {
+                recipient_name = rMatch[1].trim();
+              }
             }
           }
-          const cleanDeliveredBy = zo.delivered_by ? zo.delivered_by.replace(/\s*\[ITEMS:[\d,]+\]/, '').trim() : null;
+          const cleanDeliveredBy = zo.delivered_by
+            ? zo.delivered_by
+                .replace(/\s*\[ITEMS:[\d,]+\]/, '')
+                .replace(/\s*\[RECIPIENT:.*?\]/, '')
+                .trim()
+            : null;
 
           return {
             id: zo.id,
@@ -616,6 +646,7 @@ export async function getDeliveryZoneById(zoneId: string): Promise<DeliveryZone 
             delivery_time: zo.delivery_time || 'غير محدد',
             delivery_status: (zo.delivery_status as 'pending' | 'delivered' | 'partial') || 'pending',
             delivered_items,
+            recipient_name,
             delivered_at: zo.delivered_at,
             delivered_by: cleanDeliveredBy,
             sort_order: zo.sort_order || 0,
@@ -936,19 +967,23 @@ export async function updateOrderDeliveryStatus(
   orderIdOrZoneOrderId: string,
   status: 'delivered' | 'pending' | 'partial',
   adminName: string,
-  deliveredItems?: number[]
-): Promise<{ success: boolean; delivered_at?: string | null; delivered_by?: string | null; delivered_items?: number[] }> {
+  deliveredItems?: number[],
+  recipientName?: string | null
+): Promise<{ success: boolean; delivered_at?: string | null; delivered_by?: string | null; delivered_items?: number[]; recipient_name?: string | null }> {
   const now = new Date().toISOString();
   const delivered_at = status !== 'pending' ? now : null;
 
   let delivered_by: string | null = null;
   if (status !== 'pending') {
     const baseAdmin = adminName || 'Admin';
-    if (deliveredItems && deliveredItems.length > 0) {
-      delivered_by = `${baseAdmin} [ITEMS:${deliveredItems.join(',')}]`;
-    } else {
-      delivered_by = baseAdmin;
+    const parts: string[] = [baseAdmin];
+    if (recipientName && recipientName.trim()) {
+      parts.push(`[RECIPIENT:${recipientName.trim()}]`);
     }
+    if (deliveredItems && deliveredItems.length > 0) {
+      parts.push(`[ITEMS:${deliveredItems.join(',')}]`);
+    }
+    delivered_by = parts.join(' ');
   }
 
   const client = supabaseAdmin || supabase;
@@ -981,7 +1016,8 @@ export async function updateOrderDeliveryStatus(
             success: true,
             delivered_at,
             delivered_by: adminName || 'Admin',
-            delivered_items: deliveredItems
+            delivered_items: deliveredItems,
+            recipient_name: recipientName ? recipientName.trim() : null
           };
         }
       } else {
@@ -1009,7 +1045,8 @@ export async function updateOrderDeliveryStatus(
               success: true,
               delivered_at,
               delivered_by: adminName || 'Admin',
-              delivered_items: deliveredItems
+              delivered_items: deliveredItems,
+              recipient_name: recipientName ? recipientName.trim() : null
             };
           }
         }
@@ -1045,6 +1082,7 @@ export async function updateOrderDeliveryStatus(
   targetOrder.delivered_at = delivered_at;
   targetOrder.delivered_by = adminName || 'Admin';
   targetOrder.delivered_items = deliveredItems;
+  targetOrder.recipient_name = recipientName ? recipientName.trim() : null;
   targetOrder.updated_at = now;
 
   const zoneOrders = zone.orders || [];
@@ -1057,7 +1095,8 @@ export async function updateOrderDeliveryStatus(
     success: true,
     delivered_at,
     delivered_by: adminName || 'Admin',
-    delivered_items: deliveredItems
+    delivered_items: deliveredItems,
+    recipient_name: recipientName ? recipientName.trim() : null
   };
 }
 
