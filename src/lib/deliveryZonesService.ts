@@ -1365,10 +1365,53 @@ export async function getDeliveryAnalyticsSummary(forceRefresh = false): Promise
           )
         `);
 
-      if (!ordersErr && zoneOrdersData) {
-        allOrders = zoneOrdersData.map((zo: any) => {
+      let zoneOrdersList: any[] = [];
+
+      if (!ordersErr && zoneOrdersData && zoneOrdersData.length > 0) {
+        zoneOrdersList = zoneOrdersData;
+      } else {
+        // Resilient fallback query: fetch delivery_zone_orders directly without complex join
+        const { data: rawZo } = await client
+          .from('delivery_zone_orders')
+          .select('id, zone_id, order_id, delivery_time, delivery_status, delivered_at, delivered_by, created_at');
+
+        if (rawZo && rawZo.length > 0) {
+          const zoneMap = new Map(allZones.map(z => [z.id, z.name]));
+          const orderIds = rawZo.map(r => r.order_id).filter(Boolean);
+
+          const storeOrdersMap = new Map<string, any>();
+          if (orderIds.length > 0) {
+            try {
+              const { data: soData } = await client
+                .from('store_orders')
+                .select('id, order_code, customer_name, customer_phone, notes, store_order_items(product_title, selected_size, quantity, custom_text)')
+                .in('id', orderIds);
+              if (soData) {
+                soData.forEach((so: any) => storeOrdersMap.set(so.id, so));
+              }
+            } catch (soErr) {
+              console.warn('Error fetching store_orders for stats:', soErr);
+            }
+          }
+
+          zoneOrdersList = rawZo.map(zo => ({
+            ...zo,
+            delivery_zones: { name: zoneMap.get(zo.zone_id) || 'زون تسليم' },
+            store_orders: storeOrdersMap.get(zo.order_id) || null
+          }));
+        }
+      }
+
+      if (zoneOrdersList.length > 0) {
+        allOrders = zoneOrdersList.map((zo: any) => {
           const storeOrder = zo.store_orders || {};
-          const rawItems = storeOrder.store_order_items || [];
+          let rawItems = storeOrder.store_order_items || [];
+          if (rawItems.length === 0 && storeOrder.notes) {
+            const extracted = extractItemsFromNotes(storeOrder.notes);
+            if (extracted && extracted.length > 0) {
+              rawItems = extracted;
+            }
+          }
           const { summary, parsedItems } = formatOrderItemsSummary(rawItems);
 
           let delivered_items: number[] | undefined = undefined;

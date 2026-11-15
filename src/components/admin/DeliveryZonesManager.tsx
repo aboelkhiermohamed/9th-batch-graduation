@@ -485,8 +485,14 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
     const shouldForce = force === true;
     try {
       setIsLoadingStats(true);
-      const url = shouldForce ? '/api/admin/zones/stats?refresh=true' : '/api/admin/zones/stats';
-      const res = await fetch(url, { cache: 'no-store' });
+      const url = `/api/admin/zones/stats?refresh=${shouldForce ? 'true' : 'false'}&_t=${Date.now()}`;
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
       const data = await res.json();
       if (data.success && data.stats) {
         setDeliveryStats(data.stats);
@@ -500,11 +506,11 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
   useEffect(() => {
     if (subTab === 'stats') {
-      fetchDeliveryStats();
+      fetchDeliveryStats(true);
       const interval = setInterval(() => {
         if (typeof document !== 'undefined' && document.hidden) return;
         fetchDeliveryStats(true);
-      }, 45000);
+      }, 30000);
       return () => clearInterval(interval);
     }
   }, [subTab]);
@@ -3903,7 +3909,7 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
               <RefreshCw className="w-8 h-8 mx-auto animate-spin text-indigo-400" />
               <p className="text-xs font-bold text-slate-300">جارٍ تجميع وحساب إحصائيات التسليم لجميع الزونات...</p>
             </div>
-          ) : !deliveryStats || deliveryStats.overview.total_orders === 0 ? (
+          ) : (!deliveryStats || deliveryStats.overview.total_orders === 0) && zones.length === 0 ? (
             <div className="bg-slate-900 border border-dashed border-slate-800 rounded-3xl p-16 text-center text-slate-400 space-y-3">
               <BarChart3 className="w-12 h-12 mx-auto text-slate-600" />
               <h3 className="text-base font-bold text-white">لا توجد بيانات تسليم بعد</h3>
@@ -3917,6 +3923,23 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
               >
                 <Plus className="w-4 h-4" />
                 <span>إنشاء أول كشف زون</span>
+              </button>
+            </div>
+          ) : !deliveryStats || deliveryStats.overview.total_orders === 0 ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center text-slate-400 space-y-4">
+              <RefreshCw className="w-10 h-10 mx-auto text-indigo-400" />
+              <h3 className="text-base font-bold text-white">جارٍ مزامنة إحصائيات الكشوفات...</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                تم العثور على {zones.length} كشوفات تسليم ({zones.reduce((acc, z) => acc + (z.total_orders || 0), 0)} طلب). اضغط لتحديث وتحميل التقرير الإحصائي الكامل الآن.
+              </p>
+              <button
+                type="button"
+                onClick={() => fetchDeliveryStats(true)}
+                disabled={isLoadingStats}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs inline-flex items-center gap-2 transition shadow-lg shadow-indigo-600/30 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoadingStats ? 'animate-spin' : ''}`} />
+                <span>تحميل وتحديث الإحصائيات الآن</span>
               </button>
             </div>
           ) : (() => {
