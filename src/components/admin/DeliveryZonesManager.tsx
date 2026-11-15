@@ -995,7 +995,13 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       setGlobalSearchFeedback(null);
       setGlobalSearchResult(null);
 
-      const res = await fetch(`/api/admin/zones/search-order?query=${encodeURIComponent(q)}`, { cache: 'no-store' });
+      const res = await fetch(`/api/admin/zones/search-order?query=${encodeURIComponent(q)}&_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
       const data = await res.json();
 
       if (!res.ok || !data.success || !data.order) {
@@ -1039,10 +1045,16 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
     setItemDeliveryModalOrder(order);
     const parsedItems = parseOrderDetailsToItems(order.items_summary || order.order_details, order.items);
     // User requested unselect by default:
-    // If order was already partially delivered with specific delivered_items recorded, preserve them;
-    // Otherwise start with an empty selection (unselected by default)
+    // If order was already partially or fully delivered, preserve previously delivered items;
+    // Otherwise (pending order) start with an empty selection (unselected by default)
     if (order.delivery_status === 'partial' && order.delivered_items && Array.isArray(order.delivered_items) && order.delivered_items.length > 0) {
       setSelectedItemIndices([...order.delivered_items]);
+    } else if (order.delivery_status === 'delivered') {
+      if (order.delivered_items && Array.isArray(order.delivered_items) && order.delivered_items.length > 0) {
+        setSelectedItemIndices([...order.delivered_items]);
+      } else {
+        setSelectedItemIndices(parsedItems.map((_, i) => i));
+      }
     } else {
       setSelectedItemIndices([]);
     }
@@ -1134,6 +1146,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
           if (!prev) return prev;
           return {
             ...prev,
+            zone_id: order.zone_id && order.zone_id !== 'general' ? order.zone_id : (openedZone?.id || prev.zone_id),
+            zone_name: order.zone_name && order.zone_name !== 'كشف تسليم' ? order.zone_name : (openedZone?.name || prev.zone_name),
             delivery_status: newStatus,
             delivered_items: newStatus === 'partial' ? selectedItemIndices : (newStatus === 'delivered' ? parsedItems.map((_, i) => i) : []),
             delivered_at: newStatus !== 'pending' ? now : null,
@@ -1226,6 +1240,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
           if (!prev) return prev;
           return {
             ...prev,
+            zone_id: order.zone_id && order.zone_id !== 'general' ? order.zone_id : (openedZone?.id || prev.zone_id),
+            zone_name: order.zone_name && order.zone_name !== 'كشف تسليم' ? order.zone_name : (openedZone?.name || prev.zone_name),
             delivery_status: 'delivered',
             delivered_items: parsedItems.map((_, i) => i),
             delivered_at: now,
@@ -1306,7 +1322,22 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
         };
       });
 
-      const res = await fetch(`/api/admin/zones/${openedZoneId}/delivery`, {
+      if (globalSearchResult && (globalSearchResult.order_id === targetOrder.order_id || globalSearchResult.order_code === targetOrder.order_code)) {
+        setGlobalSearchResult((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            delivery_status: 'pending',
+            delivered_items: [],
+            delivered_at: null,
+            delivered_by: null,
+            recipient_name: null
+          };
+        });
+      }
+
+      const targetZoneId = targetOrder.zone_id || openedZoneId || 'general';
+      const res = await fetch(`/api/admin/zones/${targetZoneId}/delivery`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

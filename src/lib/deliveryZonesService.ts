@@ -401,67 +401,109 @@ export async function searchOrderForZone(query: string): Promise<SearchedZoneOrd
     delivered_items: []
   };
 
+  let zoData: any = null;
+
   try {
-    const { data: zoData } = await client
+    // Lookup by UUID or order code with latest update first
+    let queryBuilder = client
       .from('delivery_zone_orders')
-      .select('id, zone_id, delivery_status, delivered_at, delivered_by, delivery_time, delivery_zones(id, name)')
-      .eq('order_id', foundOrder.id)
-      .limit(1)
-      .maybeSingle();
+      .select('id, zone_id, delivery_status, delivered_at, delivered_by, delivery_time, delivery_zones(id, name), updated_at');
 
-    if (zoData) {
-      let delivered_items: number[] | undefined = undefined;
-      let recipient_name: string | undefined = undefined;
-      if (zoData.delivered_by) {
-        if (zoData.delivered_by.includes('[ITEMS:')) {
-          const match = zoData.delivered_by.match(/\[ITEMS:([\d,]+)\]/);
-          if (match && match[1]) {
-            delivered_items = match[1].split(',').map(Number);
-          }
-        }
-        if (zoData.delivered_by.includes('[RECIPIENT:')) {
-          const rMatch = zoData.delivered_by.match(/\[RECIPIENT:(.*?)\]/);
-          if (rMatch && rMatch[1]) {
-            recipient_name = rMatch[1].trim();
-          }
-        }
-      }
-      const cleanDeliveredBy = zoData.delivered_by
-        ? zoData.delivered_by
-            .replace(/\s*\[ITEMS:[\d,]+\]/, '')
-            .replace(/\s*\[RECIPIENT:.*?\]/, '')
-            .trim()
-        : null;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(foundOrder.id);
+    if (isUuid) {
+      queryBuilder = queryBuilder.eq('order_id', foundOrder.id);
+    } else {
+      queryBuilder = queryBuilder.or(`order_id.eq.${foundOrder.id},order_id.eq.${foundOrder.order_code}`);
+    }
 
-      zoneInfo = {
-        zone_id: zoData.zone_id,
-        zone_name: (zoData.delivery_zones as any)?.name || 'كشف تسليم',
-        zone_order_id: zoData.id,
-        delivery_status: (zoData.delivery_status as any) || 'pending',
-        delivered_items,
-        recipient_name,
-        delivered_at: zoData.delivered_at,
-        delivered_by: cleanDeliveredBy,
-        delivery_time: zoData.delivery_time
-      };
+    const { data: zoRows, error: zoErr } = await queryBuilder
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (!zoErr && zoRows && zoRows.length > 0) {
+      zoData = zoRows[0];
     }
   } catch (err) {
-    const fallbackZones = getFallbackData();
-    for (const z of fallbackZones) {
-      const o = z.orders?.find(item => item.order_id === foundOrder.id);
-      if (o) {
-        zoneInfo = {
-          zone_id: z.id,
-          zone_name: z.name,
-          zone_order_id: o.id,
-          delivery_status: o.delivery_status || 'pending',
-          delivered_items: o.delivered_items,
-          delivered_at: o.delivered_at,
-          delivered_by: o.delivered_by,
-          delivery_time: o.delivery_time
-        };
-        break;
+    console.warn('Error querying delivery_zone_orders in searchOrderForZone:', err);
+  }
+
+  // If found in Supabase
+  if (zoData) {
+    let delivered_items: number[] | undefined = undefined;
+    let recipient_name: string | undefined = undefined;
+    if (zoData.delivered_by) {
+      if (zoData.delivered_by.includes('[ITEMS:')) {
+        const match = zoData.delivered_by.match(/\[ITEMS:([\d,]+)\]/);
+        if (match && match[1]) {
+          delivered_items = match[1].split(',').map(Number);
+        }
       }
+      if (zoData.delivered_by.includes('[RECIPIENT:')) {
+        const rMatch = zoData.delivered_by.match(/\[RECIPIENT:(.*?)\]/);
+        if (rMatch && rMatch[1]) {
+          recipient_name = rMatch[1].trim();
+        }
+      }
+    }
+    const cleanDeliveredBy = zoData.delivered_by
+      ? zoData.delivered_by
+          .replace(/\s*\[ITEMS:[\d,]+\]/, '')
+          .replace(/\s*\[RECIPIENT:.*?\]/, '')
+          .trim()
+      : null;
+
+    let resolvedZoneName = (zoData.delivery_zones as any)?.name;
+    // Fallback: If joined name is missing, query delivery_zones directly by zone_id
+    if (!resolvedZoneName && zoData.zone_id) {
+      try {
+        const { data: directZone } = await client
+          .from('delivery_zones')
+          .select('name')
+          .eq('id', zoData.zone_id)
+          .limit(1)
+          .maybeSingle();
+        if (directZone?.name) resolvedZoneName = directZone.name;
+      } catch (zErr) {}
+    }
+
+    zoneInfo = {
+      zone_id: zoData.zone_id,
+      zone_name: resolvedZoneName || 'كشف تسليم',
+      zone_order_id: zoData.id,
+      delivery_status: (zoData.delivery_status as any) || 'pending',
+      delivered_items,
+      recipient_name,
+      delivered_at: zoData.delivered_at,
+      delivered_by: cleanDeliveredBy,
+      delivery_time: zoData.delivery_time
+    };
+  } else {
+    // Fallback to local file / memory if not found in DB
+    try {
+      const fallbackZones = getFallbackData();
+      for (const z of fallbackZones) {
+        const o = z.orders?.find(item =>
+          item.order_id === foundOrder.id ||
+          item.order_code === foundOrder.order_code ||
+          item.order_code?.replace(/^GRAD-/, '') === foundOrder.order_code?.replace(/^GRAD-/, '')
+        );
+        if (o) {
+          zoneInfo = {
+            zone_id: z.id,
+            zone_name: z.name,
+            zone_order_id: o.id,
+            delivery_status: o.delivery_status || 'pending',
+            delivered_items: o.delivered_items,
+            recipient_name: o.recipient_name,
+            delivered_at: o.delivered_at,
+            delivered_by: o.delivered_by,
+            delivery_time: o.delivery_time
+          };
+          break;
+        }
+      }
+    } catch (fbErr) {
+      console.warn('Error reading fallback zones in searchOrderForZone:', fbErr);
     }
   }
 
@@ -1016,15 +1058,40 @@ export async function updateOrderDeliveryStatus(
   const client = supabaseAdmin || supabase;
   const isAvailable = await checkSupabaseTablesAvailable();
 
+  // Ensure we have a valid UUID for order_id lookup to prevent PostgreSQL 22P02 syntax error
+  let targetOrderId = orderIdOrZoneOrderId;
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderIdOrZoneOrderId);
+  if (!isUuid) {
+    try {
+      const cleanCode = orderIdOrZoneOrderId.trim().replace(/^#/, '');
+      const { data: storeOrder } = await client
+        .from('store_orders')
+        .select('id')
+        .or(`order_code.eq.${cleanCode},order_code.eq.GRAD-${cleanCode}`)
+        .limit(1)
+        .maybeSingle();
+      if (storeOrder?.id) {
+        targetOrderId = storeOrder.id;
+      }
+    } catch (codeErr) {
+      console.warn('Error resolving order code to UUID:', codeErr);
+    }
+  }
+
   if (isAvailable) {
     try {
+      const isTargetUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetOrderId);
+      const isRealZoneUuid = zoneId && zoneId !== 'general' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(zoneId);
+
       // Find the row by order_id or row id
-      const { data: rows, error: findErr } = await client
-        .from('delivery_zone_orders')
-        .select('id')
-        .eq('zone_id', zoneId)
-        .or(`id.eq.${orderIdOrZoneOrderId},order_id.eq.${orderIdOrZoneOrderId}`)
-        .limit(1);
+      let findQuery = client.from('delivery_zone_orders').select('id, zone_id');
+      if (isRealZoneUuid) {
+        findQuery = findQuery.eq('zone_id', zoneId);
+      }
+      if (isTargetUuid) {
+        findQuery = findQuery.or(`id.eq.${targetOrderId},order_id.eq.${targetOrderId}`);
+      }
+      const { data: rows, error: findErr } = await findQuery.limit(1);
 
       if (!findErr && rows && rows.length > 0) {
         const rowId = rows[0].id;
@@ -1039,6 +1106,7 @@ export async function updateOrderDeliveryStatus(
           .eq('id', rowId);
 
         if (!updateErr) {
+          invalidateDeliveryCaches();
           return {
             success: true,
             delivered_at,
@@ -1048,34 +1116,36 @@ export async function updateOrderDeliveryStatus(
           };
         }
       } else {
-        // Fallback: Check if the order exists in ANY other zone by order_id
-        const { data: anyRows } = await client
-          .from('delivery_zone_orders')
-          .select('id, zone_id')
-          .or(`id.eq.${orderIdOrZoneOrderId},order_id.eq.${orderIdOrZoneOrderId}`)
-          .limit(1);
-
-        if (anyRows && anyRows.length > 0) {
-          const rowId = anyRows[0].id;
-          const { error: anyUpdateErr } = await client
+        // Fallback: Check if the order exists in ANY other zone by targetOrderId
+        if (isTargetUuid) {
+          const { data: anyRows } = await client
             .from('delivery_zone_orders')
-            .update({
-              delivery_status: status,
-              delivered_at,
-              delivered_by,
-              updated_at: now
-            })
-            .eq('id', rowId);
+            .select('id, zone_id')
+            .or(`id.eq.${targetOrderId},order_id.eq.${targetOrderId}`)
+            .limit(1);
 
-          if (!anyUpdateErr) {
-            invalidateDeliveryCaches();
-            return {
-              success: true,
-              delivered_at,
-              delivered_by: adminName || 'Admin',
-              delivered_items: deliveredItems,
-              recipient_name: recipientName ? recipientName.trim() : null
-            };
+          if (anyRows && anyRows.length > 0) {
+            const rowId = anyRows[0].id;
+            const { error: anyUpdateErr } = await client
+              .from('delivery_zone_orders')
+              .update({
+                delivery_status: status,
+                delivered_at,
+                delivered_by,
+                updated_at: now
+              })
+              .eq('id', rowId);
+
+            if (!anyUpdateErr) {
+              invalidateDeliveryCaches();
+              return {
+                success: true,
+                delivered_at,
+                delivered_by: adminName || 'Admin',
+                delivered_items: deliveredItems,
+                recipient_name: recipientName ? recipientName.trim() : null
+              };
+            }
           }
         }
       }
