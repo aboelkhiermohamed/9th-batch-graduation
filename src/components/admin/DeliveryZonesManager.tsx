@@ -501,6 +501,11 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   useEffect(() => {
     if (subTab === 'stats') {
       fetchDeliveryStats();
+      const interval = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return;
+        fetchDeliveryStats(true);
+      }, 45000);
+      return () => clearInterval(interval);
     }
   }, [subTab]);
 
@@ -860,14 +865,16 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
   // -------------------------------------------------------------
   // 2. ZONES DELIVERY LOGIC
   // -------------------------------------------------------------
-  const openDeliverySheet = async (zoneId: string) => {
+  const openDeliverySheet = async (zoneId: string, isSilent = false) => {
     try {
-      setIsLoadingOpenedZone(true);
+      if (!isSilent) {
+        setIsLoadingOpenedZone(true);
+        setDeliveryCodeSearch('');
+        setDeliverySearchFeedback(null);
+        setHighlightedOrderId(null);
+        setDeliveryFilter('all');
+      }
       setOpenedZoneId(zoneId);
-      setDeliveryCodeSearch('');
-      setDeliverySearchFeedback(null);
-      setHighlightedOrderId(null);
-      setDeliveryFilter('all');
 
       const res = await fetch(`/api/admin/zones/${zoneId}`, { cache: 'no-store' });
       const data = await res.json();
@@ -878,12 +885,32 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
 
       setOpenedZone(data.zone);
     } catch (err: any) {
-      console.error('Error opening sheet:', err);
-      showToast(err.message || 'تعذر فتح كشف التسليم', 'error');
+      if (!isSilent) {
+        console.error('Error opening sheet:', err);
+        showToast(err.message || 'تعذر فتح كشف التسليم', 'error');
+      }
     } finally {
-      setIsLoadingOpenedZone(false);
+      if (!isSilent) setIsLoadingOpenedZone(false);
     }
   };
+
+  // Auto-sync opened zone sheet quietly in the background every 30s (when active) and on window focus
+  useEffect(() => {
+    if (!openedZoneId || subTab !== 'delivery') return;
+
+    const syncQuietly = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      openDeliverySheet(openedZoneId, true);
+    };
+
+    const interval = setInterval(syncQuietly, 30000);
+    window.addEventListener('focus', syncQuietly);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', syncQuietly);
+    };
+  }, [openedZoneId, subTab]);
 
   const handleDeliverySearchByCode = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
