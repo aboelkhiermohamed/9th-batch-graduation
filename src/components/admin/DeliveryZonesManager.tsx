@@ -1245,7 +1245,8 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
             delivery_status: 'delivered',
             delivered_items: parsedItems.map((_, i) => i),
             delivered_at: now,
-            delivered_by: adminName
+            delivered_by: adminName,
+            recipient_name: order.recipient_name || prev.recipient_name || null
           };
         });
       }
@@ -2479,6 +2480,14 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
                           <span className="px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5" />
                             <span>قيد التسليم</span>
+                          </span>
+                        )}
+
+                        {/* Recipient Badge if Proxy (prominently at header, matching zone view) */}
+                        {globalSearchResult.recipient_name && (
+                          <span className="px-2.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-200 border border-purple-500/40 text-xs font-bold flex items-center gap-1.5 shadow-sm animate-in fade-in">
+                            <span>🤝</span>
+                            <span>المستلم: <strong className="text-white underline decoration-purple-400">{globalSearchResult.recipient_name}</strong></span>
                           </span>
                         )}
                       </div>

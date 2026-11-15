@@ -329,6 +329,7 @@ export interface SearchedZoneOrderResult {
   zone_order_id?: string | null;
   delivery_status: 'pending' | 'delivered' | 'partial';
   delivered_items?: number[];
+  recipient_name?: string | null;
   delivered_at?: string | null;
   delivered_by?: string | null;
   delivery_time?: string | null;
@@ -520,6 +521,7 @@ export async function searchOrderForZone(query: string): Promise<SearchedZoneOrd
     zone_order_id: zoneInfo.zone_order_id,
     delivery_status: zoneInfo.delivery_status,
     delivered_items: zoneInfo.delivered_items,
+    recipient_name: zoneInfo.recipient_name,
     delivered_at: zoneInfo.delivered_at,
     delivered_by: zoneInfo.delivered_by,
     delivery_time: zoneInfo.delivery_time
