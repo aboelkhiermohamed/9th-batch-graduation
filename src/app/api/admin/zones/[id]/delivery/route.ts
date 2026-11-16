@@ -41,6 +41,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       delivered_by: result.delivered_by,
       delivered_items: result.delivered_items,
       recipient_name: result.recipient_name,
+      zone_id: result.zone_id,
+      zone_name: result.zone_name,
       message: status === 'delivered' 
         ? 'تم تأكيد تسليم جميع قطع الطلب بنجاح' 
         : status === 'partial'

@@ -1180,6 +1180,18 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
         throw new Error(data.error || 'فشل حفظ حالة تسليم القطع');
       }
 
+      if (data.zone_id && data.zone_name) {
+        setGlobalSearchResult((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            zone_id: data.zone_id,
+            zone_name: data.zone_name
+          };
+        });
+        fetchZonesList(true);
+      }
+
       if (newStatus === 'delivered') {
         showToast(`تم تأكيد تسليم كامل قطع الطلب: ${order.customer_name} (#${order.order_code}) ✅`, 'success');
       } else if (newStatus === 'partial') {
@@ -1272,6 +1284,18 @@ export default function DeliveryZonesManager({ currentAdmin }: DeliveryZonesMana
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'فشل تحديث حالة التسليم');
+      }
+
+      if (data.zone_id && data.zone_name) {
+        setGlobalSearchResult((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            zone_id: data.zone_id,
+            zone_name: data.zone_name
+          };
+        });
+        fetchZonesList(true);
       }
 
       showToast(`تم تأكيد تسليم طلب الطالب: ${order.customer_name} (#${order.order_code}) ✅`, 'success');

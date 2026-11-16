@@ -1040,7 +1040,15 @@ export async function updateOrderDeliveryStatus(
   adminName: string,
   deliveredItems?: number[],
   recipientName?: string | null
-): Promise<{ success: boolean; delivered_at?: string | null; delivered_by?: string | null; delivered_items?: number[]; recipient_name?: string | null }> {
+): Promise<{
+  success: boolean;
+  delivered_at?: string | null;
+  delivered_by?: string | null;
+  delivered_items?: number[];
+  recipient_name?: string | null;
+  zone_id?: string | null;
+  zone_name?: string | null;
+}> {
   const now = new Date().toISOString();
   const delivered_at = status !== 'pending' ? now : null;
 
@@ -1086,7 +1094,7 @@ export async function updateOrderDeliveryStatus(
       const isRealZoneUuid = zoneId && zoneId !== 'general' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(zoneId);
 
       // Find the row by order_id or row id
-      let findQuery = client.from('delivery_zone_orders').select('id, zone_id');
+      let findQuery = client.from('delivery_zone_orders').select('id, zone_id, delivery_zones(id, name)');
       if (isRealZoneUuid) {
         findQuery = findQuery.eq('zone_id', zoneId);
       }
@@ -1097,6 +1105,9 @@ export async function updateOrderDeliveryStatus(
 
       if (!findErr && rows && rows.length > 0) {
         const rowId = rows[0].id;
+        const matchedZoneId = rows[0].zone_id;
+        const matchedZoneName = (rows[0].delivery_zones as any)?.name || 'كشف تسليم';
+
         const { error: updateErr } = await client
           .from('delivery_zone_orders')
           .update({
@@ -1114,7 +1125,9 @@ export async function updateOrderDeliveryStatus(
             delivered_at,
             delivered_by: adminName || 'Admin',
             delivered_items: deliveredItems,
-            recipient_name: recipientName ? recipientName.trim() : null
+            recipient_name: recipientName ? recipientName.trim() : null,
+            zone_id: matchedZoneId,
+            zone_name: matchedZoneName
           };
         }
       } else {
@@ -1122,12 +1135,15 @@ export async function updateOrderDeliveryStatus(
         if (isTargetUuid) {
           const { data: anyRows } = await client
             .from('delivery_zone_orders')
-            .select('id, zone_id')
+            .select('id, zone_id, delivery_zones(id, name)')
             .or(`id.eq.${targetOrderId},order_id.eq.${targetOrderId}`)
             .limit(1);
 
           if (anyRows && anyRows.length > 0) {
             const rowId = anyRows[0].id;
+            const matchedZoneId = anyRows[0].zone_id;
+            const matchedZoneName = (anyRows[0].delivery_zones as any)?.name || 'كشف تسليم';
+
             const { error: anyUpdateErr } = await client
               .from('delivery_zone_orders')
               .update({
@@ -1145,8 +1161,72 @@ export async function updateOrderDeliveryStatus(
                 delivered_at,
                 delivered_by: adminName || 'Admin',
                 delivered_items: deliveredItems,
-                recipient_name: recipientName ? recipientName.trim() : null
+                recipient_name: recipientName ? recipientName.trim() : null,
+                zone_id: matchedZoneId,
+                zone_name: matchedZoneName
               };
+            }
+          } else {
+            // ORDER IS NOT IN ANY ZONE YET (Delivered directly from Global Search!)
+            // Bulletproof: Find or create a default Direct Delivery Zone and insert this order!
+            let targetZoneId = isRealZoneUuid ? zoneId : null;
+            let targetZoneName = 'كشف التسليم المباشر (التسليم الفوري)';
+
+            if (!targetZoneId) {
+              const { data: existingZones } = await client
+                .from('delivery_zones')
+                .select('id, name')
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+              if (existingZones && existingZones.length > 0) {
+                targetZoneId = existingZones[0].id;
+                targetZoneName = existingZones[0].name;
+              } else {
+                const newZoneId = generateUUID();
+                const { error: cErr } = await client
+                  .from('delivery_zones')
+                  .insert({
+                    id: newZoneId,
+                    name: targetZoneName,
+                    created_by: adminName || 'Admin',
+                    created_at: now,
+                    updated_at: now
+                  });
+                if (!cErr) {
+                  targetZoneId = newZoneId;
+                }
+              }
+            }
+
+            if (targetZoneId) {
+              const newZoId = generateUUID();
+              const { error: insertErr } = await client
+                .from('delivery_zone_orders')
+                .insert({
+                  id: newZoId,
+                  zone_id: targetZoneId,
+                  order_id: targetOrderId,
+                  delivery_status: status,
+                  delivered_at,
+                  delivered_by,
+                  sort_order: 1,
+                  created_at: now,
+                  updated_at: now
+                });
+
+              if (!insertErr) {
+                invalidateDeliveryCaches();
+                return {
+                  success: true,
+                  delivered_at,
+                  delivered_by: adminName || 'Admin',
+                  delivered_items: deliveredItems,
+                  recipient_name: recipientName ? recipientName.trim() : null,
+                  zone_id: targetZoneId,
+                  zone_name: targetZoneName
+                };
+              }
             }
           }
         }
@@ -1174,7 +1254,66 @@ export async function updateOrderDeliveryStatus(
     }
   }
 
-  if (!zone || !targetOrder) {
+  // If still not found in any fallback zone, auto-create Direct Delivery Zone in fallback!
+  if (!targetOrder) {
+    let directZone = zones.find(z => z.id === 'direct-delivery-zone') || zones[0];
+    if (!directZone) {
+      directZone = {
+        id: 'direct-delivery-zone',
+        name: 'كشف التسليم المباشر (التسليم الفوري)',
+        created_by: adminName || 'Admin',
+        created_at: now,
+        updated_at: now,
+        total_orders: 0,
+        delivered_orders: 0,
+        pending_orders: 0,
+        orders: []
+      };
+      zones.push(directZone);
+    }
+
+    const newOrder: DeliveryZoneOrder = {
+      id: generateUUID(),
+      zone_id: directZone.id,
+      order_id: targetOrderId,
+      order_code: orderIdOrZoneOrderId,
+      customer_name: 'طالب',
+      customer_phone: '',
+      order_details: 'تسليم مباشر من البحث الشامل',
+      items_summary: 'تسليم مباشر من البحث الشامل',
+      items: [],
+      delivery_time: 'تسليم فوري',
+      delivery_status: status,
+      delivered_at,
+      delivered_by: adminName || 'Admin',
+      delivered_items: deliveredItems,
+      recipient_name: recipientName ? recipientName.trim() : null,
+      sort_order: (directZone.orders?.length || 0) + 1,
+      created_at: now,
+      updated_at: now
+    };
+
+    directZone.orders = directZone.orders || [];
+    directZone.orders.push(newOrder);
+    directZone.total_orders = directZone.orders.length;
+    directZone.delivered_orders = directZone.orders.filter(o => o.delivery_status === 'delivered').length;
+    directZone.pending_orders = directZone.total_orders - directZone.delivered_orders;
+
+    saveFallbackData(zones);
+    invalidateDeliveryCaches();
+
+    return {
+      success: true,
+      delivered_at,
+      delivered_by: adminName || 'Admin',
+      delivered_items: deliveredItems,
+      recipient_name: recipientName ? recipientName.trim() : null,
+      zone_id: directZone.id,
+      zone_name: directZone.name
+    };
+  }
+
+  if (!zone) {
     return { success: false };
   }
 
@@ -1197,7 +1336,9 @@ export async function updateOrderDeliveryStatus(
     delivered_at,
     delivered_by: adminName || 'Admin',
     delivered_items: deliveredItems,
-    recipient_name: recipientName ? recipientName.trim() : null
+    recipient_name: recipientName ? recipientName.trim() : null,
+    zone_id: zone.id,
+    zone_name: zone.name
   };
 }
 
